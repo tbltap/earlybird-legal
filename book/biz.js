@@ -134,7 +134,7 @@ async function viewBizHome() {
   const claims = (await myClaims()).filter((c) => c.status !== "withdrawn");
   const row = (c) => {
     const st = c.status === "pending" && !c.is_new_venue ? "Waiting for your document" : c.status === "rejected" ? "Not approved" : c.listing_status === "approved" ? "Live" : c.listing_status === "submitted" ? "Being checked" : c.listing_status === "sent_back" ? "Needs changes" : "Setting up";
-    const href = c.venue_id && (c.status === "approved" || c.is_new_venue) ? `#/biz/v/${c.venue_id}` : `#/biz/claim/${c.id}`;
+    const href = c.venue_id && (c.status === "approved" || c.is_new_venue) ? `#/biz/v/${c.venue_id}${st === "Live" ? "?tab=bookings" : ""}` : `#/biz/claim/${c.id}`;
     return `<a class="bizrow" href="${href}"><div><b>${esc(c.venue_name || "Your restaurant")}</b><span>${esc(c.venue_address || "")}</span></div><span class="bizpill ${st === "Live" ? "ok" : st === "Not approved" ? "bad" : ""}">${esc(st)}</span></a>`;
   };
   page(`<h1 class="display bizt">Your restaurants</h1>
@@ -388,6 +388,12 @@ function confirmInline(id, text) { const b = document.getElementById(id); if (b.
 
 /* ───────────────────────────── the restaurant's set-up ───────────────────────────── */
 async function viewVenue(venueId, q) {
+  if (q.tab === "bookings") return viewBookingsTab(venueId, q);
+  if (q.tab === "guests") return viewGuestsTab(venueId, q);
+  if (q.tab === "offers") return viewOffersTab(venueId, q);
+  return viewSetup(venueId, q);
+}
+async function viewSetup(venueId, q) {
   setTitle("Set up your listing");
   page(`<p class="loading">Loading your restaurant…</p>`);
   let ls, prof, claims;
@@ -406,6 +412,7 @@ async function viewVenue(venueId, q) {
   const firstOpen = (ls.checklist || []).find((c) => !c.done)?.key;
   page(`${back("#/biz", "Your restaurants")}
     <h1 class="display bizt">${esc(ls.venue_name || prof.name)}</h1><p class="muted">${esc(prof.address || "")}</p>
+    ${live ? tabsHtml(venueId, "setup") : ""}
     ${statusLine}
     <ol class="bizcheck">${(ls.checklist || []).map((c) => `<li class="${c.done ? "ok" : ""}">${c.done ? ic("check") : "<i></i>"}<span>${esc(c.title)}</span></li>`).join("")}</ol>
     ${sec("document", 1, "Show that you run it", verifiedHtml(claim, ls), firstOpen === "verified" || (firstOpen === "document"))}
@@ -716,5 +723,163 @@ function wireSend(venueId, S, ls, after) {
     b.disabled = true; msg.innerHTML = note("Sending…", "info");
     try { await rpc("quick_deal", { p_venue: venueId, p_setup: { ...s, publish: true, pledge: ls.pledge.version } }); toast("Sent to Early Bird."); after(); }
     catch (e) { msg.innerHTML = note(errText(e)); b.disabled = false; }
+  };
+}
+
+
+/* ───────────────────────────── after going live: bookings, check-in, guests, offers ───────────────────────────── */
+const tabsHtml = (vid, on) => `<nav class="biztabs" aria-label="Your restaurant">${[["bookings", "Bookings", "cal"], ["guests", "Guests", "person"], ["offers", "Offers", "tag"], ["setup", "Listing", "store"]]
+  .map(([k, l, i]) => `<a href="#/biz/v/${vid}${k === "setup" ? "" : "?tab=" + k}" class="${k === on ? "on" : ""}" ${k === on ? 'aria-current="page"' : ""}>${ic(i)}<span>${l}</span></a>`).join("")}</nav>`;
+async function venueHead(vid, on) {
+  const prof = await rpc("venue_profile", { p_venue: vid }).catch(() => null);
+  return `${back("#/biz", "Your restaurants")}<h1 class="display bizt">${esc(prof?.name || "Your restaurant")}</h1>${tabsHtml(vid, on)}`;
+}
+const addDays = (iso, n) => { const d = new Date(iso + "T12:00:00Z"); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+const dayName = (iso) => new Date(iso + "T12:00:00Z").toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric", timeZone: "UTC" });
+const reqText = (b) => (b.option === "nodrink" ? "20% off, nothing extra to order" : `${b.discount || 50}% off${(b.requirements || []).length ? " · " + b.requirements.map((r) => `${r.per_person || 1} ${String(r.label || "").toLowerCase()} per diner`).join(", ") : ""}`);
+
+async function viewBookingsTab(vid, q) {
+  setTitle("Bookings");
+  page(`<p class="loading">Loading bookings…</p>`);
+  let r, head;
+  try { [r, head] = await Promise.all([rpc("venue_bookings", { p_venue: vid, p_date: /^\d{4}-\d{2}-\d{2}$/.test(q.date || "") ? q.date : null }), venueHead(vid, "bookings")]); }
+  catch (e) { return page(`${back("#/biz", "Your restaurants")}${note(errText(e))}`); }
+  const d = r.date, list = r.bookings || [];
+  const url = (date) => `#/biz/v/${vid}?tab=bookings&date=${date}`;
+  const st = { confirmed: ["", "Booked"], redeemed: ["ok", "Checked in"], no_show: ["bad", "No-show"] };
+  const diners = list.filter((b) => b.status !== "no_show").reduce((a, b) => a + (b.diners || 0), 0);
+  page(`${head}
+    <div class="bkday"><a class="iconbtn" href="${url(addDays(d, -1))}" aria-label="Day before">${ic("back")}</a><div><b>${esc(dayName(d))}</b><span>${list.length} booking${list.length === 1 ? "" : "s"} · ${diners} diner${diners === 1 ? "" : "s"}</span></div><a class="iconbtn fwd" href="${url(addDays(d, 1))}" aria-label="Next day">${ic("back")}</a></div>
+    <form class="card bkcheck" id="ci" novalidate><div class="title">Check a guest in</div><p class="small muted">Type the 6-letter code the guest shows you.</p>
+      <div class="codef"><input id="ci-code" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="12" placeholder="Booking code" aria-label="Booking code"><button class="btn" type="submit">Check in</button></div><div id="ci-msg"></div></form>
+    ${list.length ? `<div class="bklist">${list.map((b) => `<div class="bkrow" data-id="${esc(b.id)}">
+        <div class="bktime">${esc(time12(b.time))}</div>
+        <div class="bkmain"><b>${esc(b.guest)} · ${b.diners} ${b.diners === 1 ? "diner" : "diners"}</b><span>${esc(reqText(b))}</span>${b.special_request ? `<span class="bkreq">“${esc(b.special_request)}”</span>` : ""}<span class="mono">${esc(b.code)}</span></div>
+        <div class="bkact"><span class="bizpill ${st[b.status]?.[0] || ""}">${esc(st[b.status]?.[1] || b.status)}</span>
+          ${b.status === "confirmed" ? `<button class="btn bk-in" type="button" data-code="${esc(b.code)}">Check in</button><button class="linkbtn bk-ns" type="button" id="ns-${esc(b.id)}" data-id="${esc(b.id)}">No-show</button>` : ""}</div></div>`).join("")}</div>`
+      : `<p class="muted center" style="margin:22px 0">No Early Bird bookings on this day.</p>`}
+    <details class="card bizsec"><summary><span class="bizn">${ic("info")}</span><b>Staff PIN</b></summary><div class="bizbody">
+      <p class="small">Staff can also check a guest in by typing this PIN on the guest's phone. 4 to 8 digits.</p>
+      <div class="codef"><input id="pin" type="password" inputmode="numeric" autocomplete="off" maxlength="8" placeholder="New PIN" aria-label="New staff PIN"><button class="btn" type="button" id="pin-go">Save PIN</button></div><div id="pin-msg"></div></div></details>`);
+  const redeem = async (code, msgEl) => {
+    try {
+      const x = await rpc("redeem_booking", { p_venue: vid, p_code: code });
+      if (!x.ok) { msgEl.innerHTML = note(x.message || "That code didn't work."); return; }
+      toast(x.created ? `${x.booking?.guest || "Guest"} checked in.` : "Already checked in.");
+      viewBookingsTab(vid, { ...q, date: x.booking?.date || d });
+    } catch (e) { msgEl.innerHTML = note(errText(e)); }
+  };
+  document.getElementById("ci").onsubmit = (e) => { e.preventDefault(); const c = document.getElementById("ci-code").value.trim(); if (!c) { document.getElementById("ci-msg").innerHTML = note("Type the guest's booking code."); return; } redeem(c, document.getElementById("ci-msg")); };
+  document.querySelectorAll(".bk-in").forEach((b) => { b.onclick = () => redeem(b.dataset.code, document.getElementById("ci-msg")); });
+  document.querySelectorAll(".bk-ns").forEach((b) => { b.onclick = async () => {
+    if (!confirmInline(b.id, "Tap again: mark no-show")) return;
+    try { await rpc("mark_no_show", { p_venue: vid, p_booking: b.dataset.id }); toast("Marked as a no-show."); viewBookingsTab(vid, q); }
+    catch (e) { toast(/too_early/.test(e.code || "") ? "You can mark a no-show once the booking time has passed." : errText(e)); b.textContent = "No-show"; delete b.dataset.armed; }
+  }; });
+  document.getElementById("pin-go").onclick = async () => {
+    const v = document.getElementById("pin").value.trim(), m = document.getElementById("pin-msg");
+    if (!/^\d{4,8}$/.test(v)) { m.innerHTML = note("Use 4 to 8 digits."); return; }
+    try { await rpc("set_staff_pin", { p_venue: vid, p_pin: v }); document.getElementById("pin").value = ""; m.innerHTML = note("PIN saved.", "ok"); }
+    catch (e) { m.innerHTML = note(/invalid_pin/.test(e.code || "") ? "Use 4 to 8 digits." : errText(e)); }
+  };
+}
+
+async function viewGuestsTab(vid, q) {
+  setTitle("Guests");
+  page(`<p class="loading">Loading your guests…</p>`);
+  let r, head, sub;
+  try { [r, head, sub] = await Promise.all([rpc("customers", { p_venue: vid, p_query: q.q || null, p_limit: 200 }), venueHead(vid, "guests"), rpc("venue_subscription", { p_venue: vid }).catch(() => null)]); }
+  catch (e) { return page(`${back("#/biz", "Your restaurants")}${note(errText(e))}`); }
+  const sm = r.summary || {}, list = r.customers || [];
+  const tile = (n, l) => `<div class="gtile"><b>${Number(n || 0).toLocaleString("en-US")}</b><span>${l}</span></div>`;
+  const when = (iso) => (iso ? new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "");
+  page(`${head}
+    <div class="gtiles">${tile(sm.diners, "Early Bird diners")}${tile(sm.listed, "On your guest list")}${tile(sm.share_contact, "Shared their contact")}${tile(sm.repeat_diners, "Came back")}</div>
+    <p class="small muted">Your guest list shows diners who agreed to share their details with you, or to hear your offers. Phone and email appear only for guests who shared them.</p>
+    <form class="textsearch" id="gq" role="search">${ic("search")}<input id="gq-in" type="search" placeholder="Search by name or phone" aria-label="Search guests" value="${esc(q.q || "")}"></form>
+    ${list.length ? `<div class="glist">${list.map((c) => `<div class="grow">
+        <span class="ava">${esc((c.first_name || "?").charAt(0))}</span>
+        <div class="gmain"><b>${esc([c.first_name, c.last_name].filter(Boolean).join(" "))}</b>
+          <span>${c.visits ? `${c.visits} visit${c.visits === 1 ? "" : "s"}` : `${c.bookings} booking${c.bookings === 1 ? "" : "s"}`} · ${c.covers} diner${c.covers === 1 ? "" : "s"} brought${c.last_visit || c.last_booking ? ` · last ${esc(when(c.last_visit || c.last_booking))}` : ""}${c.birthday_month ? ` · birthday in ${new Date(2026, c.birthday_month - 1, 1).toLocaleString("en-US", { month: "long" })}` : ""}</span>
+          ${c.share_contact ? `<span class="gcontact">${c.phone ? `<a href="tel:${esc(c.phone)}">${esc(c.phone)}</a>` : ""}${c.email ? `<a href="mailto:${esc(c.email)}">${esc(c.email)}</a>` : ""}</span>` : ""}</div>
+        <div class="gbadges">${c.share_contact ? '<span class="bizpill ok">Shared contact</span>' : ""}${c.marketing ? '<span class="bizpill">Hears your offers</span>' : ""}${c.favourite ? '<span class="bizpill">♥ Favourite</span>' : ""}</div></div>`).join("")}</div>`
+      : `<p class="muted center" style="margin:22px 0">${q.q ? `No guest matches “${esc(q.q)}”.` : "No guests on your list yet. They appear after their first Early Bird booking, when they agree to share their details."}</p>`}
+    ${sub?.features?.export ? `<p><button class="btn pale" type="button" id="gx">Download guests who shared their contact (CSV)</button></p>` : ""}`);
+  document.getElementById("gq").onsubmit = (e) => { e.preventDefault(); go(`/biz/v/${vid}`, { tab: "guests", ...(document.getElementById("gq-in").value.trim() ? { q: document.getElementById("gq-in").value.trim() } : {}) }); };
+  const gx = document.getElementById("gx");
+  if (gx) gx.onclick = async () => {
+    try {
+      const x = await rpc("customers_export", { p_venue: vid });
+      const cell = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+      const csv = ["first_name,last_name,phone,email,visits,bookings,last_visit"].concat((x.rows || []).map((c) => [c.first_name, c.last_name, c.phone, c.email, c.visits, c.bookings, c.last_visit].map(cell).join(","))).join("\n");
+      const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" })); a.download = "early-bird-guests.csv"; a.click();
+    } catch (e) { toast(errText(e)); }
+  };
+}
+
+const KINDS = { come_try: ["New diners", "Come and try us", "Diners who haven't been yet."], comeback: ["Come back", "Come back soon", "Diners who've visited before."],
+  birthday: ["Birthday", "Happy birthday from us", "Diners in their birthday month."], winback: ["We miss you", "We miss you", "Diners who haven't been for a while."] };
+async function viewOffersTab(vid, q) {
+  setTitle("Offers");
+  page(`<p class="loading">Loading your offers…</p>`);
+  let offers, head, sub, segs;
+  try { [offers, head, sub] = await Promise.all([rpc("venue_offers", { p_venue: vid }), venueHead(vid, "offers"), rpc("venue_subscription", { p_venue: vid }).catch(() => null)]); }
+  catch (e) { return page(`${back("#/biz", "Your restaurants")}${note(errText(e))}`); }
+  const canSend = !!sub?.features?.messages;
+  if (canSend) segs = (await rpc("segments", { p_venue: vid }).catch(() => ({}))).segments || [];
+  const stl = { active: ["ok", "Running"], draft: ["", "Draft"], paused: ["", "Paused"], ended: ["bad", "Ended"] };
+  const m2 = (c) => "$" + (c / 100).toFixed(c % 100 ? 2 : 0);
+  page(`${head}
+    <p class="small">Give diners a reason to book: a reward in Early Bird credit, paid after they visit and you check them in. You set a budget, and rewards paid come on your monthly Early Bird statement, never more than the budget.</p>
+    ${(offers || []).length ? `<div class="olist">${offers.map((o) => `<div class="card orow" data-id="${esc(o.id)}">
+        <div class="otop"><div><b>${esc(o.title)}</b><span>${esc(KINDS[o.kind]?.[0] || o.kind)} · ${m2(o.reward_cents)} credit per diner after their visit</span></div><span class="bizpill ${stl[o.status]?.[0] || ""}">${esc(stl[o.status]?.[1] || o.status)}</span></div>
+        <div class="ostats"><span><b>${o.claims || 0}</b> claimed</span><span><b>${o.redeemed || 0}</b> visited</span><span><b>${m2(o.funded_cents || 0)}</b> paid</span><span><b>${m2(o.budget_left_cents ?? o.budget_cents)}</b> of ${m2(o.budget_cents)} left</span></div>
+        <div class="oact">${o.status === "active" ? `<button class="btn grey o-st" data-s="paused" type="button">Pause</button>` : o.status !== "ended" ? `<button class="btn o-st" data-s="active" type="button">${o.status === "draft" ? "Start" : "Resume"}</button>` : ""}
+          ${o.status !== "ended" ? `<button class="linkbtn o-st" data-s="ended" type="button" id="end-${esc(o.id)}">End offer</button>` : ""}</div></div>`).join("")}</div>`
+      : `<p class="muted">No offers yet.</p>`}
+    <form class="card bizform" id="of" novalidate><div class="title">New offer</div>
+      <label class="field">Who it's for<select id="of-kind">${Object.entries(KINDS).map(([k, v]) => `<option value="${k}">${v[0]}: ${v[2]}</option>`).join("")}</select></label>
+      <label class="field" id="of-lap-w" hidden>No visit for (days)<input id="of-lap" type="number" min="7" max="730" value="60" inputmode="numeric"></label>
+      <label class="field">Title diners see<input id="of-title" maxlength="80" value="${esc(KINDS.come_try[1])}"></label>
+      <label class="field">More detail (optional)<textarea id="of-desc" rows="2" maxlength="400" placeholder="For example: valid for early dinner, Monday to Thursday"></textarea></label>
+      <div class="dealgrid"><label class="field">Reward per diner ($ credit)<input id="of-rew" type="number" min="1" max="200" step="1" value="5" inputmode="decimal"></label>
+        <label class="field">Total budget ($)<input id="of-bud" type="number" min="0" step="10" value="100" inputmode="decimal"></label></div>
+      <p class="small muted" id="of-sum"></p>
+      <div id="of-msg"></div><div class="actions"><button class="btn" type="submit" data-s="active">Start the offer</button><button class="btn grey" type="submit" data-s="draft">Save as draft</button></div></form>
+    ${canSend ? `<form class="card bizform" id="os" novalidate><div class="title">Tell your guests</div><p class="small muted">Sent through Early Bird to guests on a list who agreed to hear your offers. Up to 4 a week.</p>
+        <label class="field">Offer<select id="os-o">${(offers || []).filter((o) => o.status === "active").map((o) => `<option value="${esc(o.id)}">${esc(o.title)}</option>`).join("")}</select></label>
+        <label class="field">To<select id="os-s">${(segs || []).map((sg) => `<option value="${esc(sg.id)}">${esc(sg.name)} (${sg.reachable} can hear)</option>`).join("")}</select></label>
+        <div id="os-msg"></div><button class="btn" type="submit">Send</button></form>`
+      : `<div class="card"><div class="title">Tell your guests directly</div><p class="small muted">Diners already see your running offers in the Early Bird app. Messaging your guest list directly is part of the Growth plan. <a href="../support.html">Ask us about it</a>.</p></div>`}`);
+  const kind = document.getElementById("of-kind"), title = document.getElementById("of-title"), lapW = document.getElementById("of-lap-w");
+  const sum = () => { const rw = +document.getElementById("of-rew").value || 0, bd = +document.getElementById("of-bud").value || 0; document.getElementById("of-sum").textContent = rw > 0 ? `Up to ${Math.floor(bd / rw)} diners can get ${m2(Math.round(rw * 100))} each. You only pay for rewards after a visit.` : ""; };
+  kind.onchange = () => { if (Object.values(KINDS).some((v) => v[1] === title.value) || !title.value) title.value = KINDS[kind.value][1]; lapW.hidden = kind.value !== "winback"; };
+  document.getElementById("of-rew").oninput = sum; document.getElementById("of-bud").oninput = sum; sum();
+  document.getElementById("of").onsubmit = async (e) => {
+    e.preventDefault();
+    const status = e.submitter?.dataset.s || "active", msg = document.getElementById("of-msg");
+    const rw = Math.round((+document.getElementById("of-rew").value || 0) * 100), bd = Math.round((+document.getElementById("of-bud").value || 0) * 100);
+    if (!title.value.trim()) { msg.innerHTML = note("Give the offer a title."); return; }
+    if (rw < 100) { msg.innerHTML = note("Set a reward of at least $1."); return; }
+    if (bd < rw) { msg.innerHTML = note("Set a budget of at least one reward."); return; }
+    const o = { kind: kind.value, title: title.value.trim(), description: document.getElementById("of-desc").value.trim() || null, reward_kind: "credit", reward_cents: rw, budget_cents: bd, per_user_limit: 1, status,
+      ...(kind.value === "winback" ? { lapsed_days: Math.min(Math.max(+document.getElementById("of-lap").value || 60, 7), 730) } : {}) };
+    try { await rpc("save_offer", { p_venue: vid, p_offer: o }); toast(status === "active" ? "Offer started." : "Offer saved."); viewOffersTab(vid, q); }
+    catch (err) { msg.innerHTML = note(/deal_not_live/.test(err.code || "") ? "Your listing needs to be live before an offer can run. Save it as a draft for now." : /invalid_budget/.test(err.code || "") ? "That budget is above the most allowed. Try a smaller one." : errText(err)); }
+  };
+  document.querySelectorAll(".o-st").forEach((b) => { b.onclick = async () => {
+    if (b.dataset.s === "ended" && !confirmInline(b.id, "Tap again to end it")) return;
+    const o = offers.find((x) => x.id === b.closest(".orow").dataset.id);
+    const keep = ["id", "kind", "title", "description", "reward_kind", "reward_cents", "reward_percent", "budget_cents", "per_user_limit", "audience_segment_id", "lapsed_days", "starts_at", "ends_at"];
+    try { await rpc("save_offer", { p_venue: vid, p_offer: { ...Object.fromEntries(keep.map((k) => [k, o[k]])), status: b.dataset.s } }); viewOffersTab(vid, q); }
+    catch (err) { toast(/deal_not_live/.test(err.code || "") ? "Your listing needs to be live for an offer to run." : errText(err)); }
+  }; });
+  const os = document.getElementById("os");
+  if (os) os.onsubmit = async (e) => {
+    e.preventDefault(); const msg = document.getElementById("os-msg");
+    const o = document.getElementById("os-o").value, sg = document.getElementById("os-s").value;
+    if (!o || !sg) { msg.innerHTML = note(!o ? "Start an offer first." : "Make a guest list (segment) in the Early Bird app first."); return; }
+    try { const x = await rpc("send_offer", { p_venue: vid, p_offer: o, p_segment: sg }); msg.innerHTML = note(`Sent to ${x.sent} guest${x.sent === 1 ? "" : "s"}.`, "ok"); }
+    catch (err) { msg.innerHTML = note(/too_many_messages/.test(err.code || err.message || "") ? "You can send up to 4 messages a week." : errText(err)); }
   };
 }

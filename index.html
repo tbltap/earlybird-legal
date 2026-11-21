@@ -3,49 +3,164 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Early Bird: 50% off your food bill</title>
+<meta name="description" content="Book an early table at a restaurant and get 50% off your food bill. Early Bird for iPhone.">
+<meta name="theme-color" content="#0b2a3f">
+<link rel="icon" type="image/png" href="img/favicon.png">
+<link rel="apple-touch-icon" href="img/apple-touch-icon.png">
+<meta property="og:title" content="Early Bird: 50% off your food bill">
+<meta property="og:description" content="Book an early table at a restaurant and get 50% off your food bill.">
+<meta property="og:image" content="https://eatearlybird.com/img/shot-home.jpg">
+<style>
+:root{
+  --cyan:#00ccff; --navy:#0b2a3f; --gold:#e0b55a; --ink:#14171f; --muted:#566074;
+  --bg:#ffffff; --card:#f3f6fa; --line:#e1e6ee;
+  color-scheme: light dark;
+}
+@media (prefers-color-scheme: dark){
+  :root{ --ink:#eaf0f7; --muted:#9fb0c4; --bg:#0d141d; --card:#141d29; --line:#243246; }
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font:17px/1.55 -apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+a{color:inherit}
+.wrap{max-width:1040px;margin:0 auto;padding:0 20px}
 
-<title>Early Bird</title>
-<link rel="stylesheet" href="style.css">
+/* hero */
+.hero{background:radial-gradient(1200px 600px at 80% -10%,#0f4a68 0%,var(--navy) 55%,#071b29 100%);color:#fff}
+.top{display:flex;align-items:center;justify-content:space-between;padding:20px 0}
+.brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:19px;text-decoration:none}
+.brand img{width:36px;height:36px;border-radius:9px}
+.top nav a{color:#cfe3f1;text-decoration:none;font-size:15px;margin-left:18px}
+.hero-grid{display:grid;grid-template-columns:1.1fr .9fr;gap:24px;align-items:end;padding:28px 0 0}
+.hero-copy{padding-bottom:56px}
+h1{font-family:Georgia,"Times New Roman",serif;font-size:clamp(40px,7vw,68px);line-height:1.05;margin:0 0 16px;letter-spacing:-.01em}
+h1 .gold{color:var(--gold)}
+.lede{font-size:clamp(18px,2.4vw,21px);color:#cfe3f1;max-width:30em;margin:0 0 26px}
+.cta{display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+.btn{display:inline-flex;align-items:center;gap:10px;background:#000;color:#fff;border:1px solid #4a5a6a;
+  border-radius:12px;padding:10px 20px;text-decoration:none;font-weight:600;line-height:1.15}
+.btn small{display:block;font-weight:500;font-size:11px;opacity:.85;letter-spacing:.02em}
+.btn[aria-disabled="true"]{cursor:default}
+.note{font-size:14px;color:#a9c4d6;margin-top:12px}
+.hero-shot{display:flex;justify-content:center}
+.phone{width:min(300px,78vw);border-radius:38px 38px 0 0;border:8px solid #05121b;border-bottom:0;overflow:hidden;
+  box-shadow:0 30px 80px rgba(0,0,0,.45);background:#05121b}
+.phone img{display:block;width:100%;height:auto}
+
+/* sections */
+section{padding:64px 0}
+h2{font-size:clamp(26px,4vw,34px);line-height:1.15;margin:0 0 10px;letter-spacing:-.01em}
+.sub{color:var(--muted);margin:0 0 30px;max-width:36em}
+.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;list-style:none;padding:0;margin:0;counter-reset:s}
+.steps li{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:22px;counter-increment:s}
+.steps li::before{content:counter(s);display:grid;place-items:center;width:34px;height:34px;border-radius:50%;
+  background:var(--cyan);color:#14171f;font-weight:800;margin-bottom:12px}
+.steps h3{margin:0 0 6px;font-size:19px}
+.steps p{margin:0;color:var(--muted);font-size:16px}
+.fine{color:var(--muted);font-size:15px;margin-top:18px}
+
+.shots{display:flex;gap:16px;overflow-x:auto;padding:4px 20px 20px;margin:0 -20px;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch}
+.shots figure{margin:0;flex:0 0 min(240px,62vw);scroll-snap-align:center}
+.shots img{width:100%;height:auto;border-radius:24px;border:1px solid var(--line);display:block}
+.shots figcaption{font-size:14px;color:var(--muted);text-align:center;margin-top:8px}
+
+.rest{background:var(--card);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.rest .box{display:flex;flex-wrap:wrap;gap:16px 40px;align-items:center;justify-content:space-between}
+.rest p{margin:0;color:var(--muted);max-width:34em}
+.link{display:inline-block;border:2px solid var(--ink);border-radius:12px;padding:10px 18px;text-decoration:none;font-weight:700}
+
+footer{padding:36px 0 48px;color:var(--muted);font-size:15px}
+footer .row{display:flex;flex-wrap:wrap;gap:10px 22px;justify-content:space-between}
+footer a{text-decoration:none}
+footer a:hover{text-decoration:underline}
+footer nav{display:flex;flex-wrap:wrap;gap:8px 18px}
+
+@media (max-width:760px){
+  .hero-grid{grid-template-columns:1fr}
+  .hero-copy{padding-bottom:12px}
+  .steps{grid-template-columns:1fr}
+  section{padding:48px 0}
+  .top nav a:not(:last-child){display:none}
+}
+</style>
 </head>
 <body>
-<header>
-  <a class="brand" href="index.html"><span class="sun" aria-hidden="true"></span>Early Bird</a>
-  <nav><a href="terms.html">Terms</a> <a href="privacy.html">Privacy</a> <a href="credit-terms.html">Credit</a> <a href="restaurant-terms.html">Restaurants</a> <a href="support.html">Support</a></nav>
+
+<header class="hero">
+  <div class="wrap">
+    <div class="top">
+      <a class="brand" href="./"><img src="img/icon.png" alt="" width="36" height="36">Early Bird</a>
+      <nav aria-label="Main"><a href="#how">How it works</a><a href="#restaurants">Restaurants</a><a href="support.html">Support</a></nav>
+    </div>
+    <div class="hero-grid">
+      <div class="hero-copy">
+        <h1><span class="gold">50% off</span><br>your food bill</h1>
+        <p class="lede">Book an early table at restaurants in New York and Los Angeles. Show your code when you order and the food is half price.</p>
+        <div class="cta">
+          <!-- When the app is live, replace this <span> with:
+               <a class="btn" href="APP_STORE_URL">…same inner content…</a> and drop aria-disabled. -->
+          <span class="btn" aria-disabled="true" role="img" aria-label="Coming soon to the App Store">
+            <span><small>Coming soon to the</small>App Store</span>
+          </span>
+        </div>
+        <p class="note">For iPhone. Free to download.</p>
+      </div>
+      <div class="hero-shot">
+        <div class="phone"><img src="img/shot-home.jpg" alt="Early Bird home screen showing early dinner dates and popular restaurants" width="620" height="1347"></div>
+      </div>
+    </div>
+  </div>
 </header>
+
 <main>
+  <section id="how">
+    <div class="wrap">
+      <h2>How it works</h2>
+      <p class="sub">Restaurants have quiet tables early in the evening. You take them, and the restaurant takes half off the food.</p>
+      <ol class="steps">
+        <li><h3>Find an early table</h3><p>Browse restaurants near you and pick a day, a time and how many of you are coming.</p></li>
+        <li><h3>Book in the app</h3><p>Pay a small booking fee per diner to hold the table. You get a booking code.</p></li>
+        <li><h3>Show your code</h3><p>Order as normal, show your code, and your food bill is 50% off. Drinks are full price.</p></li>
+      </ol>
+      <p class="fine">Plans change? Cancel in the app and get credit back under our cancellation policy.</p>
+    </div>
+  </section>
 
-<h1 id="early-bird">Early Bird</h1>
-<p><strong>50% off the food when you book a restaurant's early
-tables</strong>, in New York and Los Angeles.</p>
-<p>Find a restaurant, book your table for a small booking fee per diner,
-and show your code when you order. Drinks are full price. Plans change?
-Cancel in the app and get credit back under our cancellation policy.</p>
-<p>Coming soon to the App Store.</p>
-<h2 id="help">Help</h2>
-<ul>
-<li><a href="support.html">Support and common questions</a></li>
-<li><a href="account-deletion.html">Delete your account</a></li>
-</ul>
-<h2 id="legal">Legal</h2>
-<ul>
-<li><a href="terms.html">Terms of Service</a></li>
-<li><a href="privacy.html">Privacy Policy</a></li>
-<li><a href="credit-terms.html">Credit Terms</a></li>
-<li><a href="restaurant-terms.html">Restaurant Terms</a>, for
-restaurants that list on Early Bird</li>
-</ul>
-<h2 id="for-restaurants">For restaurants</h2>
-<p>Listing your deal on Early Bird is free. Restaurants that offer at
-least one table every night can run featured placements and use Early
-Bird's tools to bring diners back. Contact support@venuu.menu.</p>
+  <section style="padding-top:0">
+    <div class="wrap">
+      <div class="shots" aria-label="App screenshots">
+        <figure><img src="img/shot-results.jpg" alt="Search results for early tables" loading="lazy" width="620" height="1347"><figcaption>Find a table</figcaption></figure>
+        <figure><img src="img/shot-restaurant.jpg" alt="A restaurant page with early table times" loading="lazy" width="620" height="1347"><figcaption>Pick your time</figcaption></figure>
+        <figure><img src="img/shot-earn.jpg" alt="The Earn tab for credit" loading="lazy" width="620" height="1347"><figcaption>Earn credit</figcaption></figure>
+      </div>
+    </div>
+  </section>
 
-<p class="version"></p>
+  <section id="restaurants" class="rest">
+    <div class="wrap box">
+      <div>
+        <h2>Own a restaurant?</h2>
+        <p>Listing your early tables on Early Bird is free. Fill quiet hours with new guests who come to eat.</p>
+      </div>
+      <a class="link" href="restaurant-terms.html">Restaurant terms</a>
+    </div>
+  </section>
 </main>
+
 <footer>
-  <p><a href="terms.html">Terms</a> · <a href="privacy.html">Privacy</a> · <a href="credit-terms.html">Credit Terms</a> ·
-  <a href="restaurant-terms.html">Restaurant Terms</a> · <a href="support.html">Support</a> ·
-  <a href="account-deletion.html">Delete your account</a></p>
-  <p>© Ngassa Holdings LLC, a Delaware limited liability company</p>
+  <div class="wrap row">
+    <span>&copy; 2026 Early Bird</span>
+    <nav aria-label="Footer">
+      <a href="support.html">Support</a>
+      <a href="terms.html">Terms</a>
+      <a href="privacy.html">Privacy</a>
+      <a href="credit-terms.html">Credit terms</a>
+      <a href="account-deletion.html">Delete account</a>
+    </nav>
+  </div>
 </footer>
+
 </body>
 </html>

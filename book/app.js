@@ -244,7 +244,7 @@ const photoCredit = (c) => { const p = areaPhoto(c); return p ? `<a class="photo
 // The offer, for both audiences, in a few words (no fee basis: the diner sees the actual fee when booking).
 const offerHtml = () => `<ul class="offer">
   <li>${ic("fork")}<span><b>Diners</b> get 50% off the food bill and pay a small booking fee per diner.</span></li>
-  <li>${ic("store")}<span><b>Restaurants</b> list for free. <a href="../#restaurants">How it works</a></span></li></ul>`;
+  <li>${ic("store")}<span><b>Restaurants</b> list for free. <a href="#/biz">List your restaurant</a></span></li></ul>`;
 async function refreshTestBar() {
   const bar = document.getElementById("testbar");
   try {
@@ -295,7 +295,7 @@ async function drawChrome(path) {
       <a class="hpill ghost" href="../#how">${ic("help")}<span>How it works</span></a></nav></div>`;
   foot.innerHTML = `<div class="df-in"><div class="df-cols">
       <div><h3>Diners</h3><p>Book an early table and get 50% off the food bill. A small booking fee holds it.</p><a class="dbtn" href="#/">Find a table</a></div>
-      <div><h3>Restaurants</h3><p>List your early tables on Early Bird for free and fill your quiet hours.</p><a class="dbtn ghost" href="../restaurant-terms.html">Restaurant terms</a></div>
+      <div><h3>Restaurants</h3><p>List your early tables on Early Bird for free and fill your quiet hours.</p><a class="dbtn ghost" href="#/biz">List your restaurant</a></div>
       <div><h3>Get the app</h3><p>Early Bird for iPhone: your bookings, codes and ${esc(CREDIT)} in your pocket.</p><a class="dbtn ghost" href="../?about#get">Learn more</a></div>
     </div>${legal}</div>`;
   // city picker
@@ -400,6 +400,8 @@ async function route() {
     // Visitors can browse and open restaurant pages without an account. Booking, "My bookings" and Profile need one:
     // those addresses show the sign-in screen and open again after sign-in.
     if (path.startsWith("/invite/")) return await viewInvite(decodeURIComponent(path.slice(8)));
+    // Restaurants listing themselves (eatearlybird.com/restaurants): its own module, loaded only when opened.
+    if (path === "/biz" || path.startsWith("/biz/")) return await (await import("./biz.js" + new URL(import.meta.url).search)).default(path, q);
     if (Auth.session() && store.get(IKEY)) claimInvite();
     const needsAccount = path === "/book" || path === "/bookings" || path.startsWith("/booking/") || path === "/account" || new URLSearchParams(location.search).get("pay");
     if (!Auth.session() && (needsAccount || path === "/signin")) {
@@ -977,7 +979,7 @@ async function viewSignIn(q) {
   const st = { method: q.mode === "up" ? "email" : "phone", mode: q.mode === "up" ? "up" : "in", step: 0, dial: "+1", phone: "", e164: "", email: "", first: "", last: "", resendAt: 0, busy: false };
   let tick = null;
   view.cleanup = () => clearInterval(tick);
-  const head = () => `<div class="gate"><h1 class="display">${toLinked ? "Sign in to book your table" : "Sign in to book"}</h1>
+  const head = () => `<div class="gate"><h1 class="display">${next.startsWith("#/biz") ? "Sign in to list your restaurant" : toLinked ? "Sign in to book your table" : "Sign in to book"}</h1>
     <p class="muted" style="font-size:18px">${st.method === "phone" ? "We'll text you a code. New here? An account is made for you." : st.mode === "in" ? "Use the email and password you use in the Early Bird app." : "Create a free account. It works in the Early Bird app too."}</p></div>`;
   const legal = `<p class="tiny muted center" style="margin:12px 0 0">By continuing you accept the <a href="../terms.html" target="_blank" rel="noopener">Terms</a> and <a href="../privacy.html" target="_blank" rel="noopener">Privacy Policy</a>.</p>`;
   const msgHtml = (m, k) => (m ? `<div class="msg ${k || "err"}" role="alert">${esc(m)}</div>` : "");
@@ -1476,6 +1478,10 @@ async function viewAccount() {
     };
   };
 }
+
+/* ───────────────────────────── shared with biz.js (the restaurant pages) ───────────────────────────── */
+window.EB = { CFG, Auth, ApiError, rpc, esc, ic, money, fmtStamp, showPage, plainPage, toast, go, navigate, setTitle, friendly,
+  store, sstore, viewSignIn, isDesk, time12, setCleanup: (fn) => { view.cleanup = fn; } };
 
 /* ───────────────────────────── start ───────────────────────────── */
 window.addEventListener("hashchange", route);

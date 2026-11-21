@@ -229,7 +229,11 @@ async function loadCities() {
   }
   return S.cities;
 }
-const setCity = (c) => { S.city = c || null; store.set("eb.web.city", c ? c.slug : null); };
+const setCity = (c) => {
+  S.city = c || null; store.set("eb.web.city", c ? c.slug : null);
+  const sel = document.getElementById("hcity"); // the desktop header box, drawn before the page knew the city
+  if (sel && c) { [...sel.options].forEach((o) => { if (!o.value) o.remove(); }); sel.value = c.slug; }
+};
 const kmBetween = (a, b, c, d) => { const r = (x) => (x * Math.PI) / 180, h = Math.sin(r(c - a) / 2) ** 2 + Math.cos(r(a)) * Math.cos(r(c)) * Math.sin(r(d - b) / 2) ** 2; return 12742 * Math.asin(Math.sqrt(h)); };
 const nearestCity = (lat, lng) => (S.cities || []).reduce((best, c) => (!best || kmBetween(lat, lng, c.lat, c.lng) < kmBetween(lat, lng, best.lat, best.lng) ? c : best), null);
 // One blurred photo per city behind the header (img/areas/CREDITS.md has each photo's source, author and licence).

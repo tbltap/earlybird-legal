@@ -21,16 +21,16 @@ why, who we share it with and the choices you have. Early Bird is run by
 Ngassa Holdings LLC, a Delaware limited liability company ("Early Bird",
 "we", "us"), 11644 S Brisbane Dr, Sandy, Utah 84094, United States.
 Questions: privacy@eatearlybird.com.</p>
-<p>It covers the Early Bird app, https://eatearlybird.com and Early Bird
-accounts. It doesn't cover what a restaurant does with information you
-choose to give it (§7): that restaurant's own privacy policy
-applies.</p>
+<p>It covers the Early Bird app, the website at https://eatearlybird.com
+(including booking on the website) and Early Bird accounts. It doesn't
+cover what a restaurant does with information you choose to give it
+(§7): that restaurant's own privacy policy applies.</p>
 <h2 id="1-the-short-version">1. The short version</h2>
 <ul>
 <li><strong>No cross-app tracking.</strong> We don't track you across
-other companies' apps or websites, we don't use advertising SDKs, and we
-don't sell your personal information or share it for cross-context
-behavioural advertising.</li>
+other companies' apps or websites, we don't use advertising SDKs or
+analytics on the website, and we don't sell your personal information or
+share it for cross-context behavioural advertising.</li>
 <li><strong>No card numbers.</strong> Stripe processes your payments. We
 never see or store your full card number.</li>
 <li><strong>Restaurants get your contact details only if you say yes,
@@ -86,7 +86,7 @@ digits</td>
 <td>Stripe</td>
 </tr>
 <tr>
-<td><strong>Early Bird credit</strong></td>
+<td><strong>Venuu cash</strong> (your credit balance)</td>
 <td>what you earned and spent, when, why, and when it expires; codes for
 paying with credit at a restaurant</td>
 <td>you, us, restaurants</td>
@@ -119,11 +119,13 @@ and not stored</td>
 <td><strong>Device and app</strong></td>
 <td>an app-generated device ID (so you can browse and hold a booking
 before signing in), app version, device model and operating system, IP
-address and time in our server logs</td>
-<td>your device</td>
+address and time in our server logs; on the website, a random device ID
+the site creates in your browser (used the same way) and your browser's
+IP address and type in our server logs</td>
+<td>your device or browser</td>
 </tr>
 <tr>
-<td><strong>Activity in the app</strong></td>
+<td><strong>Activity in the app and on the website</strong></td>
 <td>what you view, search and tap in Early Bird, including views and
 taps on featured restaurants</td>
 <td>your device</td>
@@ -141,6 +143,22 @@ role, actions taken in the restaurant tools</td>
 </tr>
 </tbody>
 </table></div>
+<p><strong>On the website.</strong> The website stores a few things in
+your browser so it works:</p>
+<ul>
+<li>the sign-in session for your account, so you stay signed in;</li>
+<li>the random device ID described above;</li>
+<li>while you book, the booking you're making, which is cleared when you
+close the tab.</li>
+</ul>
+<p>The website uses no advertising or analytics cookies and no tracking
+pixels. Its pages and fonts are served from our own site. Two parts come
+from other companies. The checkout loads Stripe's payment code
+(js.stripe.com), which may set its own cookies, such as
+<code>__stripe_mid</code> and <code>__stripe_sid</code>, to prevent
+fraud (see Stripe's cookie policy). An address link opens Google Maps if
+you tap it. You can clear what the website stores at any time in your
+browser's settings; you'll then need to sign in again.</p>
 <p>We don't collect contacts, health data, precise location history,
 browsing history from other apps or sites, or audio. The camera is used
 only when you choose to take a photo (for a review). Sign-in codes are
@@ -170,12 +188,13 @@ news and offers.</li>
 lawful requests, and defending legal claims.</li>
 </ul>
 <h2 id="4-payments">4. Payments</h2>
-<p>When you pay, your card or Apple Pay details go straight from the app
-to Stripe, Inc., which processes the payment as our payment provider.
-Stripe also uses payment information to prevent fraud, under its own
-privacy policy (stripe.com/privacy). With Apple Pay, Apple handles your
-card details under Apple's privacy policy. We receive only the payment
-result and the information in §2.</p>
+<p>When you pay, your card, Apple Pay or Google Pay details go straight
+from the app or the website's checkout to Stripe, Inc., which processes
+the payment as our payment provider. Stripe also uses payment
+information to prevent fraud, under its own privacy policy
+(stripe.com/privacy). With Apple Pay or Google Pay, Apple or Google
+handles your card details under its own privacy policy. We receive only
+the payment result and the information in §2.</p>
 <h2 id="5-text-messages">5. Text messages</h2>
 <p>We use our text message provider to send you sign-in codes. Your
 phone number and the message go to that provider only to deliver the
@@ -429,8 +448,8 @@ for you with your signed permission; we may still ask you to confirm
 your identity.</p>
 <h2 id="13-notice-of-financial-incentive-california">13. Notice of
 financial incentive (California)</h2>
-<p>Early Bird credit rewards (Credit Terms) are a financial incentive
-under the CCPA, because some of them involve personal information:</p>
+<p>Venuu cash rewards (Credit Terms) are a financial incentive under the
+CCPA, because some of them involve personal information:</p>
 <ul>
 <li><strong>Booking rewards and restaurant offers</strong> use your
 account and booking history.</li>

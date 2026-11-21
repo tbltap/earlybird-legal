@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Page not found | Early Bird</title>
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#0f2a43">
+<link rel="icon" type="image/png" href="/img/favicon.png">
+<style>
+body{margin:0;font:16px/1.6 "Open Sans",system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:#272b2e;background:#fff}
+main{max-width:520px;margin:12vh auto;padding:0 20px;text-align:center}
+h1{font:400 40px/1.1 "Abril Fatface",Georgia,serif;color:#0f2a43;margin:0 0 12px}
+a.btn{display:inline-block;background:#265682;color:#fff;border-radius:3px;padding:13px 24px;font-weight:700;text-decoration:none;margin:6px}
+</style>
+<script>
+// Restaurant links (https://eatearlybird.com/v/<slug>, the ones restaurants share and the iPhone app opens) land on the
+// restaurant's page in the web booking app.
+(function () {
+  var m = location.pathname.match(/^\/v\/([^\/]+)\/?$/);
+  if (m) location.replace("/book/#/r/" + m[1]);
+})();
+</script>
+</head>
+<body>
+<main>
+  <h1>We couldn't find that page</h1>
+  <p>Try the home page, or find an early table to book.</p>
+  <a class="btn" href="/">Home</a><a class="btn" href="/book/">Find a table</a>
+</main>
+</body>
+</html>

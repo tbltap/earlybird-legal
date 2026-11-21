@@ -57,6 +57,8 @@ const ICONS = {
   seal: '<path d="M12 3l2.200 1.700 2.800-.1.900 2.600 2.300 1.600-.9 2.700.9 2.700-2.300 1.600-.9 2.600-2.800-.1L12 21l-2.200-1.700-2.800.1-.9-2.600-2.300-1.600.9-2.700-.9-2.700 2.300-1.600.9-2.600 2.800.1z"/><path d="M8.500 12l2.500 2.500 4.500-5"/>',
   cancel: '<circle cx="12" cy="12" r="8.500"/><path d="M8.500 12.500l2.500 2.500 4.500-5"/>',
   arrow: '<path d="M5 12h14M13 6l6 6-6 6"/>',
+  store: '<path d="M4 10v9h16v-9M3 10l1.500-5h15L21 10c0 1.400-1.100 2.500-2.500 2.500S16 11.400 16 10c0 1.400-1.100 2.500-2.500 2.500h-3C9.100 12.500 8 11.400 8 10c0 1.400-1.100 2.500-2.500 2.500S3 11.400 3 10z"/><path d="M10 19v-4h4v4"/>',
+  locate: '<circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2.500"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>',
   help: '<circle cx="12" cy="12" r="9"/><path d="M9.500 9.500a2.500 2.500 0 1 1 3.500 2.300c-.700.400-1 .900-1 1.700M12 17v.1"/>',
   clock: '<circle cx="12" cy="12" r="8.500"/><path d="M12 7.500V12l3 2"/>',
   info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5.500M12 7.500v.1"/>',
@@ -157,6 +159,7 @@ const Auth = {
     this.save(null);
     sstore.set("eb.web.pending", null);
     store.set("eb.web.device", null); deviceId = loadDeviceId();
+    store.set("eb.web.invite", null);
     if (s) fetch(`${CFG.url}/auth/v1/logout`, { method: "POST", headers: { apikey: CFG.key, Authorization: `Bearer ${s.access_token}` } }).catch(() => {});
   },
 };
@@ -220,10 +223,24 @@ async function loadCities() {
   if (!S.cities) {
     S.cities = await rpc("cities");
     const saved = store.get("eb.web.city");
-    S.city = S.cities.find((c) => c.slug === saved) || S.cities.find((c) => c.name === "New York") || S.cities[0];
+    // No guessed city (owner, 21 Nov: "the website auto goes to nyc but i need it to be asking for location or select where
+    // you are looking for"): the saved choice, else none, and Home asks.
+    S.city = S.cities.find((c) => c.slug === saved) || null;
   }
   return S.cities;
 }
+const setCity = (c) => { S.city = c || null; store.set("eb.web.city", c ? c.slug : null); };
+const kmBetween = (a, b, c, d) => { const r = (x) => (x * Math.PI) / 180, h = Math.sin(r(c - a) / 2) ** 2 + Math.cos(r(a)) * Math.cos(r(c)) * Math.sin(r(d - b) / 2) ** 2; return 12742 * Math.asin(Math.sqrt(h)); };
+const nearestCity = (lat, lng) => (S.cities || []).reduce((best, c) => (!best || kmBetween(lat, lng, c.lat, c.lng) < kmBetween(lat, lng, best.lat, best.lng) ? c : best), null);
+// One blurred photo per city behind the header (img/areas/CREDITS.md has each photo's source, author and licence).
+const AREA_PHOTOS = { "new-york": { by: "Kidfly182", lic: "CC0" }, "los-angeles": { by: "Michael Chusid", lic: "CC0" } };
+const areaPhoto = (c) => (c && AREA_PHOTOS[c.slug] ? { url: `../img/areas/${c.slug}.jpg`, ...AREA_PHOTOS[c.slug] } : null);
+const heroAttrs = (c) => { const p = areaPhoto(c); return p ? ` hasphoto" style="--areaimg:url('${p.url}')` : ""; };
+const photoCredit = (c) => { const p = areaPhoto(c); return p ? `<a class="photocredit" href="../img/areas/CREDITS.md" target="_blank" rel="noopener">Photo: ${esc(p.by)}, ${esc(p.lic)}</a>` : ""; };
+// The offer, for both audiences, in a few words (no fee basis: the diner sees the actual fee when booking).
+const offerHtml = () => `<ul class="offer">
+  <li>${ic("fork")}<span><b>Diners</b> get 50% off the food bill and pay a small booking fee per diner.</span></li>
+  <li>${ic("store")}<span><b>Restaurants</b> list for free. <a href="../#restaurants">How it works</a></span></li></ul>`;
 async function refreshTestBar() {
   const bar = document.getElementById("testbar");
   try {
@@ -275,13 +292,13 @@ async function drawChrome(path) {
   foot.innerHTML = `<div class="df-in"><div class="df-cols">
       <div><h3>Diners</h3><p>Book an early table and get 50% off the food bill. A small booking fee holds it.</p><a class="dbtn" href="#/">Find a table</a></div>
       <div><h3>Restaurants</h3><p>List your early tables on Early Bird for free and fill your quiet hours.</p><a class="dbtn ghost" href="../restaurant-terms.html">Restaurant terms</a></div>
-      <div><h3>Get the app</h3><p>Early Bird for iPhone: your bookings, codes and ${esc(CREDIT)} in your pocket.</p><a class="dbtn ghost" href="../">Learn more</a></div>
+      <div><h3>Get the app</h3><p>Early Bird for iPhone: your bookings, codes and ${esc(CREDIT)} in your pocket.</p><a class="dbtn ghost" href="../?about#get">Learn more</a></div>
     </div>${legal}</div>`;
   // city picker
   loadCities().then(() => {
     const sel = document.getElementById("hcity"); if (!sel) return;
-    sel.innerHTML = S.cities.map((c) => `<option value="${esc(c.slug)}" ${c.slug === S.city.slug ? "selected" : ""}>${esc(c.name)}</option>`).join("");
-    sel.onchange = () => { S.city = S.cities.find((c) => c.slug === sel.value) || S.city; store.set("eb.web.city", S.city.slug); go("/", { city: S.city.slug }); };
+    sel.innerHTML = (S.city ? "" : '<option value="" selected>Choose a city</option>') + S.cities.map((c) => `<option value="${esc(c.slug)}" ${c.slug === S.city?.slug ? "selected" : ""}>${esc(c.name)}</option>`).join("");
+    sel.onchange = () => { const c = S.cities.find((x) => x.slug === sel.value); if (!c) return; setCity(c); go("/", { city: c.slug }); };
   }).catch(() => {});
   // type-ahead search: restaurant names (api.suggest), opens the restaurant page
   const hs = document.getElementById("hs"), list = document.getElementById("hs-list");
@@ -331,6 +348,43 @@ function go(path, q) {
 }
 const navigate = (hash) => { if (location.hash === hash) route(); else location.hash = hash; };
 const setTitle = (t) => { document.title = t ? `${t} | Early Bird` : "Book an early table | Early Bird"; };
+/* ───────────────────────────── invites and codes (0131_codes_and_referrals) ───────────────────────────── */
+// A friend's invite link (https://eatearlybird.com/r/<code>, mapped by 404.html to #/invite/<code>) keeps the code in this
+// browser through sign-up or sign-in, then redeems it once the diner is signed in; the stored code is then removed.
+const IKEY = "eb.web.invite";
+let claiming = null;
+function claimInvite(quiet = false) {
+  const code = store.get(IKEY);
+  if (!code || claiming || !Auth.session()) return claiming;
+  claiming = rpc("redeem_code", { p_code: code, p_device: deviceId })
+    .then((r) => { store.set(IKEY, null); if (r?.message && !quiet) toast(r.message); return r; })
+    .catch((e) => { if (e.code !== "offline") store.set(IKEY, null); return null; })
+    .finally(() => { claiming = null; });
+  return claiming;
+}
+async function viewInvite(raw) {
+  setTitle("You're invited");
+  const code = String(raw || "").trim();
+  const p = await rpc("code_preview", { p_code: code }).catch(() => ({ valid: false }));
+  const app = `<a class="btn grey" href="earlybird://r/${encodeURIComponent(code)}">Open in the Early Bird app</a><p class="small muted center">If you have the app on this phone.</p>`;
+  if (!p?.valid) {
+    store.set(IKEY, null);
+    return plainPage(`<div class="gate"><h1 class="display">This invite link isn't valid</h1><p class="muted">Check the link with the friend who sent it. You can still find an early table at half price.</p></div>
+      <div class="invite-actions"><a class="btn" href="#/">Find a table</a></div>`);
+  }
+  store.set(IKEY, p.code || code);
+  const head = `<div class="gate"><div class="invite-bird">${ic("bird")}</div><h1 class="display">${esc(p.from_name || "A friend")} invited you</h1>
+    <p class="invite-msg">${esc(p.message || (p.friend_fee_cap_cents ? `Your first booking fee is on us (up to ${money(p.friend_fee_cap_cents)})` : "Your first booking fee is on us"))}</p>
+    <p class="muted">Book an early table and get 50% off the food bill.</p></div>`;
+  if (Auth.session()) {
+    plainPage(`${head}<p class="loading center">Adding it to your account…</p>`);
+    const r = await claimInvite(true);
+    const k = r?.ok ? "ok" : "err";
+    return plainPage(`${head}${r?.message ? `<div class="msg ${k}" role="status">${esc(r.message)}</div>` : ""}<div class="invite-actions"><a class="btn" href="#/">Find a table</a>${app}</div>`);
+  }
+  plainPage(`${head}<div class="invite-actions"><a class="btn" href="#/signin?next=${encodeURIComponent("#/")}">Sign up to claim it</a><a class="btn pale" href="#/">Look around first</a>${app}</div>
+    <p class="small muted center">It's added when you sign in or create your account on this browser. For new Early Bird accounts.</p>`);
+}
 async function route() {
   if (view.cleanup) { try { await view.cleanup(); } catch { /* ignore */ } view = { cleanup: null }; }
   const { path, q } = parseHash();
@@ -341,6 +395,8 @@ async function route() {
   try {
     // Visitors can browse and open restaurant pages without an account. Booking, "My bookings" and Profile need one:
     // those addresses show the sign-in screen and open again after sign-in.
+    if (path.startsWith("/invite/")) return await viewInvite(decodeURIComponent(path.slice(8)));
+    if (Auth.session() && store.get(IKEY)) claimInvite();
     const needsAccount = path === "/book" || path === "/bookings" || path.startsWith("/booking/") || path === "/account" || new URLSearchParams(location.search).get("pay");
     if (!Auth.session() && (needsAccount || path === "/signin")) {
       const sq = new URLSearchParams(location.search);
@@ -405,7 +461,10 @@ function useNearMe() {
   if (!navigator.geolocation) return toast("Your browser can't share your location. Pick a city instead.");
   toast("Finding restaurants near you…");
   navigator.geolocation.getCurrentPosition(
-    (pos) => go("/", homeParams({ near: `${pos.coords.latitude.toFixed(3)},${pos.coords.longitude.toFixed(3)}` })),
+    (pos) => {
+      const lat = pos.coords.latitude, lng = pos.coords.longitude;
+      loadCities().then(() => { if (!S.city || kmBetween(lat, lng, S.city.lat, S.city.lng) > 80) setCity(nearestCity(lat, lng)); go("/", homeParams({ near: `${lat.toFixed(3)},${lng.toFixed(3)}` })); });
+    },
     () => toast("Location is off for this site. Allow it in your browser, or pick a city."),
     { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 });
 }
@@ -416,11 +475,25 @@ function toast(text) {
 }
 const distTxt = (v) => (H.near && v.distance_km != null ? `${(v.distance_km * 0.621).toFixed(v.distance_km < 16 ? 1 : 0)} mi` : "");
 const nearChip = () => `<button class="pill near" type="button" id="nearme" aria-pressed="${!!H.near}">${ic("pin")}${H.near ? "Near me ✓" : "Near me"}</button>`;
+// First visit, or no city chosen: ask where they're looking. "Use my location" asks the browser only when pressed;
+// the cities (and their neighbourhoods) come from the backend.
+function viewPickArea() {
+  setTitle("Choose a city");
+  const cities = (S.cities || []).filter((c) => (c.venues ?? 1) > 0);
+  showPage(`<section class="pickhero"><h1 class="display">Where are you looking?</h1>
+      <p class="muted">See restaurants with early tables near you, or pick a city.</p>
+      <button class="btn" type="button" id="pick-near">${ic("locate")}Use my location</button></section>
+    <div class="picklist" role="list">${cities.map((c) => `<a role="listitem" class="pickcity${heroAttrs(c)}" href="#/?city=${esc(c.slug)}"><b>${esc(c.name)}</b><span>${esc((c.areas || []).slice(0, 4).map((a) => a.name).join(" · "))}</span></a>`).join("")}</div>
+    ${offerHtml()}`, { wash: false, size: "pick" });
+  document.getElementById("pick-near").onclick = useNearMe;
+}
 async function viewHome(q) {
   setTitle("");
   await Promise.all([loadCities(), loadConfig()]);
-  if (q.city) { const c = S.cities.find((x) => x.slug === q.city); if (c) { S.city = c; store.set("eb.web.city", c.slug); } }
+  if (q.city) { const c = S.cities.find((x) => x.slug === q.city); if (c) setCity(c); }
   const nm = /^(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)$/.exec(q.near || ""); H.near = nm ? { lat: +nm[1], lng: +nm[2] } : null;
+  if (!S.city && H.near) setCity(nearestCity(H.near.lat, H.near.lng));
+  if (!S.city) return viewPickArea();
   H.q = q.q || ""; H.cuisines = list(q.c); H.areas = list(q.a); H.prices = list(q.p).map(Number).filter((n) => n >= 1 && n <= 4);
   H.sort = SORTS.some(([k]) => k === q.sort) ? q.sort : "featured"; H.date = /^\d{4}-\d{2}-\d{2}$/.test(q.date || "") ? q.date : ""; H.map = q.map === "1";
   H.meal = ["breakfast", "lunch", "dinner"].includes(q.meal) ? q.meal : H.meal;
@@ -430,7 +503,8 @@ async function viewHome(q) {
   const params = () => ({ city: S.city.slug, meal: H.meal, diners: H.diners, ...(H.q ? { q: H.q } : {}), ...(H.cuisine ? { c: H.cuisine } : {}), ...(H.near ? { near: `${H.near.lat},${H.near.lng}` } : {}) });
   const maxD = Math.min(S.config.max_party || 12, 12);
   showPage(`
-    <h1 class="display" style="margin:14px 0 0">Ready to get <span class="gold">50% off</span> your food bill?</h1>
+    <section class="mhero${heroAttrs(S.city)}"><div class="mtop"><label class="pinsel">${ic("pin")}<select id="f-city" aria-label="City">${S.cities.map((c) => `<option value="${esc(c.slug)}" ${c.slug === S.city.slug ? "selected" : ""}>${esc(c.name)}</option>`).join("")}</select></label><button class="iconbtn" type="button" id="focus-q" aria-label="Search">${ic("search")}</button></div>
+      <h1 class="display">Ready to get <span class="gold">50% off</span> your food bill?</h1>${offerHtml()}${photoCredit(S.city)}</section>
     <form id="findform" role="search">
       <div class="searchbar">
         <label>${ic("fork")}<select id="f-meal" aria-label="Meal">${["breakfast", "lunch", "dinner"].map((m) => `<option value="${m}" ${m === H.meal ? "selected" : ""}>${m[0].toUpperCase() + m.slice(1)}</option>`).join("")}</select>
@@ -444,10 +518,10 @@ async function viewHome(q) {
     <div id="grid"></div>
     <div style="margin-top:8px"><button class="btn pale" id="more" hidden>Show more</button></div>
     <div class="card help" style="margin-top:18px"><div>${ic("help")}</div><div><div class="title">How do I get 50% off?</div><div class="muted">See how Early Bird works</div><a class="learn" href="../#how">Learn more</a></div></div>`,
-  { right: `<label class="pinsel">${ic("pin")}<select id="f-city" aria-label="City">${S.cities.map((c) => `<option value="${esc(c.slug)}" ${c.slug === S.city.slug ? "selected" : ""}>${esc(c.name)}</option>`).join("")}</select></label><button class="iconbtn" type="button" id="focus-q" aria-label="Search">${ic("search")}</button>` });
+  { wash: false });
   document.getElementById("focus-q").onclick = () => { const i = document.getElementById("f-q"); i.scrollIntoView({ block: "center", behavior: "smooth" }); i.focus({ preventScroll: true }); };
   document.getElementById("findform").onsubmit = (e) => { e.preventDefault(); H.q = val("f-q"); go("/", { ...params(), meal: val("f-meal"), diners: val("f-diners"), ...(val("f-q") ? { q: val("f-q") } : { q: "" }) }); };
-  document.getElementById("f-city").onchange = (e) => go("/", { ...params(), city: e.target.value });
+  document.getElementById("f-city").onchange = (e) => { const { near, ...rest } = params(); go("/", { ...rest, city: e.target.value }); };
   document.getElementById("f-meal").onchange = (e) => go("/", { ...params(), meal: e.target.value });
   document.getElementById("f-diners").onchange = (e) => go("/", { ...params(), diners: e.target.value });
   document.getElementById("more").onclick = () => loadResults(true);
@@ -536,11 +610,11 @@ async function viewHomeDesk() {
   const dates = Array.from({ length: Math.min(S.config.max_days_ahead || 14, 14) }, (_, i) => { const d = dateObj(today); d.setUTCDate(d.getUTCDate() + i); return d.toISOString().slice(0, 10); });
   const filterOn = H.cuisines.length || H.areas.length || H.prices.length || H.q;
   showRaw(`
-    <section class="dhero"><div class="wide dhero-in">
+    <section class="dhero${heroAttrs(city)}"><div class="wide dhero-in">
       <div><div class="crumbs"><a href="#/">Early Bird</a><span>/</span>${esc(city.name)}</div>
         <h1>${H.near ? "Restaurants near you" : `${esc(city.name)} restaurants`}</h1><p>Dine early and save 50% on your food bill</p></div>
-      <a class="teaser" href="../#how"><b>Your table, early</b><span>Pick a time, pay a small booking fee per diner, and the food is half price when you dine.</span><span class="go" aria-hidden="true">${ic("arrow")}</span></a>
-    </div></section>
+      <div class="offerbox">${offerHtml()}</div>
+    </div>${photoCredit(city)}</section>
     <div class="wide">
       <div class="fbar" id="fbar">
         <label>${ic("fork")}<select id="f-meal" aria-label="Meal">${MEALS.map((m) => `<option value="${m}" ${m === H.meal ? "selected" : ""}>${cap(m)}</option>`).join("")}</select></label>
@@ -1053,7 +1127,8 @@ async function viewCheckout(q) {
   const linesHtml = () => {
     const h = hd();
     return `<div class="lines"><div><span>Booking fee${h.fee_per_diner_cents != null ? ` (${h.diners} × ${money(h.fee_per_diner_cents)})` : ""}</span><span>${money(h.fee_cents)}</span></div>
-      ${h.credit_cents > 0 ? `<div class="g"><span>Paid from your ${esc(CREDIT)}</span><span>−${money(h.credit_cents)}</span></div>` : ""}
+      ${h.promo_cents > 0 ? `<div class="g"><span>Free booking fee</span><span>−${money(h.promo_cents)}</span></div>` : ""}
+      ${h.credit_cents - (h.promo_cents || 0) > 0 ? `<div class="g"><span>Paid from your ${esc(CREDIT)}</span><span>−${money(h.credit_cents - (h.promo_cents || 0))}</span></div>` : ""}
       ${h.credit_kept_cents > 0 && h.amount_due_cents > 0 ? `<div class="k"><span>${money(h.credit_kept_cents)} credit saved for a fee it covers in full</span></div>` : ""}
       <div class="tot"><span>To pay now</span><span>${money(due())}</span></div>
       <div class="g"><span>${ic("check")} Est. savings on food</span><span>${m0(h.saving_cents)}</span></div>
@@ -1089,7 +1164,7 @@ async function viewCheckout(q) {
       <div class="grow-f agree" id="w-c-ok"><label class="check"><input type="checkbox" id="c-ok" ${d.accepted ? "checked" : ""}><span>I agree to the Early Bird conditions, the cancellation policy and the <a href="../terms.html" target="_blank" rel="noopener">booking terms</a></span></label><div class="ferr" id="e-c-ok" role="alert" hidden></div></div>
       <label class="check small"><input type="checkbox" id="c-sh" ${d.share ? "checked" : ""}><span>Share my name, mobile number and email with ${esc(v.name)}, so they can contact me about my bookings</span></label>
       <label class="check small"><input type="checkbox" id="c-mk" ${d.marketing ? "checked" : ""}><span>Let ${esc(v.name)} send me offers through Early Bird</span></label>
-      <div class="paybar"><div class="paysum"><b>${money(due())}</b><span>${payNeeded() ? "to pay now" : due() === 0 && h.credit_cents > 0 ? "covered by credit" : "nothing to pay"}</span></div><button class="btn" id="c-go" type="button">${goLabel()}</button></div>
+      <div class="paybar"><div class="paysum"><b>${money(due())}</b><span>${payNeeded() ? "to pay now" : due() === 0 && h.credit_cents > 0 ? (h.promo_cents >= h.credit_cents ? "free booking fee" : "covered by credit") : "nothing to pay"}</span></div><button class="btn" id="c-go" type="button">${goLabel()}</button></div>
       ${testBadge(C.intent?.mode || h.stripe_mode)}`;
   }
 
@@ -1285,7 +1360,7 @@ async function viewBooking(id, q) {
     ${b.status === "cancelled" ? `<div class="msg info">This booking was cancelled${b.cancelled_at ? " on " + esc(fmtStamp(b.cancelled_at)) : ""}.</div>` : ""}
     <div class="card"><div class="sumrow" style="margin-top:0">${thumbHtml(v)}<div><span class="deal-pill">${ic("tag")}${b.discount}% off food bill</span><div class="nm">${esc(v.name || "Restaurant")}</div><div class="muted">${time12(b.time)}, ${esc(fmtLong(b.date))}</div></div></div>
       <dl class="kv"><dt>Diners</dt><dd>${b.diners}${b.option === "nodrink" ? " (no drinks needed)" : ""}</dd>
-        <dt>Booking fee</dt><dd>${money(b.fee_cents)}${b.credit_used_cents ? ` (${money(b.credit_used_cents)} from your ${esc(CREDIT)})` : ""}${b.amount_paid_cents ? ` · ${money(b.amount_paid_cents)} paid by card` : ""}</dd>
+        <dt>Booking fee</dt><dd>${money(b.fee_cents)}${b.promo_cents > 0 ? ` (${money(b.promo_cents)} free booking fee)` : ""}${b.credit_used_cents - (b.promo_cents || 0) > 0 ? ` (${money(b.credit_used_cents - (b.promo_cents || 0))} from your ${esc(CREDIT)})` : ""}${b.amount_paid_cents ? ` · ${money(b.amount_paid_cents)} paid by card` : ""}</dd>
         ${b.saving_cents ? `<dt>Est. savings</dt><dd class="green">${m0(b.saving_cents)} on food</dd>` : ""}
         ${b.requirements?.length ? `<dt>Order rules</dt><dd>${b.requirements.map((r) => `${r.per_person} ${esc(r.label.toLowerCase())} per person`).join(", ")}</dd>` : ""}
         ${b.guest_name ? `<dt>Name</dt><dd>${esc(b.guest_name)}</dd>` : ""}${b.special_request ? `<dt>Request</dt><dd>${esc(b.special_request)}</dd>` : ""}
@@ -1325,7 +1400,11 @@ function downloadIcs(b) {
 /* ───────────────────────────── profile ───────────────────────────── */
 async function viewAccount() {
   setTitle("Profile");
-  const [p, cr, au] = await Promise.all([rpc("profile"), rpc("my_credit", { p_device: deviceId }), Auth.user()]);
+  const [p, cr, au, ps] = await Promise.all([rpc("profile"), rpc("my_credit", { p_device: deviceId }), Auth.user(), rpc("my_passes", { p_device: deviceId }).catch(() => null)]);
+  const passes = (ps?.passes || []).filter((x) => x.status === "available");
+  const passCard = passes.length ? `<div class="card"><div class="title">Free booking fees</div>${passes.map((x) => `<div class="item"><div><span>${esc(x.title)}</span>${x.expires_at ? `<div class="d">Use by ${esc(fmtStamp(x.expires_at))}</div>` : ""}</div><b>Up to ${money(x.cap_cents)}</b></div>`).join("")}
+    <p class="small muted" style="margin-top:6px">Taken off your next booking fee automatically, before any credit.</p></div>` : "";
+  const codeCard = `<div class="card"><div class="title">Have a code?</div><form id="codef" class="codef" novalidate><input id="code-in" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="Code or invite link" aria-label="Code or invite link"><button class="btn" type="submit">Apply</button></form><div id="code-msg"></div></div>`;
   const email = au?.email || "", phone = au?.phone || "", pendingEmail = au?.new_email || "";
   const sign = `<div class="card"><div class="title">How you sign in</div>
     <dl class="kv" style="margin:10px 0 4px"><dt>Phone</dt><dd>${phone ? esc(prettyPhone(phone)) : '<span class="muted">Not added</span>'}</dd>
@@ -1339,9 +1418,23 @@ async function viewAccount() {
       ${cr.pending_cents ? `<div class="muted small">${money(cr.pending_cents)} pending (available after your visit)</div>` : ""}
       <p class="small muted" style="margin-top:8px">Credit from a cancellation is used first on your next booking fee. Credit you earn is used only when it covers a whole booking fee. It's for booking fees only and has no cash value. <a href="../credit-terms.html">${esc(CREDIT)} terms</a></p>
       ${(cr.credits || []).length ? `<div class="title" style="font-size:16px;margin:14px 0 4px">Expiring soonest</div>${cr.credits.slice(0, 6).map((c) => `<div class="item"><div><span>${esc(c.title)}</span><div class="d">${c.pending ? "Pending" : c.expires_at ? "Use by " + esc(fmtStamp(c.expires_at)) : ""}</div></div><div class="p">${money(c.cents)}</div></div>`).join("")}` : ""}</div>
+    ${passCard}${codeCard}
     <div class="actions"><a class="btn pale" href="#/bookings">Bookings</a><button class="btn grey" id="so" type="button">Sign out</button></div>
     <p class="center small muted" style="margin-top:20px"><a href="../account-deletion.html" style="color:inherit">Delete my account</a></p>`);
   document.getElementById("so").onclick = async () => { await Auth.signOut(); navigate("#/"); };
+  document.getElementById("codef").onsubmit = async (e) => {
+    e.preventDefault();
+    const inp = document.getElementById("code-in"), out = document.getElementById("code-msg"), btn = e.target.querySelector("button");
+    const code = inp.value.trim();
+    if (!code) { out.innerHTML = '<div class="msg err" role="alert">Type or paste your code.</div>'; inp.focus(); return; }
+    btn.disabled = true;
+    try {
+      const r = await rpc("redeem_code", { p_code: code, p_device: deviceId });
+      if (r.ok) { toast(r.message || "Code added."); return route(); }
+      out.innerHTML = `<div class="msg err" role="alert">${esc(r.message || "That code didn't work.")}</div>`;
+    } catch (err) { out.innerHTML = `<div class="msg err" role="alert">${esc(friendly(err))}</div>`; }
+    btn.disabled = false;
+  };
   const area = document.getElementById("link-area");
   const note = (m, k = "err") => `<div class="msg ${k}" role="alert">${esc(m)}</div>`;
   const ae = document.getElementById("add-email");

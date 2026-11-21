@@ -649,3 +649,59 @@ body.desk #co .coright .lines{margin:16px 0 8px}
 .hpill.ghost{color:var(--muted)!important;font-weight:500}
 .hnav{gap:6px}
 body.desk .dhead[hidden]{display:none}
+
+/* invites and codes */
+.invite-bird{display:inline-flex;width:64px;height:64px;border-radius:50%;background:var(--pale-blue);color:var(--navy);align-items:center;justify-content:center}
+.invite-bird svg{width:34px;height:34px}
+.invite-msg{font:600 20px/1.35 var(--sans);margin:4px auto 8px;max-width:30ch}
+.invite-actions{display:flex;flex-direction:column;gap:10px;max-width:420px;margin:18px auto 8px}
+.invite-actions .btn{width:100%;text-align:center}
+.invite-actions p{margin:0}
+.codef{display:flex;gap:10px;margin-top:10px}
+.codef input{flex:1;min-width:0;margin:0;text-transform:uppercase;background:var(--card-fill);border:0;border-radius:14px;padding:14px 16px;font:500 17px var(--sans);color:var(--ink)}
+.codef input::placeholder{text-transform:none;color:var(--muted)}
+.codef .btn{flex:none;width:auto;padding-left:22px;padding-right:22px}
+
+/* Area photo headers, first-visit city picker, offer lines (owner, 21 Nov) */
+.hasphoto{background-image:linear-gradient(180deg,rgba(8,28,42,.42),rgba(8,28,42,.72)),var(--areaimg)!important;background-size:cover!important;background-position:center!important}
+.dhero{position:relative}
+.dhero.hasphoto{padding-bottom:104px}
+.photocredit{position:absolute;right:12px;bottom:8px;font-size:11px;color:rgba(255,255,255,.75);text-decoration:none}
+.photocredit:hover{text-decoration:underline}
+body.desk .dhero .photocredit{bottom:56px;right:24px}
+.offer{list-style:none;margin:14px 0 0;padding:0;display:flex;flex-direction:column;gap:8px;font-size:16px;line-height:1.35}
+.offer li{display:flex;gap:10px;align-items:flex-start}
+.offer li svg{width:20px;height:20px;flex:none;margin-top:1px}
+.offer b{font-weight:700}
+.offerbox{width:360px;flex:none;background:rgba(255,255,255,.12);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,.22);border-radius:14px;padding:18px 20px}
+.offerbox .offer{margin:0;font-size:17px;color:#fff}
+.offerbox .offer a{color:#9FE6FF}
+/* phone hero */
+.mhero{position:relative;margin:0 -18px;padding:10px 18px 26px;background:linear-gradient(180deg,var(--hero-top) 0,rgba(143,229,255,.35) 70%,var(--page) 100%)}
+.mtop{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:4px 0 10px}
+.mhero .display{margin:6px 0 0}
+.mhero .offer{color:var(--ink)}
+.mhero .offer a{color:var(--navy)}
+.mhero.hasphoto{padding-bottom:30px;border-radius:0 0 22px 22px}
+.mhero.hasphoto .display,.mhero.hasphoto .offer,.mhero.hasphoto .pinsel,.mhero.hasphoto .pinsel select{color:#fff}
+.mhero.hasphoto .gold{color:#F6CF5E}
+.mhero.hasphoto .offer a{color:#9FE6FF}
+.mhero.hasphoto .pinsel select option{color:var(--ink)}
+.mhero.hasphoto .iconbtn{background:rgba(255,255,255,.18);color:#fff}
+.mhero + #findform{margin-top:16px}
+/* first visit: where are you looking? */
+body.desk .col.pick{max-width:640px}
+.pickhero{text-align:center;padding:34px 0 8px}
+.pickhero .display{margin:0 0 8px}
+.pickhero p{margin:0 0 18px;font-size:18px}
+.pickhero .btn{display:inline-flex;align-items:center;justify-content:center;gap:10px;width:auto;min-width:260px}
+.pickhero .btn svg{width:22px;height:22px}
+.picklist{display:grid;gap:12px;margin:22px 0 22px}
+.pickcity{display:flex;flex-direction:column;justify-content:flex-end;min-height:120px;padding:16px 18px;border-radius:16px;text-decoration:none;color:var(--ink);background:var(--card-fill);border:1px solid var(--hairline)}
+.pickcity b{font:900 26px/1.1 var(--serif)}
+.pickcity span{font-size:14px;color:var(--muted);margin-top:4px}
+.pickcity.hasphoto{color:#fff}
+.pickcity.hasphoto span{color:rgba(255,255,255,.85)}
+.pickcity:focus-visible,.pickcity:hover{outline:3px solid var(--accent);outline-offset:2px}
+.col.pick > .offer{background:#fff;border:1px solid var(--hairline);border-radius:16px;padding:16px 18px;margin-bottom:10px}
+.pickcity.hasphoto{background-image:linear-gradient(180deg,rgba(8,28,42,.12),rgba(8,28,42,.66)),var(--areaimg)!important}

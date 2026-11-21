@@ -19,6 +19,9 @@ a.btn{display:inline-block;background:#265682;color:#fff;border-radius:3px;paddi
 (function () {
   var m = location.pathname.match(/^\/v\/([^\/]+)\/?$/);
   if (m) location.replace("/book/#/r/" + m[1]);
+  // Invite links (https://eatearlybird.com/r/<code>, what a diner shares from the app) open the invite page.
+  var r = location.pathname.match(/^\/r\/([A-Za-z0-9-]{3,40})\/?$/);
+  if (r) location.replace("/book/#/invite/" + r[1]);
 })();
 </script>
 </head>

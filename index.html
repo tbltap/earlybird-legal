@@ -4,6 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Early Bird: 50% off your food bill</title>
+<script>
+// Visitors land on the places (owner, 21 Nov: "the first land in the site i want it to be on the thing to see the places").
+// This page stays reachable for its sections (/#how, /#restaurants, /#get) and at /?about.
+if (!location.hash && !/[?&]about\b/.test(location.search)) location.replace("/book/");
+</script>
 <meta name="description" content="Dine early and save 50% off your food bill. Book an early table at restaurants online or with the Early Bird iPhone app.">
 <meta name="theme-color" content="#0f2a43">
 <link rel="icon" type="image/png" href="img/favicon.png">

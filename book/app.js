@@ -109,14 +109,23 @@ const Auth = {
       return e.status ? null : s.access_token; // offline: try the old token
     }
   },
-  async call(path, body) {
+  async call(path, body, { method = "POST", token } = {}) {
     const res = await fetch(`${CFG.url}/auth/v1/${path}`, {
-      method: "POST", headers: { "Content-Type": "application/json", apikey: CFG.key }, body: JSON.stringify(body),
+      method, headers: { "Content-Type": "application/json", apikey: CFG.key, ...(token ? { Authorization: `Bearer ${token}` } : {}) }, body: JSON.stringify(body),
     }).catch(() => { throw new ApiError("offline", "No connection. Check your internet and try again."); });
     const j = await res.json().catch(() => ({}));
     if (!res.ok) throw new ApiError(j.error_code || j.error || "auth_failed", authMessage(j, res.status), res.status);
     return j;
   },
+  // Phone sign-in: same two calls as the app (Auth.swift): text a code, then check it. The account is made the first time.
+  async sendPhoneCode(phone) { await this.call("otp", { phone, create_user: true, channel: "sms" }); },
+  async verifyPhoneCode(phone, code) { const j = await this.call("verify", { type: "sms", phone, token: code }); if (!j.access_token) throw new ApiError("otp_expired", "That code is wrong or has expired."); this.save(j); return j; },
+  // The signed-in user's own sign-in details (email, phone, a pending new email).
+  async user() { const t = await this.token(); if (!t) return null; const res = await fetch(`${CFG.url}/auth/v1/user`, { headers: { apikey: CFG.key, Authorization: `Bearer ${t}` } }); return res.ok ? res.json() : null; },
+  // Add the other sign-in method to this account (Supabase Auth "update user"): the account stays the same person.
+  async addEmail(email, password) { return this.call("user" + redirectQuery(), { email: email.toLowerCase(), password }, { method: "PUT", token: await this.token() }); },
+  async addPhone(phone) { return this.call("user", { phone }, { method: "PUT", token: await this.token() }); },
+  async confirmPhoneChange(phone, code) { const j = await this.call("verify", { type: "phone_change", phone, token: code }); if (j.access_token) this.save(j); return j; },
   async signIn(email, password) { const j = await this.call("token?grant_type=password", { email: email.toLowerCase(), password }); this.save(j); return j; },
   async signUp(email, password, first, last) {
     const j = await this.call("signup" + redirectQuery(), { email: email.toLowerCase(), password, data: { first_name: first, last_name: last } });
@@ -137,7 +146,12 @@ function authMessage(j, status) {
   const m = String(j.msg || j.error_description || j.message || "").toLowerCase();
   if (code === "invalid_credentials" || m.includes("invalid login")) return "That email and password don't match.";
   if (code === "user_already_exists" || code === "email_exists" || m.includes("already registered")) return "There's already an account with this email. Sign in instead.";
-  if (code === "weak_password") return "Choose a longer password (6+ characters).";
+  if (code === "weak_password") return "Choose a longer password (8+ characters).";
+  if (code === "same_password") return "Choose a different password.";
+  if (code === "otp_expired" || m.includes("expired or is invalid")) return "That code is wrong or has expired.";
+  if (code === "phone_provider_disabled" || code === "sms_send_failed" || m.includes("unsupported phone")) return "Couldn't send a text right now. Use email instead.";
+  if (code === "phone_exists") return "That number already belongs to another Early Bird account.";
+  if (code === "validation_failed" && m.includes("phone")) return "Check your phone number and try again.";
   if (code.startsWith("over_") || status === 429 || m.includes("rate limit") || m.includes("security purposes")) return "Too many tries. Wait a minute and try again.";
   if (code === "validation_failed" || m.includes("valid email")) return "Check your email address and try again.";
   return j.msg || j.error_description || j.message || `Something went wrong (${status}).`;
@@ -440,11 +454,31 @@ async function viewVenue(slug, q) {
   if (q.date) document.querySelector(`[data-date="${q.date}"]`)?.scrollIntoView({ inline: "center", block: "nearest" });
 }
 
-/* ───────────────────────────── sign in / create account ───────────────────────────── */
+/* ───────────────────────────── sign in: phone code (like the app) or email ───────────────────────────── */
+const DIALS = [["🇺🇸", "+1"], ["🇳🇿", "+64"], ["🇦🇺", "+61"], ["🇬🇧", "+44"]];
+function e164(dial, raw) {
+  let d = String(raw || "").replace(/\D/g, "");
+  if (String(raw || "").trim().startsWith("+")) return d.length >= 8 && d.length <= 15 ? "+" + d : null; // typed with its own country code
+  if (dial === "+1" && d.length === 11 && d[0] === "1") d = d.slice(1);
+  d = d.replace(/^0+/, "");
+  const full = dial.replace("+", "") + d;
+  return d.length >= 7 && full.length <= 15 ? "+" + full : null;
+}
+const prettyPhone = (p) => (p ? `+${String(p).replace(/^\+/, "")}`.replace(/^\+1(\d{3})(\d{3})(\d{4})$/, "+1 ($1) $2-$3") : "");
+// Six boxes over one invisible input: typing, paste and the phone's "From Messages" code suggestion (autocomplete=one-time-code) all fill it.
+const codeBoxesHtml = () => `<div class="codebox" id="codebox"><div class="boxes" aria-hidden="true">${"<span></span>".repeat(6)}</div><input id="code-in" class="codein" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="40" aria-label="6-digit code"></div>`;
+function bindCodeBoxes(onFull) {
+  const inp = document.getElementById("code-in"), box = document.getElementById("codebox"), spans = [...box.querySelectorAll("span")];
+  const render = () => { const v = inp.value; spans.forEach((sp, i) => { sp.textContent = v[i] || ""; sp.classList.toggle("cur", i === Math.min(v.length, 5)); }); };
+  inp.addEventListener("input", () => { box.classList.remove("bad"); inp.value = inp.value.replace(/\D/g, "").slice(0, 6); render(); if (inp.value.length === 6) onFull(inp.value); });
+  box.addEventListener("click", () => inp.focus());
+  render(); inp.focus();
+  return { value: () => inp.value, clear() { inp.value = ""; render(); inp.focus(); }, error() { box.classList.add("bad"); }, };
+}
+
 async function viewSignIn(q) {
   setTitle("Sign in");
   const next = q.next || "#/";
-  let mode = q.mode === "up" ? "up" : "in";
   const toLinked = /^#\/(r|book|booking)\b/.test(next);
   const done = async () => {
     rpc("link_device", { p_device: deviceId }).catch(() => {}); // moves anything made on this browser to the account
@@ -452,42 +486,91 @@ async function viewSignIn(q) {
     navigate(next.startsWith("#") ? next : "#/");
   };
   if (Auth.session() && (await Auth.token())) return done();
-  const keep = { email: "", first: "", last: "" };
-  function draw(msg = "", kind = "err") {
-    showPage(`<div class="gate"><h1 class="display">${toLinked ? "Sign in to book your table" : "Sign in to book"}</h1>
-      <p class="muted" style="font-size:18px">${mode === "in" ? "Use the email and password you use in the Early Bird app." : "Create a free account. It works in the Early Bird app too."}</p></div>
-      ${msg ? `<div class="msg ${kind}" role="alert">${esc(msg)}</div>` : ""}
+  const st = { method: q.mode === "up" ? "email" : "phone", mode: q.mode === "up" ? "up" : "in", step: 0, dial: "+1", phone: "", e164: "", email: "", first: "", last: "", resendAt: 0, busy: false };
+  let tick = null;
+  view.cleanup = () => clearInterval(tick);
+  const head = () => `<div class="gate"><h1 class="display">${toLinked ? "Sign in to book your table" : "Sign in to book"}</h1>
+    <p class="muted" style="font-size:18px">${st.method === "phone" ? "We'll text you a code. New here? An account is made for you." : st.mode === "in" ? "Use the email and password you use in the Early Bird app." : "Create a free account. It works in the Early Bird app too."}</p></div>`;
+  const legal = `<p class="tiny muted center" style="margin:12px 0 0">By continuing you accept the <a href="../terms.html" target="_blank" rel="noopener">Terms</a> and <a href="../privacy.html" target="_blank" rel="noopener">Privacy Policy</a>.</p>`;
+  const msgHtml = (m, k) => (m ? `<div class="msg ${k || "err"}" role="alert">${esc(m)}</div>` : "");
+
+  function drawPhone(msg = "", kind = "err") {
+    st.method = "phone"; st.step = 0;
+    showPage(`${head()}${msgHtml(msg, kind)}
+      <form id="pf" class="card" novalidate>
+        <label class="field">Phone number</label>
+        <div style="display:flex;gap:8px;margin-top:-6px"><select id="p-dial" aria-label="Country code" style="width:96px;margin:0;flex:none">${DIALS.map(([f, d]) => `<option value="${d}" ${d === st.dial ? "selected" : ""}>${f} ${d}</option>`).join("")}</select>
+          <input id="p-num" type="tel" inputmode="tel" autocomplete="tel-national" placeholder="Phone number" style="margin:0" value="${esc(st.phone)}"></div>
+        <button class="btn" id="p-go" type="submit" style="margin-top:14px">Next</button>
+        ${legal}</form>
+      <p class="center"><button class="linklike" type="button" id="use-email">Use email instead</button></p>`);
+    document.getElementById("use-email").onclick = () => { st.method = "email"; drawEmail(); };
+    document.getElementById("pf").onsubmit = async (e) => {
+      e.preventDefault();
+      st.dial = document.getElementById("p-dial").value; st.phone = val("p-num");
+      const num = e164(st.dial, st.phone);
+      if (!num) return drawPhone("Check your phone number and try again.");
+      const btn = document.getElementById("p-go"); btn.disabled = true; btn.textContent = "Sending…";
+      try { await Auth.sendPhoneCode(num); st.e164 = num; drawCode(); }
+      catch (err) { drawPhone(err.message); }
+    };
+  }
+  function drawCode(msg = "", kind = "err") {
+    st.step = 1; st.resendAt = st.resendAt > Date.now() ? st.resendAt : Date.now() + 30000;
+    showPage(`<div class="gate"><h1 class="display">Enter the code</h1><p class="muted" style="font-size:18px">We texted a 6-digit code to ${esc(prettyPhone(st.e164))}.</p></div>
+      ${msgHtml(msg, kind)}
+      <div class="card">${codeBoxesHtml()}
+        <button class="btn" id="v-go" type="button" style="margin-top:14px" disabled>Verify</button>
+        <div class="actions" style="margin-top:12px"><button class="btn grey" id="v-back" type="button">Back</button><button class="btn grey" id="v-resend" type="button" disabled>Resend</button></div></div>`);
+    const verify = async (code) => {
+      if (st.busy) return; st.busy = true;
+      const go = document.getElementById("v-go"); go.disabled = true; go.textContent = "Checking…";
+      try { await Auth.verifyPhoneCode(st.e164, code); await done(); }
+      catch (err) { st.busy = false; ctl.error(); ctl.clear(); go.textContent = "Verify"; go.disabled = true; const m = document.querySelector(".msg"); if (m) m.remove(); document.getElementById("codebox").insertAdjacentHTML("beforebegin", msgHtml(err.message)); }
+    };
+    const ctl = bindCodeBoxes((c) => { document.getElementById("v-go").disabled = false; verify(c); });
+    document.getElementById("code-in").addEventListener("input", (e) => { document.getElementById("v-go").disabled = e.target.value.length !== 6; });
+    document.getElementById("v-go").onclick = () => ctl.value().length === 6 && verify(ctl.value());
+    document.getElementById("v-back").onclick = () => { st.resendAt = 0; drawPhone(); };
+    const rs = document.getElementById("v-resend");
+    clearInterval(tick);
+    tick = setInterval(() => { const left = Math.ceil((st.resendAt - Date.now()) / 1000); if (!rs.isConnected) return clearInterval(tick); rs.disabled = left > 0; rs.textContent = left > 0 ? `Resend in ${left}s` : "Resend"; }, 500);
+    rs.onclick = async () => { rs.disabled = true; try { await Auth.sendPhoneCode(st.e164); st.resendAt = Date.now() + 30000; ctl.clear(); } catch (err) { drawCode(err.message); } };
+  }
+  function drawEmail(msg = "", kind = "err") {
+    st.method = "email";
+    showPage(`${head()}${msgHtml(msg, kind)}
       <form id="af" class="card" novalidate>
-        ${mode === "up" ? `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><label class="field">First name<input id="a-first" type="text" autocomplete="given-name" value="${esc(keep.first)}" required></label><label class="field">Last name<input id="a-last" type="text" autocomplete="family-name" value="${esc(keep.last)}" required></label></div>` : ""}
-        <label class="field">Email<input id="a-email" type="email" autocomplete="email" inputmode="email" value="${esc(keep.email)}" required></label>
-        <label class="field">Password<input id="a-pw" type="password" autocomplete="${mode === "in" ? "current-password" : "new-password"}" minlength="6" required></label>
-        ${mode === "up" ? `<p class="tiny muted" style="margin:0 0 12px">By creating an account you accept the <a href="../terms.html" target="_blank" rel="noopener">Terms</a> and <a href="../privacy.html" target="_blank" rel="noopener">Privacy Policy</a>.</p>` : ""}
-        <button class="btn" id="a-go" type="submit">${mode === "in" ? "Sign in" : "Create account"}</button>
-        ${mode === "in" ? `<p class="center small" style="margin:14px 0 0"><button class="linklike" type="button" id="a-forgot">Forgot password?</button></p>` : ""}
+        ${st.mode === "up" ? `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><label class="field">First name<input id="a-first" type="text" autocomplete="given-name" value="${esc(st.first)}" required></label><label class="field">Last name<input id="a-last" type="text" autocomplete="family-name" value="${esc(st.last)}" required></label></div>` : ""}
+        <label class="field">Email<input id="a-email" type="email" autocomplete="email" inputmode="email" value="${esc(st.email)}" required></label>
+        <label class="field">Password<input id="a-pw" type="password" autocomplete="${st.mode === "in" ? "current-password" : "new-password"}" minlength="8" required></label>
+        <button class="btn" id="a-go" type="submit">${st.mode === "in" ? "Sign in" : "Create account"}</button>
+        ${st.mode === "in" ? `<p class="center small" style="margin:14px 0 0"><button class="linklike" type="button" id="a-forgot">Forgot password?</button></p>` : legal}
       </form>
-      <p class="center">${mode === "in" ? `New to Early Bird? <button class="linklike" type="button" id="a-swap">Create an account</button>` : `Already have an account? <button class="linklike" type="button" id="a-swap">Sign in</button>`}</p>`);
-    document.getElementById("a-swap").onclick = () => { mode = mode === "in" ? "up" : "in"; draw(); };
+      <p class="center">${st.mode === "in" ? `New to Early Bird? <button class="linklike" type="button" id="a-swap">Create an account</button>` : `Already have an account? <button class="linklike" type="button" id="a-swap">Sign in</button>`}<br><button class="linklike" type="button" id="use-phone" style="margin-top:10px">Use my phone number instead</button></p>`);
+    document.getElementById("use-phone").onclick = () => drawPhone();
+    document.getElementById("a-swap").onclick = () => { st.mode = st.mode === "in" ? "up" : "in"; drawEmail(); };
     const forgot = document.getElementById("a-forgot");
     if (forgot) forgot.onclick = async () => {
-      const email = (keep.email = val("a-email"));
-      if (!/^\S+@\S+\.\S+$/.test(email)) return draw("Type your email above first, then tap Forgot password.");
-      try { await Auth.reset(email); draw("Check your email for a link to set a new password.", "ok"); } catch (e) { draw(e.message); }
+      const email = (st.email = val("a-email"));
+      if (!/^\S+@\S+\.\S+$/.test(email)) return drawEmail("Type your email above first, then tap Forgot password.");
+      try { await Auth.reset(email); drawEmail("Check your email for a link to set a new password.", "ok"); } catch (e) { drawEmail(e.message); }
     };
     document.getElementById("af").onsubmit = async (e) => {
       e.preventDefault();
-      const email = (keep.email = val("a-email")), pw = document.getElementById("a-pw").value;
-      keep.first = val("a-first"); keep.last = val("a-last");
-      if (!/^\S+@\S+\.\S+$/.test(email)) return draw("Check your email address and try again.");
-      if (pw.length < 6) return draw("Choose a longer password (6+ characters).");
+      const email = (st.email = val("a-email")), pw = document.getElementById("a-pw").value;
+      st.first = val("a-first"); st.last = val("a-last");
+      if (!/^\S+@\S+\.\S+$/.test(email)) return drawEmail("Check your email address and try again.");
+      if (pw.length < 8) return drawEmail("Choose a longer password (8+ characters).");
       const btn = document.getElementById("a-go"); btn.disabled = true; btn.textContent = "One moment…";
       try {
-        if (mode === "in") await Auth.signIn(email, pw);
-        else { if (!keep.first) { btn.disabled = false; return draw("Please add your first name."); } await Auth.signUp(email, pw, keep.first, keep.last); }
+        if (st.mode === "in") await Auth.signIn(email, pw);
+        else { if (!st.first) { btn.disabled = false; return drawEmail("Please add your first name."); } await Auth.signUp(email, pw, st.first, st.last); }
         await done();
-      } catch (err) { draw(err.message); }
+      } catch (err) { drawEmail(err.message); }
     };
   }
-  draw(q.reset ? "Your password was changed. Sign in with it." : "", "ok");
+  if (st.method === "email") drawEmail(q.reset ? "Your password was changed. Sign in with it." : "", "ok"); else drawPhone(q.reset ? "Your password was changed. Sign in with it." : "", "ok");
 }
 
 /* ───────────────────────────── checkout: "Make a booking" ───────────────────────────── */
@@ -796,9 +879,16 @@ function downloadIcs(b) {
 /* ───────────────────────────── profile ───────────────────────────── */
 async function viewAccount() {
   setTitle("Profile");
-  const [p, cr] = await Promise.all([rpc("profile"), rpc("my_credit", { p_device: deviceId })]);
+  const [p, cr, au] = await Promise.all([rpc("profile"), rpc("my_credit", { p_device: deviceId }), Auth.user()]);
+  const email = au?.email || "", phone = au?.phone || "", pendingEmail = au?.new_email || "";
+  const sign = `<div class="card"><div class="title">How you sign in</div>
+    <dl class="kv" style="margin:10px 0 4px"><dt>Phone</dt><dd>${phone ? esc(prettyPhone(phone)) : '<span class="muted">Not added</span>'}</dd>
+      <dt>Email</dt><dd>${email ? esc(email) : pendingEmail ? `<span class="muted">Waiting for you to confirm ${esc(pendingEmail)}</span>` : '<span class="muted">Not added</span>'}</dd></dl>
+    <p class="small muted" style="margin:6px 0 10px">${!email ? "Add an email and a password to sign in with them too, in the app or on the website. It stays the same account, with the same bookings and balance." : !phone ? "Add your phone number to sign in with a texted code too. It stays the same account." : "You can sign in either way. It is the same account."}</p>
+    <div id="link-area">${!email && !pendingEmail ? '<button class="btn pale" id="add-email" type="button">Add email and password</button>' : !phone ? '<button class="btn pale" id="add-phone" type="button">Add phone number</button>' : ""}</div></div>`;
   showPage(`<h1 class="display" style="margin:14px 0 16px">Profile</h1>
-    <div class="card"><b style="font-size:19px">${esc([p.first_name, p.last_name].filter(Boolean).join(" ") || "Early Bird diner")}</b><div class="muted">${esc(p.email || "")}</div></div>
+    <div class="card"><b style="font-size:19px">${esc([p.first_name, p.last_name].filter(Boolean).join(" ") || "Early Bird diner")}</b><div class="muted">${esc(email || prettyPhone(phone) || p.email || "")}</div></div>
+    ${sign}
     <div class="card"><div class="title">${esc(CREDIT)}</div><div class="balance">${money(cr.balance_cents)}</div>
       ${cr.pending_cents ? `<div class="muted small">${money(cr.pending_cents)} pending (available after your visit)</div>` : ""}
       <p class="small muted" style="margin-top:8px">It's used automatically on your next booking fee. ${esc(CREDIT)} has no cash value. <a href="../credit-terms.html">${esc(CREDIT)} terms</a></p>
@@ -806,6 +896,42 @@ async function viewAccount() {
     <div class="actions"><a class="btn pale" href="#/bookings">Bookings</a><button class="btn grey" id="so" type="button">Sign out</button></div>
     <p class="center small muted" style="margin-top:20px"><a href="../account-deletion.html" style="color:inherit">Delete my account</a></p>`);
   document.getElementById("so").onclick = async () => { await Auth.signOut(); navigate("#/"); };
+  const area = document.getElementById("link-area");
+  const note = (m, k = "err") => `<div class="msg ${k}" role="alert">${esc(m)}</div>`;
+  const ae = document.getElementById("add-email");
+  if (ae) ae.onclick = () => {
+    area.innerHTML = `<form id="ef" novalidate><label class="field">Email<input id="l-email" type="email" autocomplete="email" inputmode="email" required></label>
+      <label class="field">Password<input id="l-pw" type="password" autocomplete="new-password" minlength="8" required><span class="hint">8 or more characters. You'll use it with this email to sign in.</span></label>
+      <div id="l-msg"></div><button class="btn" id="l-go" type="submit">Add email</button></form>`;
+    document.getElementById("ef").onsubmit = async (e) => {
+      e.preventDefault();
+      const em = val("l-email"), pw = document.getElementById("l-pw").value, m = document.getElementById("l-msg");
+      if (!/^\S+@\S+\.\S+$/.test(em)) return (m.innerHTML = note("Check your email address and try again."));
+      if (pw.length < 8) return (m.innerHTML = note("Choose a longer password (8+ characters)."));
+      const b = document.getElementById("l-go"); b.disabled = true; b.textContent = "One moment…";
+      try { await Auth.addEmail(em, pw); area.innerHTML = note(`We emailed a link to ${em}. Open it to finish: after that you can sign in with this email and password.`, "ok"); }
+      catch (err) { b.disabled = false; b.textContent = "Add email"; m.innerHTML = note(err.code === "email_exists" ? "That email already belongs to another Early Bird account." : err.message); }
+    };
+  };
+  const ap = document.getElementById("add-phone");
+  if (ap) ap.onclick = () => {
+    area.innerHTML = `<form id="pf2" novalidate><label class="field">Phone number</label><div style="display:flex;gap:8px;margin-top:-6px"><select id="l-dial" style="width:96px;margin:0;flex:none">${DIALS.map(([f, d]) => `<option value="${d}">${f} ${d}</option>`).join("")}</select><input id="l-num" type="tel" inputmode="tel" autocomplete="tel-national" placeholder="Phone number" style="margin:0"></div>
+      <div id="l-msg" style="margin-top:10px"></div><button class="btn" id="l-go" type="submit" style="margin-top:6px">Send code</button></form>`;
+    document.getElementById("pf2").onsubmit = async (e) => {
+      e.preventDefault();
+      const num = e164(document.getElementById("l-dial").value, val("l-num")), m = document.getElementById("l-msg");
+      if (!num) return (m.innerHTML = note("Check your phone number and try again."));
+      const b = document.getElementById("l-go"); b.disabled = true; b.textContent = "Sending…";
+      try { await Auth.addPhone(num); } catch (err) { b.disabled = false; b.textContent = "Send code"; return (m.innerHTML = note(err.message)); }
+      area.innerHTML = `<p class="small">We texted a 6-digit code to ${esc(prettyPhone(num))}.</p>${codeBoxesHtml()}<div id="l-msg" style="margin-top:10px"></div>`;
+      let busy = false;
+      const ctl = bindCodeBoxes(async (c) => {
+        if (busy) return; busy = true;
+        try { await Auth.confirmPhoneChange(num, c); await viewAccount(); }
+        catch (err) { busy = false; ctl.error(); ctl.clear(); document.getElementById("l-msg").innerHTML = note(err.message); }
+      });
+    };
+  };
 }
 
 /* ───────────────────────────── start ───────────────────────────── */

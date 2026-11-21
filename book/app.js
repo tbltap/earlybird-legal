@@ -240,7 +240,7 @@ async function refreshTestBar() {
 function drawTabs(path) {
   const el = document.getElementById("tabs");
   const signedIn = !!Auth.session();
-  el.hidden = path === "/book" || path === "/signin"; // the booking screen is a full-screen sheet in the app: no tab bar
+  el.hidden = path === "/book" || path === "/signin" || path.startsWith("/r/"); // the booking sheet and the restaurant page are pushed screens in the app: no tab bar
   const on = path === "/" || path.startsWith("/r/") || path === "/book" ? "home" : path.startsWith("/booking") ? "bookings" : path === "/account" ? "account" : "";
   const tab = (k, href, icon, label) => `<a href="${href}" class="${on === k ? "on" : ""}" ${on === k ? 'aria-current="page"' : ""}>${ic(icon)}${label}</a>`;
   el.innerHTML = tab("home", "#/", "home", "Home") + tab("bookings", "#/bookings", "cal", "Bookings") + (signedIn ? tab("account", "#/account", "person", "Profile") : tab("account", "#/signin", "person", "Sign in"));
@@ -523,6 +523,10 @@ function resultHtml(v) {
 
 
 /* ───────────────────────────── desktop list (the First Table-style region page) ───────────────────────────── */
+// Ratings (0105_ratings): v.rating / v.review_count count verified visits only, one per person; the reviews list can be
+// longer (unverified reviews too) and can exist while v.rating is null.
+const visitsTxt = (n) => `${n} verified visit${n === 1 ? "" : "s"}`;
+const revExtras = (r, v) => `${r.dish ? `<div class="muted small">Had the ${esc(r.dish)}</div>` : ""}${r.reply?.text ? `<div class="revreply"><b>Reply from ${esc(v.name)}</b><p>${esc(r.reply.text)}</p></div>` : ""}`;
 const stars5 = (r) => { const n = Math.round(Number(r) || 0); return `<span class="stars" aria-label="${Number(r).toFixed(1)} out of 5">${"★".repeat(n)}<span class="off">${"★".repeat(5 - n)}</span></span>`; };
 const MEALS = ["breakfast", "lunch", "dinner"];
 const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
@@ -680,7 +684,7 @@ async function viewVenue(slug, q) {
   showPage(`
     <div class="hero">${img ? `<img src="${esc(img)}" alt="" onerror="this.remove()">` : ""}<a class="round l" href="#/" aria-label="Back">${ic("back")}</a></div>
     <h1 class="vtitle">${esc(v.name)}</h1>
-    ${v.rating != null ? `<div class="info"><span class="stars">★</span><span>${Number(v.rating).toFixed(1)}${v.review_count ? ` (${v.review_count} reviews)` : ""}</span></div>` : `<div class="info">${ic("bird")}<span>New on Early Bird</span></div>`}
+    ${v.rating != null ? `<div class="info"><span class="stars">★</span><span>${Number(v.rating).toFixed(1)}${v.review_count ? ` (${visitsTxt(v.review_count)})` : ""}</span></div>` : `<div class="info">${ic("bird")}<span>New on Early Bird</span></div>`}
     ${v.address ? `<div class="info">${ic("pin")}<a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(v.name + " " + v.address)}" target="_blank" rel="noopener" style="color:inherit">${esc(v.address)}</a></div>` : ""}
     ${cuisineText(v) ? `<div class="info">${ic("fork")}<span>${esc(cuisineText(v))}</span></div>` : ""}
     ${v.description ? `<p style="margin:10px 0">${esc(v.description)}</p>` : ""}
@@ -705,8 +709,8 @@ async function viewVenue(slug, q) {
       ${menu.map((s, i) => `<details ${i === 0 ? "open" : ""}><summary>${esc(s.title)}</summary>${s.items.map((it) => `
         <div class="item"><div><span>${esc(it.name)}</span>${v.deal_menu && it.on_deal ? ' <span class="badge">On the deal</span>' : ""}${it.description ? `<div class="d">${esc(it.description)}</div>` : ""}</div><div class="p">${it.price_cents != null ? money(it.price_cents) : ""}</div></div>`).join("")}</details>`).join("")}</div>` : ""}
     <hr class="rule"><h2 class="title" style="margin-bottom:8px">Opening hours</h2><table class="hours">${hoursRows}</table>
-    ${(v.reviews || []).length ? `<hr class="rule"><h2 class="title" style="margin-bottom:6px">Reviews</h2>${v.reviews.map((r) => `<div class="review"><div><span class="stars">${"★".repeat(r.rating)}</span> <b>${esc(r.author)}</b> ${r.verified ? '<span class="status ok">Verified visit</span>' : ""}</div>${r.text ? `<div>${esc(r.text)}</div>` : ""}</div>`).join("")}` : ""}
-    ${deal ? `<div class="stickybook"><div class="in"><button class="btn" id="b-go" disabled>Book</button></div></div>` : ""}`, { wash: false });
+    ${(v.reviews || []).length ? `<hr class="rule"><h2 class="title" style="margin-bottom:6px">Reviews</h2>${v.reviews.map((r) => `<div class="review"><div><span class="stars">${"★".repeat(r.rating)}</span> <b>${esc(r.author)}</b> ${r.verified ? '<span class="status ok">Verified visit</span>' : ""}${r.edited ? ' <span class="muted small">· Edited</span>' : ""}</div>${r.text ? `<div>${esc(r.text)}</div>` : ""}${revExtras(r, v)}</div>`).join("")}` : ""}
+    ${deal ? `<div class="stickybook"><div class="in"><button class="btn" id="b-go">Book</button></div></div>` : ""}`, { wash: false });
   const mb = document.getElementById("menu-btn");
   if (mb) mb.onclick = (e) => { e.preventDefault(); document.getElementById("menu").scrollIntoView({ behavior: "smooth" }); };
   if (!deal) return;
@@ -718,7 +722,6 @@ async function viewVenue(slug, q) {
     B.loading = false; drawSlots();
   }
   function drawSlots() {
-    goBtn.disabled = !B.time;
     if (B.loading) { slotsEl.innerHTML = '<p class="loading">Checking tables…</p>'; return; }
     const days = B.avail || [];
     if (!days.some((d) => d.open && d.slots.some((s) => s.left > 0))) { slotsEl.innerHTML = `<p class="muted" style="margin-top:14px">No ${B.meal} tables in the next 8 days. Try another meal or number of diners.</p>`; return; }
@@ -734,7 +737,7 @@ async function viewVenue(slug, q) {
   }
   document.getElementById("b-meal").onchange = (e) => { B.meal = e.target.value; B.date = null; fetchAvail(); };
   document.getElementById("b-diners").onchange = (e) => { B.diners = +e.target.value; B.date = null; fetchAvail(); };
-  goBtn.onclick = () => B.time && go("/book", { v: v.slug, deal: deal.id, date: B.date, time: B.time, meal: B.meal, diners: B.diners });
+  goBtn.onclick = () => { if (!B.time) { const y = scrollY; slotsEl.scrollIntoView({ behavior: "smooth", block: "center" }); setTimeout(() => { if (scrollY === y) slotsEl.scrollIntoView({ block: "center" }); }, 400); toast("Pick a time first."); return; } go("/book", { v: v.slug, deal: deal.id, date: B.date, time: B.time, meal: B.meal, diners: B.diners }); };
   await fetchAvail();
   if (q.date) document.querySelector(`[data-date="${q.date}"]`)?.scrollIntoView({ inline: "center", block: "nearest" });
 }
@@ -762,7 +765,7 @@ async function viewVenueDesk(v, q) {
   showRaw(`<div class="wide">
     <div class="crumbs vcrumbs"><a href="#/">${esc(v.city || "Restaurants")}</a>${v.area ? `<span>/</span><a href="#/?${new URLSearchParams({ city: city?.slug || "", a: v.area })}">${esc(v.area)}</a>` : ""}<span>/</span>${esc(v.name)}</div>
     <div class="vhead"><div><h1>${esc(v.name)}</h1>
-      <div class="vrate">${v.rating != null ? `${stars5(v.rating)} <a href="#reviews" id="to-rev">${v.review_count} review${v.review_count === 1 ? "" : "s"}</a>` : `${ic("bird")} New on Early Bird`}</div></div>
+      <div class="vrate">${v.rating != null ? `${stars5(v.rating)} <a href="#reviews" id="to-rev">${visitsTxt(v.review_count)}</a>` : `${ic("bird")} New on Early Bird`}</div></div>
       <div class="vlinks">${v.website ? `<a href="${esc(v.website)}" target="_blank" rel="noopener" aria-label="Website">${ic("share")}</a>` : ""}${v.phone ? `<a href="tel:${esc(v.phone)}" aria-label="Phone">${ic("info")}</a>` : ""}</div></div>
   </div>
   <div class="gallery ${photos.length > 1 ? "" : "one"}">
@@ -779,8 +782,8 @@ async function viewVenueDesk(v, q) {
         ${menu.map((s, i) => `<details ${i < 2 ? "open" : ""}><summary>${esc(s.title)}</summary>${s.items.map((it) => `
           <div class="item"><div><span>${esc(it.name)}</span>${v.deal_menu && it.on_deal ? ' <span class="badge">On the deal</span>' : ""}${it.description ? `<div class="d">${esc(it.description)}</div>` : ""}</div><div class="p">${it.price_cents != null ? money(it.price_cents) : ""}</div></div>`).join("")}</details>`).join("")}</div>` : ""}
       <div id="reviews"><h2 class="serif">What people say</h2>
-        ${reviews.length ? `<div class="revsum">${stars5(v.rating)} <b>${Number(v.rating).toFixed(1)}</b> <span class="muted">from ${v.review_count} review${v.review_count === 1 ? "" : "s"}</span></div>
-          ${reviews.map((r) => `<div class="drev"><span class="ava">${esc((r.author || "?").charAt(0))}</span><div><b>${esc(r.author)}</b><div class="muted small">${r.verified ? `Dined at ${esc(v.name)}` : "Reviewed"}${r.date ? ` on ${esc(fmtStamp(r.date))}` : ""}</div><div>${stars5(r.rating)}</div>${r.text ? `<p>${esc(r.text)}</p>` : ""}</div></div>`).join("")}`
+        ${reviews.length ? `${v.rating != null ? `<div class="revsum">${stars5(v.rating)} <b>${Number(v.rating).toFixed(1)}</b> <span class="muted">from ${visitsTxt(v.review_count)}</span></div>` : `<div class="revsum">${ic("bird")} <span class="muted">New on Early Bird</span></div>`}
+          ${reviews.map((r) => `<div class="drev"><span class="ava">${esc((r.author || "?").charAt(0))}</span><div><b>${esc(r.author)}</b><div class="muted small">${r.verified ? `Dined at ${esc(v.name)}` : "Reviewed"}${r.date ? ` on ${esc(fmtStamp(r.date))}` : ""}${r.edited ? " · Edited" : ""}</div><div>${stars5(r.rating)}</div>${r.text ? `<p>${esc(r.text)}</p>` : ""}${revExtras(r, v)}</div></div>`).join("")}`
         : `<p class="muted">No reviews yet. Diners can review after their visit.</p>`}</div>
       <div id="contact"><h2 class="serif">Opening hours and contact</h2>
         <div class="contact"><table class="hours">${hoursRows}</table>

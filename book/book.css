@@ -432,3 +432,4 @@ body.desk #co .card{border-radius:10px}
 .hsearch:focus-within{max-width:440px}
 @media (min-width:1024px) and (max-width:1279px){.hnav .hhow{display:none}.hnav{gap:16px}.hsearch{max-width:300px}}
 body.desk main>.col{padding-top:28px}
+.lines .k{color:var(--muted);font-size:14px;padding-top:2px}

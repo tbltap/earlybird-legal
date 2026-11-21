@@ -968,7 +968,7 @@ async function viewCheckout(q) {
   };
   const policyHtml = () => {
     const cfg = S.config;
-    return `<div class="policy"><b>Cancellation policy</b><br>Plans change. This policy encourages you to cancel sooner rather than later so the restaurant has time to fill your table with another Early Bird booking. Cancellations are returned as ${esc(CREDIT)} you can use on other Early Bird bookings for ${cfg.credit_valid_days} days.
+    return `<div class="policy"><b>Cancellation policy</b><br>Plans change. This policy encourages you to cancel sooner rather than later so the restaurant has time to fill your table with another Early Bird booking. Cancellations are returned as ${esc(CREDIT)} for booking fees on other Early Bird bookings, used first on your next one, for ${cfg.credit_valid_days} days.
       <table><tr><td>Within ${cfg.cancel_full_credit_minutes} minutes of booking</td><td>The whole fee</td></tr>
       <tr><td>Later, before the day of your booking</td><td>${cfg.cancel_before_day_percent}% of the fee</td></tr>
       <tr><td>On the day, or no-show</td><td>Nothing</td></tr></table></div>`;
@@ -977,6 +977,7 @@ async function viewCheckout(q) {
     const h = hd();
     return `<div class="lines"><div><span>Booking fee${h.fee_per_diner_cents != null ? ` (${h.diners} × ${money(h.fee_per_diner_cents)})` : ""}</span><span>${money(h.fee_cents)}</span></div>
       ${h.credit_cents > 0 ? `<div class="g"><span>Paid from your ${esc(CREDIT)}</span><span>−${money(h.credit_cents)}</span></div>` : ""}
+      ${h.credit_kept_cents > 0 && h.amount_due_cents > 0 ? `<div class="k"><span>${money(h.credit_kept_cents)} credit saved for a fee it covers in full</span></div>` : ""}
       <div class="g"><span>${ic("check")} Est. savings on food</span><span>${m0(h.saving_cents)}</span></div>
       ${S.config.reward_per_booking_cents > 0 ? `<div class="n"><span>${ic("bird")} ${esc(CREDIT)} you'll earn</span><span>+${money(S.config.reward_per_booking_cents)}</span></div>` : ""}</div>`;
   };
@@ -1251,7 +1252,7 @@ async function viewAccount() {
     ${sign}
     <div class="card"><div class="title">${esc(CREDIT)}</div><div class="balance">${money(cr.balance_cents)}</div>
       ${cr.pending_cents ? `<div class="muted small">${money(cr.pending_cents)} pending (available after your visit)</div>` : ""}
-      <p class="small muted" style="margin-top:8px">It's used automatically on your next booking fee. ${esc(CREDIT)} has no cash value. <a href="../credit-terms.html">${esc(CREDIT)} terms</a></p>
+      <p class="small muted" style="margin-top:8px">Credit from a cancellation is used first on your next booking fee. Credit you earn is used only when it covers a whole booking fee. It's for booking fees only and has no cash value. <a href="../credit-terms.html">${esc(CREDIT)} terms</a></p>
       ${(cr.credits || []).length ? `<div class="title" style="font-size:16px;margin:14px 0 4px">Expiring soonest</div>${cr.credits.slice(0, 6).map((c) => `<div class="item"><div><span>${esc(c.title)}</span><div class="d">${c.pending ? "Pending" : c.expires_at ? "Use by " + esc(fmtStamp(c.expires_at)) : ""}</div></div><div class="p">${money(c.cents)}</div></div>`).join("")}` : ""}</div>
     <div class="actions"><a class="btn pale" href="#/bookings">Bookings</a><button class="btn grey" id="so" type="button">Sign out</button></div>
     <p class="center small muted" style="margin-top:20px"><a href="../account-deletion.html" style="color:inherit">Delete my account</a></p>`);

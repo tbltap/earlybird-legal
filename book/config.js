@@ -7,5 +7,5 @@ window.EB_CONFIG = {
   key: "sb_publishable_TW9FPHv3ijsOZx4QPTIsdA_hSWFafW4",
   payUrl: "https://xopcdblqmmrvyocqomqz.supabase.co/functions/v1/pay",
   siteUrl: "https://eatearlybird.com",
-  creditName: "Venuu cash"
+  creditName: "Early Bird credit"
 };

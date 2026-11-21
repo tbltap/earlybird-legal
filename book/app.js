@@ -219,28 +219,31 @@ function drawTabs(path) {
 }
 // Desktop (1024 px and wider) follows the First Table-style website layout (FIRST_TABLE_WEB_FLOW.md): a white header with
 // search and city, a navy footer, wide pages. Phones keep the app-style layout and the floating tab bar.
-// One design at every width (owner, 21 Nov: "on mobile near exact same"): the website layout, made to fit phones in
-// book.css. The older app-style phone screens below stay in the file but are no longer used.
-const isDesk = () => true;
+// Phones get the app's own screens (owner, 21 Nov: "the ui needs to feel exact same"): no logo header, the app's floating
+// Home / Bookings / Profile pill bar, the app's restaurant page and booking sheet. Desktop (1024 px+) keeps the wide
+// website layout with the app's pill-style nav buttons.
+const DESK_MQ = matchMedia("(min-width: 1024px)");
+const isDesk = () => DESK_MQ.matches;
+DESK_MQ.addEventListener?.("change", () => route());
 async function drawChrome(path) {
   const desk = isDesk(), signedIn = !!Auth.session(), minimal = path === "/book";
   document.body.classList.toggle("desk", desk);
   const head = document.getElementById("dhead"), foot = document.getElementById("dfoot");
   head.hidden = foot.hidden = !desk;
   if (!desk) return;
-  const logo = `<a class="dlogo" href="../"><img src="../img/bird-cyan.png" alt="" width="29" height="34">Early Bird</a>`;
   const legal = `<div class="df-legal"><a href="../terms.html">Terms</a><a href="../privacy.html">Privacy</a><a href="../credit-terms.html">${esc(CREDIT)} terms</a><a href="../support.html">Support</a><span>© 2026 Early Bird</span></div>`;
   if (minimal) {
-    head.innerHTML = `<div class="dh-in dh-min">${logo}</div>`;
+    head.innerHTML = ""; head.hidden = true; // the booking page is a sheet, like the app: no header
     foot.innerHTML = `<div class="df-in df-min">${legal}</div>`;
     return;
   }
   const on = (k) => ((k === "home" && (path === "/" || path.startsWith("/r/"))) || (k === "bookings" && path.startsWith("/booking")) || (k === "account" && path === "/account") ? ' class="on"' : "");
-  head.innerHTML = `<div class="dh-in">${logo}
+  const pill = (k, href, icon, label, cls = "") => `<a href="${href}" class="hpill ${cls}"${on(k)}>${ic(icon)}<span>${label}</span></a>`;
+  head.innerHTML = `<div class="dh-in">
     ${`<div class="hsearch" id="hsearch">${ic("search")}<input id="hs" type="search" placeholder="Search restaurants" autocomplete="off" aria-label="Search restaurants"><div id="hs-list" class="hs-list" role="listbox" hidden></div></div>
       <label class="hcity">${ic("pin")}<select id="hcity" aria-label="City"><option>City</option></select></label>`}
-    <nav class="hnav" aria-label="Main"><a class="hhow" href="../#how">How it works</a>${signedIn ? `<a href="#/"${on("home")}>Find a table</a><a href="#/bookings"${on("bookings")}>My bookings</a><a href="#/account"${on("account")}>Profile</a>` : `<a href="#/"${on("home")}>Find a table</a><a href="#/signin" class="hsign">Sign in</a>`}
-      <a class="hout" href="../restaurant-terms.html">For restaurants</a></nav></div>`;
+    <nav class="hnav" aria-label="Main">${pill("home", "#/", "home", "Home")}${pill("bookings", signedIn ? "#/bookings" : "#/signin", "cal", "Bookings")}${signedIn ? pill("account", "#/account", "person", "Profile") : pill("account", "#/signin", "person", "Sign in")}
+      <a class="hpill ghost" href="../#how">${ic("help")}<span>How it works</span></a></nav></div>`;
   foot.innerHTML = `<div class="df-in"><div class="df-cols">
       <div><h3>Diners</h3><p>Book an early table and get 50% off the food bill. A small booking fee holds it.</p><a class="dbtn" href="#/">Find a table</a></div>
       <div><h3>Restaurants</h3><p>List your early tables on Early Bird for free and fill your quiet hours.</p><a class="dbtn ghost" href="../restaurant-terms.html">Restaurant terms</a></div>
@@ -278,7 +281,7 @@ async function drawChrome(path) {
   document.addEventListener("click", (e) => { if (!e.target.closest("#hsearch")) close(); });
 }
 const legalLinks = `<div class="legal"><a href="../terms.html">Terms</a><a href="../privacy.html">Privacy</a><a href="../credit-terms.html">${esc(CREDIT)} terms</a><a href="../support.html">Support</a></div>`;
-const topbar = (right = "") => `<div class="wash"><div class="col"><div class="topbar"><a class="brand" href="../"><img src="../img/bird-navy.png" alt="" width="26" height="30">Early Bird</a>${right}</div></div></div>`;
+const topbar = (right = "") => `<div class="wash"><div class="col"><div class="topbar${right ? "" : " empty"}">${right}</div></div></div>`;
 const showPage = (inner, { wash = true, right = "", size = "" } = {}) => {
   if (isDesk()) { APP.innerHTML = `<div class="col ${size || (Auth.session() ? "" : "narrow")}">${inner}</div>`; return; }
   APP.innerHTML = (wash ? topbar(right) : "") + `<div class="col">${inner}${legalLinks}</div>`;
@@ -413,7 +416,8 @@ async function viewHome(q) {
     <div id="grid"></div>
     <div style="margin-top:8px"><button class="btn pale" id="more" hidden>Show more</button></div>
     <div class="card help" style="margin-top:18px"><div>${ic("help")}</div><div><div class="title">How do I get 50% off?</div><div class="muted">See how Early Bird works</div><a class="learn" href="../#how">Learn more</a></div></div>`,
-  { right: `<label class="pinsel">${ic("pin")}<select id="f-city" aria-label="City">${S.cities.map((c) => `<option value="${esc(c.slug)}" ${c.slug === S.city.slug ? "selected" : ""}>${esc(c.name)}</option>`).join("")}</select></label>` });
+  { right: `<label class="pinsel">${ic("pin")}<select id="f-city" aria-label="City">${S.cities.map((c) => `<option value="${esc(c.slug)}" ${c.slug === S.city.slug ? "selected" : ""}>${esc(c.name)}</option>`).join("")}</select></label><button class="iconbtn" type="button" id="focus-q" aria-label="Search">${ic("search")}</button>` });
+  document.getElementById("focus-q").onclick = () => { const i = document.getElementById("f-q"); i.scrollIntoView({ block: "center", behavior: "smooth" }); i.focus({ preventScroll: true }); };
   document.getElementById("findform").onsubmit = (e) => { e.preventDefault(); H.q = val("f-q"); go("/", { ...params(), meal: val("f-meal"), diners: val("f-diners"), ...(val("f-q") ? { q: val("f-q") } : { q: "" }) }); };
   document.getElementById("f-city").onchange = (e) => go("/", { ...params(), city: e.target.value });
   document.getElementById("f-meal").onchange = (e) => go("/", { ...params(), meal: e.target.value });
@@ -485,7 +489,7 @@ function resultHtml(v) {
     }).join("");
   }
   return `<article class="res"><a class="head" href="${href}">${thumbHtml(v)}<div><div class="nm">${esc(v.name)}</div><div class="meta">${esc(sub)}</div></div></a>
-    ${d ? `<div class="chips chiprow"><span class="pill">${ic("card")}${m0(d.fee_per_diner_cents)} booking fee</span><span class="pill">${ic("bird")}+${m0(S.config.reward_per_booking_cents || 0)} ${esc(CREDIT)}</span></div>` : ""}
+    ${d ? `<div class="chips chiprow"><span class="pill">${ic("card")}${m0(d.fee_per_diner_cents)} booking fee</span><span class="pill">${ic("bird")}+${m0(S.config.reward_per_booking_cents || 0)} credit</span></div>` : ""}
     ${cols ? `<div class="days">${cols}</div>` : d ? `<p class="muted small" style="padding:12px 18px 0">No ${H.meal} tables listed.</p>` : ""}</article>`;
 }
 
@@ -660,7 +664,7 @@ async function viewVenue(slug, q) {
         <label>${ic("fork")}<select id="b-meal" aria-label="Meal">${meals.map((m) => `<option value="${m}" ${m === B.meal ? "selected" : ""}>${m[0].toUpperCase() + m.slice(1)}</option>`).join("")}</select></label>
         <label>${ic("person")}<select id="b-diners" aria-label="Diners">${Array.from({ length: maxD }, (_, i) => i + 1).map((n) => `<option ${n === B.diners ? "selected" : ""} value="${n}">${n} ${n === 1 ? "diner" : "diners"}</option>`).join("")}</select></label>
       </div>
-      <div class="chiprow"><span class="pill">${ic("card")}${m0(deal.fee_per_diner_cents)} booking fee</span><span class="pill">${ic("bird")}+${m0(S.config.reward_per_booking_cents || 0)} ${esc(CREDIT)}</span></div>
+      <div class="chiprow"><span class="pill">${ic("card")}${m0(deal.fee_per_diner_cents)} booking fee</span><span class="pill">${ic("bird")}+${m0(S.config.reward_per_booking_cents || 0)} credit</span></div>
       <div id="slots"></div>
       <p class="tiny muted" style="margin-top:10px">${deal.booking_type === "walk_in" ? "Walk-in deal: arrive at your time and show your code." : `Your table is held for ${S.config.hold_minutes || 7} minutes while you check out.`}</p>
       <hr class="rule">

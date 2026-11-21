@@ -628,3 +628,18 @@ body.desk #co .coright .lines{margin:16px 0 8px}
   .vbook .assure{font-size:14px;gap:4px 14px}
 }
 @media (max-width:1023px){ .hnav:has(.hsign) a[href="#/"]{display:inline} }
+
+/* ── App look (owner, 21 Nov "exact same"): no logo header; phones top row = city + search like the app ── */
+.topbar{justify-content:space-between}
+.topbar.empty{padding:4px 0 0;min-height:8px}
+.iconbtn{width:42px;height:42px;border-radius:50%;border:0;background:rgba(255,255,255,.7);color:var(--ink);display:flex;align-items:center;justify-content:center;cursor:pointer}
+.iconbtn svg{width:22px;height:22px}
+/* desktop header: the app's pill buttons instead of a logo and text links */
+.dh-in{gap:16px}
+.hpill{display:inline-flex;align-items:center;gap:8px;padding:9px 16px;border-radius:999px;color:var(--ink)!important;text-decoration:none!important;font:600 15px var(--sans);white-space:nowrap}
+.hpill svg{width:20px;height:20px}
+.hpill:hover{background:#F1F3F8}
+.hpill.on{background:var(--chip);color:var(--navy)!important}
+.hpill.ghost{color:var(--muted)!important;font-weight:500}
+.hnav{gap:6px}
+body.desk .dhead[hidden]{display:none}

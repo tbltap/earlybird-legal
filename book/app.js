@@ -159,11 +159,10 @@ function authMessage(j, status) {
 
 /* ───────────────────────────── API (always with the diner's token) ───────────────────────────── */
 async function rpc(fn, params = {}) {
-  const token = await Auth.token();
-  if (!token) throw new ApiError("not_signed_in", "Please sign in to continue.", 401);
+  const token = await Auth.token(); // visitors (not signed in) browse with the publishable key
   const res = await fetch(`${CFG.url}/rest/v1/rpc/${fn}`, {
     method: "POST",
-    headers: { apikey: CFG.key, Authorization: `Bearer ${token}`, "Content-Type": "application/json", "Content-Profile": "api", "Accept-Profile": "api" },
+    headers: { apikey: CFG.key, Authorization: `Bearer ${token || CFG.key}`, "Content-Type": "application/json", "Content-Profile": "api", "Accept-Profile": "api" },
     body: JSON.stringify(params),
   }).catch(() => { throw new ApiError("offline", "No connection. Check your internet and try again."); });
   if (!res.ok) {
@@ -213,11 +212,10 @@ async function refreshTestBar() {
 function drawTabs(path) {
   const el = document.getElementById("tabs");
   const signedIn = !!Auth.session();
-  el.hidden = !signedIn || path === "/book"; // the booking screen is a full-screen sheet in the app: no tab bar
-  if (!signedIn) return;
+  el.hidden = path === "/book" || path === "/signin"; // the booking screen is a full-screen sheet in the app: no tab bar
   const on = path === "/" || path.startsWith("/r/") || path === "/book" ? "home" : path.startsWith("/booking") ? "bookings" : path === "/account" ? "account" : "";
   const tab = (k, href, icon, label) => `<a href="${href}" class="${on === k ? "on" : ""}" ${on === k ? 'aria-current="page"' : ""}>${ic(icon)}${label}</a>`;
-  el.innerHTML = tab("home", "#/", "home", "Home") + tab("bookings", "#/bookings", "cal", "Bookings") + tab("account", "#/account", "person", "Profile");
+  el.innerHTML = tab("home", "#/", "home", "Home") + tab("bookings", "#/bookings", "cal", "Bookings") + (signedIn ? tab("account", "#/account", "person", "Profile") : tab("account", "#/signin", "person", "Sign in"));
 }
 // Desktop (1024 px and wider) follows the First Table-style website layout (FIRST_TABLE_WEB_FLOW.md): a white header with
 // search and city, a navy footer, wide pages. Phones keep the app-style layout and the floating tab bar.
@@ -230,7 +228,7 @@ async function drawChrome(path) {
   const head = document.getElementById("dhead"), foot = document.getElementById("dfoot");
   head.hidden = foot.hidden = !desk;
   if (!desk) return;
-  const logo = `<a class="dlogo" href="../"><img src="../img/icon.png" alt="" width="34" height="34">Early Bird</a>`;
+  const logo = `<a class="dlogo" href="../"><img src="../img/bird-cyan.png" alt="" width="29" height="34">Early Bird</a>`;
   const legal = `<div class="df-legal"><a href="../terms.html">Terms</a><a href="../privacy.html">Privacy</a><a href="../credit-terms.html">${esc(CREDIT)} terms</a><a href="../support.html">Support</a><span>© 2026 Early Bird</span></div>`;
   if (minimal) {
     head.innerHTML = `<div class="dh-in dh-min">${logo}</div>`;
@@ -239,16 +237,15 @@ async function drawChrome(path) {
   }
   const on = (k) => ((k === "home" && (path === "/" || path.startsWith("/r/"))) || (k === "bookings" && path.startsWith("/booking")) || (k === "account" && path === "/account") ? ' class="on"' : "");
   head.innerHTML = `<div class="dh-in">${logo}
-    ${signedIn ? `<div class="hsearch" id="hsearch">${ic("search")}<input id="hs" type="search" placeholder="Search restaurants" autocomplete="off" aria-label="Search restaurants"><div id="hs-list" class="hs-list" role="listbox" hidden></div></div>
-      <label class="hcity">${ic("pin")}<select id="hcity" aria-label="City"><option>City</option></select></label>` : ""}
-    <nav class="hnav" aria-label="Main"><a class="hhow" href="../#how">How it works</a>${signedIn ? `<a href="#/"${on("home")}>Find a table</a><a href="#/bookings"${on("bookings")}>My bookings</a><a href="#/account"${on("account")}>Profile</a>` : `<a href="#/signin" class="hsign">Sign in</a>`}
+    ${`<div class="hsearch" id="hsearch">${ic("search")}<input id="hs" type="search" placeholder="Search restaurants" autocomplete="off" aria-label="Search restaurants"><div id="hs-list" class="hs-list" role="listbox" hidden></div></div>
+      <label class="hcity">${ic("pin")}<select id="hcity" aria-label="City"><option>City</option></select></label>`}
+    <nav class="hnav" aria-label="Main"><a class="hhow" href="../#how">How it works</a>${signedIn ? `<a href="#/"${on("home")}>Find a table</a><a href="#/bookings"${on("bookings")}>My bookings</a><a href="#/account"${on("account")}>Profile</a>` : `<a href="#/"${on("home")}>Find a table</a><a href="#/signin" class="hsign">Sign in</a>`}
       <a class="hout" href="../restaurant-terms.html">For restaurants</a></nav></div>`;
   foot.innerHTML = `<div class="df-in"><div class="df-cols">
       <div><h3>Diners</h3><p>Book an early table and get 50% off the food bill. A small booking fee holds it.</p><a class="dbtn" href="#/">Find a table</a></div>
       <div><h3>Restaurants</h3><p>List your early tables on Early Bird for free and fill your quiet hours.</p><a class="dbtn ghost" href="../restaurant-terms.html">Restaurant terms</a></div>
       <div><h3>Get the app</h3><p>Early Bird for iPhone: your bookings, codes and ${esc(CREDIT)} in your pocket.</p><a class="dbtn ghost" href="../">Learn more</a></div>
     </div>${legal}</div>`;
-  if (!signedIn) return;
   // city picker
   loadCities().then(() => {
     const sel = document.getElementById("hcity"); if (!sel) return;
@@ -281,7 +278,7 @@ async function drawChrome(path) {
   document.addEventListener("click", (e) => { if (!e.target.closest("#hsearch")) close(); });
 }
 const legalLinks = `<div class="legal"><a href="../terms.html">Terms</a><a href="../privacy.html">Privacy</a><a href="../credit-terms.html">${esc(CREDIT)} terms</a><a href="../support.html">Support</a></div>`;
-const topbar = (right = "") => `<div class="wash"><div class="col"><div class="topbar"><a class="brand" href="../"><img src="../img/icon.png" alt="" width="30" height="30">Early Bird</a>${right}</div></div></div>`;
+const topbar = (right = "") => `<div class="wash"><div class="col"><div class="topbar"><a class="brand" href="../"><img src="../img/bird-navy.png" alt="" width="26" height="30">Early Bird</a>${right}</div></div></div>`;
 const showPage = (inner, { wash = true, right = "", size = "" } = {}) => {
   if (isDesk()) { APP.innerHTML = `<div class="col ${size || (Auth.session() ? "" : "narrow")}">${inner}</div>`; return; }
   APP.innerHTML = (wash ? topbar(right) : "") + `<div class="col">${inner}${legalLinks}</div>`;
@@ -311,8 +308,10 @@ async function route() {
   drawChrome(path);
   APP.innerHTML = '<div class="col"><p class="loading">Loading…</p></div>';
   try {
-    // Signed-out visitors get the sign-in screen for every address (a link to a restaurant or booking is kept and opened after sign-in).
-    if (!Auth.session()) {
+    // Visitors can browse and open restaurant pages without an account. Booking, "My bookings" and Profile need one:
+    // those addresses show the sign-in screen and open again after sign-in.
+    const needsAccount = path === "/book" || path === "/bookings" || path.startsWith("/booking/") || path === "/account" || new URLSearchParams(location.search).get("pay");
+    if (!Auth.session() && (needsAccount || path === "/signin")) {
       const sq = new URLSearchParams(location.search);
       const next = sq.get("pay") ? "" : path === "/signin" ? q.next || "#/" : location.hash || "#/";
       return await viewSignIn({ ...q, next, mode: q.mode });
@@ -328,7 +327,10 @@ async function route() {
     if (path === "/account") return await viewAccount();
     showPage(`<div class="gate"><h1 class="display">Page not found</h1><p><a class="btn" href="#/">Home</a></p></div>`);
   } catch (e) {
-    if (e.code === "not_signed_in") { Auth.save(null); return route(); }
+    if (e.code === "not_signed_in") {
+      if (Auth.session()) { Auth.save(null); return route(); } // the session ran out
+      return viewSignIn({ next: location.hash || "#/" });      // the server only lets signed-in people see this
+    }
     showPage(`<div class="msg err">${esc(friendly(e))}</div><a class="btn" href="#/">Back to Home</a>`);
     console.error(e);
   }

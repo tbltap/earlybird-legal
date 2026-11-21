@@ -21,7 +21,7 @@ svg.i{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.8;stro
 .wash{background:linear-gradient(180deg,var(--hero-top) 0,rgba(143,229,255,.35) 55%,var(--page) 100%)}
 .topbar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 0 6px}
 .brand{display:flex;align-items:center;gap:9px;color:var(--ink);text-decoration:none;font:900 22px/1 var(--serif)}
-.brand img{border-radius:8px;width:30px;height:30px}
+.brand img{width:auto;height:30px}
 .pinsel{display:flex;align-items:center;gap:8px;color:var(--navy-dark);font-weight:500}
 .pinsel select{border:0;background:transparent;font:500 17px var(--sans);color:var(--navy-dark);padding:4px 0;margin:0;width:auto;cursor:pointer}
 .testbar{background:#FFF1E4;color:#8a3d0b;text-align:center;font-size:14px;padding:7px 12px;border-bottom:1px solid #f4d3b3}

@@ -97,6 +97,7 @@ async function upload(bucket, path, blob) {
 /* ───────────────────────────── entry ───────────────────────────── */
 export default async function bizRoute(path, q) {
   if (path === "/biz") return viewBizHome();
+  if (path === "/biz/why") return viewWhy();
   if (!Auth.session()) return viewSignIn({ next: location.hash });
   if (path === "/biz/find") return viewFind(q);
   if (path === "/biz/new") return viewNew();
@@ -104,7 +105,7 @@ export default async function bizRoute(path, q) {
   if (path.startsWith("/biz/v/")) return viewVenue(path.slice(7), q);
   return viewBizHome();
 }
-const page = (inner) => showPage(`<div class="biz">${inner}</div>`, { wash: false });
+const page = (inner) => showPage(`<div class="biz">${inner}</div>`, { wash: false, size: "bizwide" });
 const back = (href, label) => `<a class="bizback" href="${href}">${ic("back")}${esc(label)}</a>`;
 async function myClaims() { return (await rpc("my_venue_claims")) || []; }
 const claimFor = (claims, venueId) => claims.find((c) => c.venue_id === venueId && c.status !== "withdrawn" && c.status !== "rejected");
@@ -119,12 +120,15 @@ async function viewBizHome() {
       <li><b>Add your photos, menu and links</b><span>Pictures of the place and the food, your menu as a file or a link, your ordering and reservations sites.</span></li>
       <li><b>Send it</b><span>It goes live once your document checks out. We'll then give you a call.</span></li></ol>`;
   if (!Auth.session()) {
-    return page(`<section class="bizhero"><h1 class="display">List your restaurant on Early Bird</h1>
+    page(`<section class="bizhero"><h1 class="display">List your restaurant on Early Bird</h1>
       <ul class="bizpoints"><li>${ic("check")}Listing is free.</li><li>${ic("check")}You choose the days, the early times and how many tables.</li><li>${ic("check")}Diners get 50% off the food bill at those times, and your quiet hours fill up.</li></ul>
       <a class="btn" href="#/signin?next=${encodeURIComponent("#/biz")}">Get started</a>
       <p class="small muted">Sign in with your phone number or email. It takes about 15 minutes, all online.</p></section>
-      <h2 class="bizh">How it works</h2>${steps}
+      ${econHtml()}
+      <h2 class="bizh">How you sign up</h2>${steps}
+      <a class="btn" href="#/signin?next=${encodeURIComponent("#/biz")}">Get started</a>
       <p class="small muted"><a href="../restaurant-terms.html">Restaurant Terms</a> · Questions? <a href="../support.html">Support</a></p>`);
+    return wireEcon();
   }
   page(`<p class="loading">Loading your restaurants…</p>`);
   const claims = (await myClaims()).filter((c) => c.status !== "withdrawn");
@@ -136,7 +140,115 @@ async function viewBizHome() {
   page(`<h1 class="display bizt">Your restaurants</h1>
     ${claims.length ? `<div class="bizlist">${claims.map(row).join("")}</div>` : `<p class="muted">You haven't added a restaurant yet.</p>`}
     <a class="btn" href="#/biz/find">${claims.length ? "Add another restaurant" : "Find your restaurant"}</a>
+    <p><a class="btn pale" href="#/biz/why">How Early Bird makes you money</a></p>
     <h2 class="bizh">The steps</h2>${steps}`);
+}
+function viewWhy() {
+  setTitle("How Early Bird makes you money");
+  page(`${back("#/biz", Auth.session() ? "Your restaurants" : "List your restaurant")}<h1 class="display bizt">How Early Bird makes you money</h1>${econHtml()}
+    <a class="btn" href="${Auth.session() ? "#/biz/find" : `#/signin?next=${encodeURIComponent("#/biz")}`}">${Auth.session() ? "Find your restaurant" : "Get started"}</a>`);
+  wireEcon();
+}
+
+/* ───────────────────────────── what we offer restaurants, with the maths ───────────────────────────── */
+// Owner, 21 Nov: show restaurants visually how a table that would sit empty still makes money: full-price drinks and
+// sides, the main at half price, staff they pay anyway, a month of extra money from averages, the guest list they own,
+// and that they choose the slow times while Early Bird does the marketing. Example numbers only; never the booking fee.
+const EX = { tables: 2, perTable: 2, nights: 26, full: 75, main: 24, drink: 9, side: 11, foodPct: 30, drinkPct: 22, card: 3 };
+const usd = (n) => (n < 0 ? "−" : "") + "$" + Math.abs(n).toLocaleString("en-US", { maximumFractionDigits: n !== 0 && Math.abs(n) < 100 ? 2 : 0, minimumFractionDigits: n !== 0 && Math.abs(n) < 100 ? 2 : 0 });
+function guestMaths(x) {
+  const pays = x.main / 2 + x.drink + x.side;
+  const ingredients = x.main * x.foodPct / 100 + x.drink * x.drinkPct / 100 + x.side * x.foodPct / 100;
+  const fees = pays * x.card / 100, keep = pays - ingredients - fees;
+  const guests = Math.round(x.tables * x.perTable * x.nights * x.full / 100);
+  return { pays, ingredients, fees, keep, guests, sales: guests * pays, cost: guests * (ingredients + fees), net: guests * keep };
+}
+function econHtml() {
+  const g = guestMaths(EX);
+  const slot = (t, k) => `<span class="eslot ${k}">${t}</span>`;
+  return `<section class="econ">
+    <div class="ecard">
+      <h2 class="eh">Your quiet hours, filled</h2>
+      <p>Most restaurants have tables that sit empty early in the evening, while the kitchen and the floor are already staffed. You pick those times. We fill them.</p>
+      <div class="etimeline" aria-label="An evening at your restaurant">
+        <div><span class="elabel">5:00</span>${slot("Early Bird", "eb")}</div><div><span class="elabel">5:30</span>${slot("Early Bird", "eb")}</div><div><span class="elabel">6:00</span>${slot("Early Bird", "eb")}</div>
+        <div><span class="elabel">6:30</span>${slot("Filling up", "mid")}</div><div><span class="elabel">7:00</span>${slot("Full price", "full")}</div><div><span class="elabel">8:00</span>${slot("Full price", "full")}</div></div>
+      <p class="small muted">Early Bird tables only go at the times you choose. Your busy hours stay full price.</p>
+    </div>
+
+    <div class="ecard">
+      <h2 class="eh">What one Early Bird guest orders</h2>
+      <p>Each diner orders a drink and a side or dessert at full price. The 50% covers the dishes you put on your deal, for example the mains.</p>
+      <div class="ebill">
+        <div class="ebill-h"><span class="badge">50% off mains</span><span class="small muted">Example, per guest</span></div>
+        <div><span>Drink</span><span>${usd(EX.drink)} <i>full price</i></span></div>
+        <div><span>Starter or dessert</span><span>${usd(EX.side)} <i>full price</i></span></div>
+        <div><span>Main</span><span><s>${usd(EX.main)}</s> ${usd(EX.main / 2)}</span></div>
+        <div class="tot"><span>The guest pays you</span><span>${usd(g.pays)}</span></div>
+        <div class="minus"><span>Ingredients (about ${EX.foodPct}% food, ${EX.drinkPct}% drinks)</span><span>−${usd(g.ingredients)}</span></div>
+        <div class="minus"><span>Card fees (about ${EX.card}%)</span><span>−${usd(g.fees)}</span></div>
+        <div class="keep"><span>You keep, per guest</span><span>${usd(g.keep)}</span></div>
+      </div>
+      <p class="small">Drinks and sides are your best-margin items, so a half-price main still leaves money on the table for you. Not on it.</p>
+    </div>
+
+    <div class="ecard">
+      <h2 class="eh">Your staff are paid either way</h2>
+      <div class="estaff"><div class="ecol empty"><b>An empty table</b><span>Staff, rent and power still cost you</span><strong>$0 in</strong></div>
+        <div class="ecol eb"><b>An Early Bird table of 2</b><span>The same staff serve it</span><strong>about ${usd(g.keep * 2)} kept</strong></div></div>
+      <p class="small muted">The money from early tables helps pay costs you have anyway. Listing on Early Bird is free: the diner pays us a small booking fee, not you.</p>
+    </div>
+
+    <div class="ecard" id="ecalc">
+      <h2 class="eh">A month, worked out</h2>
+      <p class="small">Change the numbers to match your restaurant.</p>
+      <div class="ecalc-in">
+        ${[["tables", "Early tables each evening", 1, 10, 1, ""], ["perTable", "Diners per table", 1, 6, 1, ""], ["nights", "Evenings a month", 4, 31, 1, ""], ["full", "How often they're booked", 20, 100, 5, "%"],
+           ["main", "Average main", 10, 60, 1, "$"], ["drink", "Average drink", 3, 25, 1, "$"], ["side", "Average starter or dessert", 4, 25, 1, "$"], ["foodPct", "Food cost", 20, 45, 1, "%"], ["drinkPct", "Drink cost", 10, 40, 1, "%"]]
+          .map(([k, l, mn, mx, st, u]) => `<label class="erange"><span>${l}</span><output id="o-${k}">${u === "$" ? "$" + EX[k] : EX[k] + u}</output><input type="range" id="e-${k}" min="${mn}" max="${mx}" step="${st}" value="${EX[k]}" data-u="${u}"></label>`).join("")}
+      </div>
+      <div class="eresult" aria-live="polite">
+        <div><span>Early Bird guests a month</span><b id="r-guests">${g.guests}</b></div>
+        <div><span>Extra sales</span><b id="r-sales">${usd(g.sales)}</b></div>
+        <div><span>Ingredients and card fees</span><b id="r-cost">−${usd(g.cost)}</b></div>
+        <div class="big"><span>Extra money each month</span><b id="r-net">${usd(g.net)}</b></div>
+        <div><span>Over a year</span><b id="r-year">${usd(g.net * 12)}</b></div>
+      </div>
+      <p class="small muted">An estimate from the averages above, before tips and before anything they spend when they come back. Your prices and costs will differ.</p>
+    </div>
+
+    <div class="ecard">
+      <h2 class="eh">Your guests, your relationship</h2>
+      <p>Guests who agree to share their details join your guest list on Early Bird. Send them an offer to come back, and next time they're full-paying regulars.</p>
+      <div class="eguests">
+        <div class="eguest"><span class="ava">M</span><div><b>Maya R.</b><span>Visited twice · Dinner for 2</span></div><span class="bizpill ok">Shared contact</span></div>
+        <div class="eguest"><span class="ava">J</span><div><b>James T.</b><span>Visited Friday · Dinner for 4</span></div><span class="bizpill ok">Shared contact</span></div>
+        <div class="eoffer"><b>Your offer</b><span>“Come back for our new tasting menu this weekend.”</span><em>Sent through Early Bird</em></div>
+      </div>
+    </div>
+
+    <div class="ecard">
+      <h2 class="eh">You set the times. We bring the diners.</h2>
+      <p>Choose the days, the early window and how many tables. Change them any time. We put your restaurant in front of diners in the Early Bird app and on eatearlybird.com, with your photos, your dishes and your times.</p>
+      <div class="ephone"><div class="ephone-card"><div class="ephone-top"><span class="ephone-img">${ic("fork")}</span><div><b>Your restaurant</b><span>Your area · Your cuisine</span></div></div>
+        <div class="days ephone-days">${["Today", "Sat", "Sun", "Mon"].map((d, i) => `<div class="dcol ${i % 2 ? "alt" : ""}"><div class="dh"><span>${d}</span></div><span class="badge">50% off</span><span class="slot">5:00PM</span><span class="slot">5:30PM</span><span class="slot">6:00PM</span></div>`).join("")}</div></div>
+        <p class="small muted center">How diners see your early tables in the app.</p></div>
+    </div>
+  </section>`;
+}
+function wireEcon() {
+  const box = document.getElementById("ecalc"); if (!box) return;
+  const calc = () => {
+    const x = { ...EX };
+    box.querySelectorAll("input[type=range]").forEach((r) => { const k = r.id.slice(2); x[k] = +r.value; const u = r.dataset.u; document.getElementById("o-" + k).textContent = u === "$" ? "$" + r.value : r.value + u; });
+    const g = guestMaths(x);
+    document.getElementById("r-guests").textContent = g.guests.toLocaleString("en-US");
+    document.getElementById("r-sales").textContent = usd(g.sales);
+    document.getElementById("r-cost").textContent = "−" + usd(g.cost);
+    document.getElementById("r-net").textContent = usd(g.net);
+    document.getElementById("r-year").textContent = usd(g.net * 12);
+  };
+  box.querySelectorAll("input[type=range]").forEach((r) => { r.oninput = calc; });
 }
 
 /* ───────────────────────────── find and claim ───────────────────────────── */

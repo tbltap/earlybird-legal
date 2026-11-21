@@ -358,27 +358,45 @@ function checkoutHref(v, deal, date, time, meal, diners) {
 }
 
 /* ───────────────────────────── Home: search, quick search, results ───────────────────────────── */
-const H = { q: "", cuisines: [], areas: [], prices: [], sort: "featured", date: "", map: false, meal: "dinner", diners: 2, rows: [], offset: 0, more: false, loading: false };
+const H = { q: "", near: null, cuisines: [], areas: [], prices: [], sort: "featured", date: "", map: false, meal: "dinner", diners: 2, rows: [], offset: 0, more: false, loading: false };
 const SORTS = [["featured", "Featured first"], ["distance", "Nearest first"], ["highest_rated", "Highest rated"], ["new", "Newest"], ["alphabetical", "A to Z"]];
 const list = (v) => String(v || "").split("|").filter(Boolean);
 function homeParams(extra = {}) {
   const p = { city: S.city.slug, meal: H.meal, diners: H.diners, ...(H.q ? { q: H.q } : {}), ...(H.cuisines.length ? { c: H.cuisines.join("|") } : {}),
     ...(H.areas.length ? { a: H.areas.join("|") } : {}), ...(H.prices.length ? { p: H.prices.join("|") } : {}), ...(H.sort !== "featured" ? { sort: H.sort } : {}),
-    ...(H.date ? { date: H.date } : {}), ...(H.map ? { map: 1 } : {}), ...extra };
+    ...(H.date ? { date: H.date } : {}), ...(H.map ? { map: 1 } : {}), ...(H.near ? { near: `${H.near.lat},${H.near.lng}` } : {}), ...extra };
   Object.keys(p).forEach((k) => (p[k] === "" || p[k] == null) && delete p[k]);
   return p;
 }
+// "Near me": the browser's location (asked only when the button is pressed), rounded to about 100 m, kept in the address.
+function useNearMe() {
+  if (H.near) return go("/", homeParams({ near: "" }));
+  if (!navigator.geolocation) return toast("Your browser can't share your location. Pick a city instead.");
+  toast("Finding restaurants near you…");
+  navigator.geolocation.getCurrentPosition(
+    (pos) => go("/", homeParams({ near: `${pos.coords.latitude.toFixed(3)},${pos.coords.longitude.toFixed(3)}` })),
+    () => toast("Location is off for this site. Allow it in your browser, or pick a city."),
+    { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 });
+}
+function toast(text) {
+  let t = document.getElementById("toast");
+  if (!t) { t = document.createElement("div"); t.id = "toast"; t.className = "toast"; t.setAttribute("role", "status"); document.body.appendChild(t); }
+  t.textContent = text; t.classList.add("on"); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove("on"), 3500);
+}
+const distTxt = (v) => (H.near && v.distance_km != null ? `${(v.distance_km * 0.621).toFixed(v.distance_km < 16 ? 1 : 0)} mi` : "");
+const nearChip = () => `<button class="pill near" type="button" id="nearme" aria-pressed="${!!H.near}">${ic("pin")}${H.near ? "Near me ✓" : "Near me"}</button>`;
 async function viewHome(q) {
   setTitle("");
   await Promise.all([loadCities(), loadConfig()]);
   if (q.city) { const c = S.cities.find((x) => x.slug === q.city); if (c) { S.city = c; store.set("eb.web.city", c.slug); } }
+  const nm = /^(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)$/.exec(q.near || ""); H.near = nm ? { lat: +nm[1], lng: +nm[2] } : null;
   H.q = q.q || ""; H.cuisines = list(q.c); H.areas = list(q.a); H.prices = list(q.p).map(Number).filter((n) => n >= 1 && n <= 4);
   H.sort = SORTS.some(([k]) => k === q.sort) ? q.sort : "featured"; H.date = /^\d{4}-\d{2}-\d{2}$/.test(q.date || "") ? q.date : ""; H.map = q.map === "1";
   H.meal = ["breakfast", "lunch", "dinner"].includes(q.meal) ? q.meal : H.meal;
   H.diners = Math.min(Math.max(Number(q.diners) || H.diners, 1), S.config.max_party || 12);
   if (isDesk()) return viewHomeDesk();
   H.cuisine = H.cuisines[0] || "";
-  const params = () => ({ city: S.city.slug, meal: H.meal, diners: H.diners, ...(H.q ? { q: H.q } : {}), ...(H.cuisine ? { c: H.cuisine } : {}) });
+  const params = () => ({ city: S.city.slug, meal: H.meal, diners: H.diners, ...(H.q ? { q: H.q } : {}), ...(H.cuisine ? { c: H.cuisine } : {}), ...(H.near ? { near: `${H.near.lat},${H.near.lng}` } : {}) });
   const maxD = Math.min(S.config.max_party || 12, 12);
   showPage(`
     <h1 class="display" style="margin:14px 0 0">Ready to get <span class="gold">50% off</span> your food bill?</h1>
@@ -390,17 +408,18 @@ async function viewHome(q) {
       </div>
       <div class="textsearch">${ic("search")}<input id="f-q" type="search" placeholder="Search restaurants or cuisines" aria-label="Search" value="${esc(H.q)}" autocomplete="off"></div>
     </form>
-    <div class="chiprow" id="chips" role="group" aria-label="Cuisine" style="margin:4px 0 16px"></div>
-    <div class="card help"><div>${ic("help")}</div><div><div class="title">How do I get 50% off?</div><div class="muted">See how Early Bird works</div><a class="learn" href="../#how">Learn more</a></div></div>
-    <div class="sec"><h2 id="reshead">${H.cuisine ? esc(H.cuisine) + " in " : "Most popular in "}${esc(S.city.name)}</h2></div>
+    <div class="chiprow scrollx" id="chips" role="group" aria-label="Near me and cuisine" style="margin:4px 0 16px">${nearChip()}</div>
+    <div class="sec"><h2 id="reshead">${H.cuisine ? esc(H.cuisine) + (H.near ? " near you" : " in " + esc(S.city.name)) : H.near ? "Near you" : "Most popular in " + esc(S.city.name)}</h2></div>
     <div id="grid"></div>
-    <div style="margin-top:8px"><button class="btn pale" id="more" hidden>Show more</button></div>`,
+    <div style="margin-top:8px"><button class="btn pale" id="more" hidden>Show more</button></div>
+    <div class="card help" style="margin-top:18px"><div>${ic("help")}</div><div><div class="title">How do I get 50% off?</div><div class="muted">See how Early Bird works</div><a class="learn" href="../#how">Learn more</a></div></div>`,
   { right: `<label class="pinsel">${ic("pin")}<select id="f-city" aria-label="City">${S.cities.map((c) => `<option value="${esc(c.slug)}" ${c.slug === S.city.slug ? "selected" : ""}>${esc(c.name)}</option>`).join("")}</select></label>` });
   document.getElementById("findform").onsubmit = (e) => { e.preventDefault(); H.q = val("f-q"); go("/", { ...params(), meal: val("f-meal"), diners: val("f-diners"), ...(val("f-q") ? { q: val("f-q") } : { q: "" }) }); };
   document.getElementById("f-city").onchange = (e) => go("/", { ...params(), city: e.target.value });
   document.getElementById("f-meal").onchange = (e) => go("/", { ...params(), meal: e.target.value });
   document.getElementById("f-diners").onchange = (e) => go("/", { ...params(), diners: e.target.value });
   document.getElementById("more").onclick = () => loadResults(true);
+  document.getElementById("nearme").onclick = useNearMe;
   const chipsP = rpc("cuisines", { p_lat: S.city.lat, p_lng: S.city.lng, p_radius_km: S.city.radius_km || 25 }).catch(() => []);
   await loadResults(false);
   chipsP.then((cs) => {
@@ -409,7 +428,8 @@ async function viewHome(q) {
     let names = cs.map((c) => c.name);
     if (!names.length) names = [...new Set(H.rows.flatMap((r) => r.cuisines || []))].sort(); // no cuisine list yet: use what the results show
     if (H.cuisine && !names.includes(H.cuisine)) names.unshift(H.cuisine);
-    el.innerHTML = names.slice(0, 12).map((n) => `<button class="pill" type="button" aria-pressed="${n === H.cuisine}" data-c="${esc(n)}">${esc(n)}</button>`).join("");
+    el.innerHTML = nearChip() + names.slice(0, 14).map((n) => `<button class="pill" type="button" aria-pressed="${n === H.cuisine}" data-c="${esc(n)}">${esc(n)}</button>`).join("");
+    document.getElementById("nearme").onclick = useNearMe;
     el.onclick = (e) => {
       const b = e.target.closest("[data-c]"); if (!b) return;
       const p = params(); if (b.dataset.c === H.cuisine) delete p.c; else p.c = b.dataset.c;
@@ -425,9 +445,9 @@ async function loadResults(append) {
   if (!append) { H.rows = []; H.offset = 0; grid.innerHTML = '<p class="loading">Finding tables…</p>'; }
   try {
     const rows = await rpc("search_venues", {
-      p_query: H.q || null, p_lat: S.city.lat, p_lng: S.city.lng, p_radius_km: S.city.radius_km || 25,
+      p_query: H.q || null, p_lat: H.near ? H.near.lat : S.city.lat, p_lng: H.near ? H.near.lng : S.city.lng, p_radius_km: H.near ? 15 : S.city.radius_km || 25,
       p_cuisines: H.cuisines.length ? H.cuisines : null, p_areas: H.areas.length ? H.areas : null, p_price: H.prices.length ? H.prices : null,
-      p_limit: 24, p_offset: H.offset, p_sort: H.sort || "featured",
+      p_limit: 24, p_offset: H.offset, p_sort: H.near && H.sort === "featured" ? "distance" : H.sort || "featured",
     });
     const avail = rows.length ? await loadAvail(rows.map((r) => r.id), H.meal, H.diners, H.date || null).catch(() => ({})) : {};
     if (!document.getElementById("grid") || seq !== H.seq) return;
@@ -437,6 +457,7 @@ async function loadResults(append) {
     H.more = rows.length === 24;
     const desk = isDesk();
     grid.innerHTML = H.rows.length ? H.rows.map(desk ? resultHtmlDesk : resultHtml).join("")
+      : H.near ? `<div class="card center"><b>No Early Bird restaurants near you yet.</b><p class="muted" style="margin:6px 0 12px">We're in ${esc(S.cities.map((c) => c.name).join(" and "))} for now.</p><a class="btn pale" href="#/?${new URLSearchParams(homeParams({ near: "" }))}">Show all of ${esc(S.city.name)}</a></div>`
       : `<div class="card center muted">No restaurants found${H.q ? ` for “${esc(H.q)}”` : ""}. Try fewer filters, another search or another city.</div>`;
     const more = document.getElementById("more"); if (more) more.hidden = !H.more;
     const cnt = document.getElementById("count"); if (cnt) cnt.textContent = H.rows.length ? `${H.rows.length}${H.more ? "+" : ""} restaurant${H.rows.length === 1 && !H.more ? "" : "s"}` : "";
@@ -450,7 +471,7 @@ function thumbHtml(v) {
 function resultHtml(v) {
   const d = v.deal, a = v._avail;
   const href = `#/r/${esc(v.slug)}?meal=${H.meal}&diners=${H.diners}`;
-  const sub = [v.area, cuisineText(v)].filter(Boolean).join(" • ");
+  const sub = [distTxt(v), v.area, cuisineText(v)].filter(Boolean).join(" • ");
   let cols = "";
   if (d && a) {
     cols = (a.days || []).map((day, i) => {
@@ -481,7 +502,7 @@ async function viewHomeDesk() {
   showRaw(`
     <section class="dhero"><div class="wide dhero-in">
       <div><div class="crumbs"><a href="#/">Early Bird</a><span>/</span>${esc(city.name)}</div>
-        <h1>${esc(city.name)} restaurants</h1><p>Dine early and save 50% on your food bill</p></div>
+        <h1>${H.near ? "Restaurants near you" : `${esc(city.name)} restaurants`}</h1><p>Dine early and save 50% on your food bill</p></div>
       <a class="teaser" href="../#how"><b>Your table, early</b><span>Pick a time, pay a small booking fee per diner, and the food is half price when you dine.</span><span class="go" aria-hidden="true">${ic("arrow")}</span></a>
     </div></section>
     <div class="wide">
@@ -492,9 +513,10 @@ async function viewHomeDesk() {
       </div>
       <div class="lcols">
         <div class="lmain">
+          <div class="qchips" id="qchips" role="group" aria-label="Near me and cuisine">${nearChip()}</div>
           <div class="sortrow"><span id="count" class="muted"></span>${H.q ? `<span class="qchip">“${esc(H.q)}” <a href="#/?${new URLSearchParams(homeParams({ q: "" }))}" aria-label="Clear search">×</a></span>` : ""}
             <label>Sort by <select id="f-sort">${SORTS.map(([k, l]) => `<option value="${k}" ${k === H.sort ? "selected" : ""}>${l}</option>`).join("")}</select></label></div>
-          ${H.map ? `<div id="map" class="mapbox"><p class="loading" style="padding:20px">Loading the map…</p></div><div id="grid" hidden></div>` : `${filterOn ? "" : '<div id="newarr" class="newarr"></div>'}<div id="grid"></div><div id="sentinel"></div><button class="btn pale" id="more" hidden style="margin-top:10px">Show more</button>`}
+          ${H.map ? `<div id="map" class="mapbox"><p class="loading" style="padding:20px">Loading the map…</p></div><div id="grid" hidden></div>` : `${filterOn || H.near ? "" : '<div id="newarr" class="newarr"></div>'}<div id="grid"></div><div id="sentinel"></div><button class="btn pale" id="more" hidden style="margin-top:10px">Show more</button>`}
           <section class="howband"><h2>Enjoy 50% off your food bill</h2><ol>
             <li><b>Find a restaurant</b><span>Pick an early time that suits you.</span></li>
             <li><b>Book the early table</b><span>Pay a small booking fee per diner to hold it.</span></li>
@@ -516,6 +538,7 @@ async function viewHomeDesk() {
   document.getElementById("f-diners").onchange = (e) => nav({ diners: e.target.value });
   document.getElementById("f-sort").onchange = (e) => nav({ sort: e.target.value });
   document.getElementById("mapbtn").onclick = () => nav({ map: H.map ? "" : 1 });
+  document.getElementById("nearme").onclick = useNearMe;
   const clr = document.getElementById("clear"); if (clr) clr.onclick = () => go("/", { city: city.slug, meal: H.meal, diners: H.diners });
   document.querySelectorAll("[data-area]").forEach((c) => (c.onchange = () => nav({ a: [...document.querySelectorAll("[data-area]:checked")].map((x) => x.dataset.area).join("|") })));
   document.querySelectorAll("[data-price]").forEach((c) => (c.onchange = () => nav({ p: [...document.querySelectorAll("[data-price]:checked")].map((x) => x.dataset.price).join("|") })));
@@ -524,14 +547,22 @@ async function viewHomeDesk() {
   const drawCuisines = (cs) => {
     const el = document.getElementById("fl-cuisine"); if (!el) return;
     let names = cs.map((c) => c.name);
-    if (!names.length) names = [...new Set(H.rows.flatMap((r) => r.cuisines || []))].sort(); // no cuisine list yet: use what the results show H.cuisines.forEach((c) => names.includes(c) || names.unshift(c));
+    if (!names.length) names = [...new Set(H.rows.flatMap((r) => r.cuisines || []))].sort(); // no cuisine list yet: use what the results show
+    H.cuisines.forEach((c) => names.includes(c) || names.unshift(c));
+    // one-tap cuisine chips above the list (the sidebar keeps the full list)
+    const qc = document.getElementById("qchips");
+    if (qc) {
+      qc.innerHTML = nearChip() + names.slice(0, 9).map((n) => `<button class="pill" type="button" data-qc="${esc(n)}" aria-pressed="${H.cuisines.includes(n)}">${esc(n)}</button>`).join("");
+      document.getElementById("nearme").onclick = useNearMe;
+      qc.querySelectorAll("[data-qc]").forEach((b) => (b.onclick = () => { const n = b.dataset.qc; const set = H.cuisines.includes(n) ? H.cuisines.filter((x) => x !== n) : [...H.cuisines, n]; nav({ c: set.join("|") }); }));
+    }
     el.innerHTML = names.map((n, i) => `<label class="ck" ${i >= 10 && !H.cuisines.includes(n) ? "data-extra hidden" : ""}><span>${esc(n)}</span><input type="checkbox" data-cuisine="${esc(n)}" ${H.cuisines.includes(n) ? "checked" : ""}></label>`).join("")
       + (names.length > 10 ? `<button class="linklike small" type="button" id="cu-more">Show all ${names.length}</button>` : "");
     el.querySelectorAll("[data-cuisine]").forEach((c) => (c.onchange = () => nav({ c: [...el.querySelectorAll("[data-cuisine]:checked")].map((x) => x.dataset.cuisine).join("|") })));
     const m = document.getElementById("cu-more"); if (m) m.onclick = () => { el.querySelectorAll("[data-extra]").forEach((x) => (x.hidden = false)); m.remove(); };
     if (!names.length) el.innerHTML = '<p class="muted small">No cuisines to filter yet.</p>';
   };
-  if (!H.map && !filterOn) rpc("search_venues", { p_lat: city.lat, p_lng: city.lng, p_radius_km: city.radius_km || 25, p_sort: "new", p_limit: 4 }).then((rows) => {
+  if (!H.map && !filterOn && !H.near) rpc("search_venues", { p_lat: city.lat, p_lng: city.lng, p_radius_km: city.radius_km || 25, p_sort: "new", p_limit: 4 }).then((rows) => {
     const el = document.getElementById("newarr"); if (!el || !rows.length) return;
     el.innerHTML = `<div class="sechead"><h2>New on Early Bird</h2><a href="#/?${new URLSearchParams(homeParams({ sort: "new" }))}">See all</a></div><div class="ncards">${rows.map((v) => `
       <a class="ncard" href="#/r/${esc(v.slug)}?meal=${H.meal}&diners=${H.diners}"><div class="nph">${esc(v.name.charAt(0))}${(v.photo || v.dish_photos?.[0]) ? `<img src="${esc(v.photo || v.dish_photos[0])}" alt="" loading="lazy" onerror="this.remove()">` : ""}</div>
@@ -562,7 +593,7 @@ function resultHtmlDesk(v) {
         ${rest > 0 ? `<a class="more-t" href="${href}&date=${day.date}">More times</a>` : ""}</div>`;
     }).join("");
   }
-  const where = [v.area && `${ic("pin")}${esc(v.area)}`, cuisineText(v) && `${ic("fork")}${esc(cuisineText(v))}`, priceTxt(v)].filter(Boolean).join("");
+  const where = [distTxt(v) && `<b class="dist">${distTxt(v)}</b>`, v.area && `${ic("pin")}${esc(v.area)}`, cuisineText(v) && `${ic("fork")}${esc(cuisineText(v))}`, priceTxt(v)].filter(Boolean).join("");
   return `<article class="drow"><a class="dthumb" href="${href}">${esc((v.name || "?").charAt(0))}${(v.photo || v.dish_photos?.[0]) ? `<img src="${esc(v.photo || v.dish_photos[0])}" alt="" loading="lazy" onerror="this.remove()">` : ""}${v.rating >= 4.7 && v.review_count >= 20 ? '<span class="ribbon">Top rated</span>' : ""}</a>
     <div class="dbody"><div class="dtop"><a class="dname" href="${href}">${esc(v.name)} <span aria-hidden="true">›</span></a>${v.rating != null ? `<span class="drate">${Number(v.rating).toFixed(1)} ${stars5(v.rating)} <span class="muted">(${v.review_count})</span></span>` : '<span class="drate muted">New on Early Bird</span>'}</div>
       <div class="dwhere">${where}</div>
@@ -586,7 +617,7 @@ async function drawMap() {
   try { await loadLeaflet(); } catch { box.innerHTML = '<p class="muted" style="padding:20px">The map could not load. Use the list instead.</p>'; return; }
   box.innerHTML = "";
   const pts = H.rows.filter((v) => v.lat && v.lng);
-  const map = L.map(box, { scrollWheelZoom: true }).setView([S.city.lat, S.city.lng], 12);
+  const map = L.map(box, { scrollWheelZoom: true }).setView(H.near ? [H.near.lat, H.near.lng] : [S.city.lat, S.city.lng], 12);
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap contributors" }).addTo(map);
   const pin = L.divIcon({ className: "ebpin", html: "<span></span>", iconSize: [22, 22], iconAnchor: [11, 22] });
   pts.forEach((v) => L.marker([v.lat, v.lng], { icon: pin }).addTo(map).bindPopup(`<a href="#/r/${esc(v.slug)}?meal=${H.meal}&diners=${H.diners}"><b>${esc(v.name)}</b></a><br>${esc(v.area || "")}${v.deal ? `<br>${v.deal.max_discount || v.deal.discount}% off food · ${m0(v.deal.fee_per_diner_cents)} fee` : ""}`));
@@ -927,7 +958,9 @@ function normalisePhone(raw) {
 }
 async function viewCheckout(q) {
   setTitle("Make a booking");
-  const C = { hold: null, venue: null, profile: null, intent: null, timer: null, done: false, paying: false, details: null };
+  // One page: party, details, payment and one "Pay and book" button (like Apple Pay checkouts). If something is
+  // missing, that field is marked, scrolled to and focused, with a line saying what to add.
+  const C = { hold: null, venue: null, profile: null, intent: null, timer: null, done: false, paying: false, details: null, cardComplete: false, busy: false };
   const slug = q.v, wanted = { deal: q.deal, date: q.date, time: q.time, meal: q.meal || "dinner", diners: Number(q.diners) || 2, option: q.opt === "nodrink" ? "nodrink" : "standard" };
   if (!slug || !wanted.deal || !wanted.date || !wanted.time) return go("/");
   const [page, profile] = await Promise.all([rpc("venue_page", { p_slug: slug }), rpc("profile"), loadConfig()]);
@@ -936,157 +969,168 @@ async function viewCheckout(q) {
   const v = C.venue;
   const out = (msg) => showPage(`<div class="sheethead"><h1>Couldn't hold that table</h1><a class="x" href="#/r/${esc(v.slug)}" aria-label="Close">${ic("x")}</a></div><div class="msg err">${esc(msg)}</div><a class="btn" href="#/r/${esc(v.slug)}">Choose another time</a>`, { wash: false });
   const makeHold = async () => { C.hold = await rpc("hold", { p_device: deviceId, p_deal: wanted.deal, p_date: wanted.date, p_time: wanted.time, p_diners: wanted.diners, p_meal: wanted.meal, p_option: wanted.option }); };
-  try { await makeHold(); } catch (e) { if (e.code === "not_signed_in") throw e; return out(friendly(e)); }
-  C.details = { name: [profile.first_name, profile.last_name].filter(Boolean).join(" "), phone: profile.phone || "", request: "", marketing: false, accepted: false, venueRef: "", bookedWithVenue: false };
-  view.cleanup = () => { clearInterval(C.timer); try { C.paymentEl?.destroy(); C.expressEl?.destroy(); } catch { /* ignore */ } if (C.hold && !C.intent && !C.done) rpc("release_hold", { p_device: deviceId, p_claim: C.hold.booking_id }).catch(() => {}); };
+  const hd = () => C.hold;
+  const payNeeded = () => hd().payment_mode === "stripe" && hd().amount_due_cents > 0;
+  const prepPayment = async () => { C.intent = payNeeded() ? await pay("intent", { claim_id: hd().booking_id }) : null; };
+  try { await makeHold(); await prepPayment(); } catch (e) { if (e.code === "not_signed_in") throw e; return out(friendly(e)); }
+  C.details = { name: [profile.first_name, profile.last_name].filter(Boolean).join(" ").replace(/^Early Bird diner$/, ""), phone: profile.phone || "", request: "", marketing: false, accepted: false, venueRef: "", bookedWithVenue: false };
+  const unmount = () => { try { C.paymentEl?.destroy(); C.expressEl?.destroy(); } catch { /* ignore */ } C.paymentEl = C.expressEl = null; };
+  view.cleanup = () => { clearInterval(C.timer); unmount(); if (C.hold && !C.intent && !C.done) rpc("release_hold", { p_device: deviceId, p_claim: C.hold.booking_id }).catch(() => {}); };
 
   function startTimer() {
     clearInterval(C.timer);
     const tick = () => {
       const el = document.getElementById("timer"); if (!el) return;
       const ms = new Date(C.hold.expires_at) - Date.now();
-      if (ms <= 0) { clearInterval(C.timer); el.textContent = "0:00"; if (!C.done && !C.paying) { const b = document.getElementById("expired"); if (b) b.hidden = false; document.querySelectorAll("#co button.btn").forEach((x) => (x.disabled = true)); } return; }
+      if (ms <= 0) { clearInterval(C.timer); el.textContent = "0:00"; if (!C.done && !C.paying) { const b = document.getElementById("expired"); if (b) b.hidden = false; const g = document.getElementById("c-go"); if (g) g.disabled = true; } return; }
       const s = Math.floor(ms / 1000);
       el.textContent = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
       el.classList.toggle("low", s < 60);
     };
     tick(); C.timer = setInterval(tick, 1000);
   }
-  const hd = () => C.hold;
   const reqText = () => (hd().requirements || []).map((r) => `${r.per_person} ${r.label.toLowerCase()} per person`).join(", ");
-  const summaryHtml = () => {
+  const rules = () => { const r = [...(v.deal?.conditions || [])]; if (reqText() && hd().option !== "nodrink") r.unshift(`Order ${reqText()}`); return r; };
+  const cfg = S.config;
+  const testBadge = (mode) => (mode === "test" ? '<span class="testbadge">TEST MODE · card 4242 4242 4242 4242</span>' : "");
+  const due = () => (C.intent ? C.intent.amount_cents : hd().amount_due_cents);
+  const goLabel = () => (payNeeded() ? `Pay ${money(due())} and book` : "Book now");
+
+  const summaryMobile = () => {
     const h = hd();
-    return `<div class="sumrow">${thumbHtml(v)}<div><span class="deal-pill">${ic("tag")}${h.discount}% off food bill</span><div class="nm">${esc(v.name)}</div>
+    return `<div class="sheethead"><div><h1>Make a booking</h1><div class="green small" style="margin-top:6px;display:flex;gap:8px;align-items:center">${ic("seal")}Guaranteed booking • Flexible cancellation</div></div><a class="x" href="#/r/${esc(v.slug)}" aria-label="Close">${ic("x")}</a></div>
+      <div class="sumrow">${thumbHtml(v)}<div><span class="deal-pill">${ic("tag")}${h.discount}% off food bill</span><div class="nm">${esc(v.name)}</div>
       <div class="muted">${time12(h.time)}, ${esc(fmtLong(h.date))}</div></div></div>
-      <div class="savebox"><div><b>Estimated savings on food</b><span>Based on one main each. Results may vary.</span></div><div class="amt">${m0(h.saving_cents)}</div></div>`;
+      <div class="holdpill">Table held for <span class="timer" id="timer">–</span></div>
+      <div id="expired" class="msg err" hidden>Your hold ran out. <a href="#/r/${esc(v.slug)}">Choose a time again</a>.</div>`;
   };
-  const conditionsHtml = () => {
-    const rules = [...(v.deal?.conditions || [])];
-    if (reqText()) rules.unshift(`Order ${reqText()}`);
-    return rules.length ? `<div class="card flat" style="background:#F1F3F8"><div class="title" style="font-size:18px">Early Bird conditions</div><div class="muted small">To keep these ${hd().standard_discount || hd().discount}% deals alive, please follow a few house rules</div>
-      <ul class="rules">${rules.map((c) => `<li>${ic("check")}<span>${esc(c)}</span></li>`).join("")}</ul></div>` : "";
-  };
-  const policyHtml = () => {
-    const cfg = S.config;
-    return `<div class="policy"><b>Cancellation policy</b><br>Plans change. This policy encourages you to cancel sooner rather than later so the restaurant has time to fill your table with another Early Bird booking. Cancellations are returned as ${esc(CREDIT)} for booking fees on other Early Bird bookings, used first on your next one, for ${cfg.credit_valid_days} days.
-      <table><tr><td>Within ${cfg.cancel_full_credit_minutes} minutes of booking</td><td>The whole fee</td></tr>
-      <tr><td>Later, before the day of your booking</td><td>${cfg.cancel_before_day_percent}% of the fee</td></tr>
-      <tr><td>On the day, or no-show</td><td>Nothing</td></tr></table></div>`;
-  };
-  const breakdownHtml = () => {
-    const h = hd();
-    return `<div class="lines"><div><span>Booking fee${h.fee_per_diner_cents != null ? ` (${h.diners} × ${money(h.fee_per_diner_cents)})` : ""}</span><span>${money(h.fee_cents)}</span></div>
-      ${h.credit_cents > 0 ? `<div class="g"><span>Paid from your ${esc(CREDIT)}</span><span>−${money(h.credit_cents)}</span></div>` : ""}
-      ${h.credit_kept_cents > 0 && h.amount_due_cents > 0 ? `<div class="k"><span>${money(h.credit_kept_cents)} credit saved for a fee it covers in full</span></div>` : ""}
-      <div class="g"><span>${ic("check")} Est. savings on food</span><span>${m0(h.saving_cents)}</span></div>
-      ${S.config.reward_per_booking_cents > 0 ? `<div class="n"><span>${ic("bird")} ${esc(CREDIT)} you'll earn</span><span>+${money(S.config.reward_per_booking_cents)}</span></div>` : ""}</div>`;
-  };
-  const head = () => `<div class="sheethead"><div><h1>Make a booking</h1><div class="green small" style="margin-top:6px;display:flex;gap:8px;align-items:center">${ic("seal")}Guaranteed booking • Flexible cancellation</div></div><a class="x" href="#/r/${esc(v.slug)}" aria-label="Close">${ic("x")}</a></div>`;
-  const holdLine = () => `<div class="holdline">Holding your table for <span class="timer" id="timer">–</span></div><div id="expired" class="msg err" hidden>Your hold ran out. <a href="#/r/${esc(v.slug)}">Choose a time again</a>.</div>`;
-  const testBadge = (mode) => (mode === "test" ? '<span class="testbadge">TEST MODE</span>' : "");
-  // Desktop: "Finalise your booking", form on the left, the held table on the right (FIRST_TABLE_WEB_FLOW.md).
-  const deskSummary = () => {
+  const summaryDesk = () => {
     const h = hd();
     return `<aside class="coright"><div class="holdbar">We're holding this table for you for the next <b id="timer">–</b></div>
       <div id="expired" class="msg err" hidden>Your hold ran out. <a href="#/r/${esc(v.slug)}">Choose a time again</a>.</div>
       <div class="cowhen">${time12(h.time)}, ${esc(fmtDate(h.date, { weekday: "long", day: "numeric", month: "long" }))}</div>
       <span class="deal-pill">${ic("tag")}${h.discount}% off food bill</span>
       <div class="covenue">${thumbHtml(v)}<div><b>${esc(v.name)}</b>${v.rating != null ? `<div>${stars5(v.rating)} ${Number(v.rating).toFixed(1)} (${v.review_count})</div>` : ""}
-        ${v.address ? `<div class="muted">${ic("pin")}${esc(v.address)}</div>` : ""}${cuisineText(v) ? `<div class="muted">${ic("fork")}${esc(cuisineText(v))}</div>` : ""}
-        ${S.config.reward_per_booking_cents > 0 ? `<div class="muted">${ic("bird")}Earn ${money(S.config.reward_per_booking_cents)} ${esc(CREDIT)}</div>` : ""}</div></div>
-      <div class="savebox"><div><b>Estimated savings on food</b><span>Based on one main each. Results may vary.</span></div><div class="amt">${m0(h.saving_cents)}</div></div>
+        ${v.address ? `<div class="muted">${ic("pin")}${esc(v.address)}</div>` : ""}${cuisineText(v) ? `<div class="muted">${ic("fork")}${esc(cuisineText(v))}</div>` : ""}</div></div>
+      ${linesHtml()}
       <div class="assure"><span>${ic("check")}Guaranteed booking</span><span>${ic("cancel")}Flexible cancellation</span></div></aside>`;
   };
-  const coPage = (left) => (isDesk()
-    ? showPage(`<div id="co"><div class="cotop"><a href="#/r/${esc(v.slug)}">‹ Back to ${esc(v.name)}</a></div><h1 class="cohead">Finalise your booking</h1><div class="cogrid"><div class="coleft">${left}</div>${deskSummary()}</div></div>`, { size: "wide" })
-    : showPage(`<div id="co">${head()}${summaryHtml()}${left}${holdLine()}</div>`, { wash: false }));
-
-  function drawDetails(msg) {
-    const d = C.details, h = hd();
-    coPage(`
-      ${msg ? `<div class="msg err" role="alert">${esc(msg)}</div>` : ""}
-      <div class="row"><b style="font-size:18px">Diners</b><div class="stepper"><button type="button" id="d-minus" aria-label="Fewer diners">−</button><span id="d-n" aria-live="polite">${h.diners}</span><button type="button" id="d-plus" aria-label="More diners">+</button></div></div>
-      ${h.nodrink_discount ? `<div role="radiogroup" aria-label="Drinks option">
-        <label class="opt ${h.option === "standard" ? "on" : ""}"><input type="radio" name="opt" value="standard" ${h.option === "standard" ? "checked" : ""}><span><b>${h.standard_discount}% off food bill</b><span class="d">${reqText() ? `Order ${esc(reqText())}.` : "Nothing extra to order."}</span></span></label>
-        <label class="opt ${h.option === "nodrink" ? "on" : ""}"><input type="radio" name="opt" value="nodrink" ${h.option === "nodrink" ? "checked" : ""}><span><b>${h.nodrink_discount}% off, no drinks needed</b><span class="d">Nothing extra to order. A smaller discount and a smaller fee.</span></span></label></div>` : ""}
-      ${conditionsHtml()}
-      ${h.reservation_url ? `<div class="card"><div class="title" style="font-size:18px">1. Book your table with ${esc(v.name)}</div><p class="small muted" style="margin:6px 0 12px">This venue takes reservations on its own website. Book for ${time12(h.time)}, ${esc(fmtLong(h.date))} for ${h.diners}, then come back here to add your ${h.discount}% off.</p>
-        <a class="btn pale" href="${esc(h.reservation_url)}" target="_blank" rel="noopener">Open ${esc(v.name)} booking</a>
-        <label class="field" style="margin-top:12px">Reservation name or number <span class="hint">(optional)</span><input id="c-ref" type="text" maxlength="80" value="${esc(d.venueRef)}"></label>
-        <label class="check"><input type="checkbox" id="c-bv" ${d.bookedWithVenue ? "checked" : ""}><span>I've booked ${time12(h.time)} with ${esc(v.name)}</span></label></div>` : ""}
-      <div class="card"><div class="title" style="margin-bottom:12px">Your details</div>
-        <label class="field">Full name<input id="c-name" type="text" autocomplete="name" maxlength="80" value="${esc(d.name)}" required></label>
-        <label class="field">Mobile number<input id="c-phone" type="tel" autocomplete="tel" inputmode="tel" maxlength="32" placeholder="(310) 555-0101" value="${esc(d.phone)}" required><span class="hint">The restaurant may use it to reach you about this table.</span></label>
-        <label class="field">Special request <span class="hint" style="display:inline">(optional)</span><input id="c-req" type="text" maxlength="500" value="${esc(d.request)}" placeholder="Allergies, a window seat…"></label>
-        <label class="check"><input type="checkbox" id="c-mk" ${d.marketing ? "checked" : ""}><span>Let ${esc(v.name)} send me offers</span></label>
-      </div>
-      ${policyHtml()}
-      <label class="check"><input type="checkbox" id="c-ok" ${d.accepted ? "checked" : ""}><span>I accept Early Bird conditions and the <a href="../terms.html" target="_blank" rel="noopener">booking terms</a></span></label>
-      ${breakdownHtml()}
-      <div class="complete">Complete booking <span>${money(h.amount_due_cents)} to pay</span></div>
-      <div id="c-err" class="msg err" role="alert" hidden></div>
-      <button class="btn" id="c-go">${h.amount_due_cents > 0 && h.payment_mode === "stripe" ? "Continue to payment" : "Confirm booking"}</button>
-      ${h.amount_due_cents === 0 ? `<p class="tiny muted center" style="margin:8px 0 0">Nothing to pay: your ${esc(CREDIT)} covers the fee.</p>` : ""}
-      ${testBadge(h.stripe_mode)}`);
-    startTimer();
-    const capture = () => {
-      d.name = val("c-name"); d.phone = val("c-phone"); d.request = val("c-req");
-      d.marketing = document.getElementById("c-mk").checked; d.accepted = document.getElementById("c-ok").checked;
-      if (document.getElementById("c-ref")) { d.venueRef = val("c-ref"); d.bookedWithVenue = document.getElementById("c-bv").checked; }
-    };
-    const reprice = async (fn) => { capture(); try { C.hold = await fn(); drawDetails(); } catch (e) { drawDetails(friendly(e)); } };
-    document.getElementById("d-minus").onclick = () => { if (h.diners > 1) reprice(() => rpc("set_party", { p_device: deviceId, p_claim: h.booking_id, p_diners: h.diners - 1 })); };
-    document.getElementById("d-plus").onclick = () => { if (h.diners < h.max_diners) reprice(() => rpc("set_party", { p_device: deviceId, p_claim: h.booking_id, p_diners: h.diners + 1 })); };
-    document.querySelectorAll('input[name="opt"]').forEach((r) => (r.onchange = () => reprice(() => rpc("set_option", { p_device: deviceId, p_claim: h.booking_id, p_option: r.value }))));
-    document.getElementById("c-go").onclick = async () => {
-      capture();
-      const err = (m) => { const e = document.getElementById("c-err"); e.textContent = m; e.hidden = false; e.scrollIntoView({ block: "center", behavior: "smooth" }); };
-      const phone = normalisePhone(d.phone);
-      if (d.name.trim().length < 2) return err("Please add your name for the reservation.");
-      if (!phone) return err("Please add a mobile number (10 digits, or with + and your country code).");
-      if (h.reservation_url && !d.bookedWithVenue) return err(`Book with ${v.name} first, then tick the box.`);
-      if (!d.accepted) return err("Tick the box to accept the conditions.");
-      d.phone = phone;
-      const btn = document.getElementById("c-go"); btn.disabled = true; btn.textContent = "One moment…";
-      try { if (h.payment_mode === "stripe" && h.amount_due_cents > 0) await drawPayment(); else await confirmWithoutCard(); }
-      catch (e) {
-        if (e.code === "hold_expired") { clearInterval(C.timer); C.done = true; return out(friendly(e)); }
-        btn.disabled = false; drawDetails(friendly(e));
-      }
-    };
-  }
-  const confirmParams = (id) => ({ p_device: deviceId, p_claim: id, p_name: C.details.name.trim(), p_phone: C.details.phone, p_request: C.details.request || null, p_external_ref: C.details.venueRef || null, p_share_contact: null, p_marketing: C.details.marketing ? true : null });
-  async function confirmWithoutCard() { const b = await rpc("confirm", confirmParams(hd().booking_id)); C.done = true; after(b); }
-  function after(b) {
-    const n = C.details.name.trim().split(/\s+/);
-    rpc("save_profile", { p_first: n[0], p_last: n.slice(1).join(" ") || null, p_phone: C.details.phone }).catch(() => {});
-    sstore.set("eb.web.pending", null);
-    go("/booking/" + b.id, { new: 1 });
-  }
-
-  async function drawPayment() {
+  const linesHtml = () => {
     const h = hd();
-    const info = await pay("intent", { claim_id: h.booking_id });
-    C.intent = info;
-    sstore.set("eb.web.pending", JSON.stringify({ id: h.booking_id, details: C.details }));
-    coPage(`
-      <div class="row"><span>Diners</span><b>${h.diners}</b></div>${breakdownHtml()}
-      <div class="complete">Complete booking <span>${money(info.amount_cents)} to pay</span></div>
-      <div id="express-element"></div><div id="pay-element"></div>
-      <div id="p-err" class="msg err" role="alert" hidden></div>
-      <button class="btn" id="p-go" type="button" disabled>Pay ${money(info.amount_cents)} and book</button>
-      <p class="center"><button class="linklike" id="p-back" type="button" style="margin-top:12px">Change details</button></p>
-      ${testBadge(info.mode)}${info.mode === "test" ? '<p class="tiny muted center" style="margin:6px 0 0">Test card 4242 4242 4242 4242, any future expiry, any CVC. No card is charged.</p>' : ""}
-      <p class="tiny muted center" style="margin:10px 0 0">Secure payment by Stripe.</p>`);
+    return `<div class="lines"><div><span>Booking fee${h.fee_per_diner_cents != null ? ` (${h.diners} × ${money(h.fee_per_diner_cents)})` : ""}</span><span>${money(h.fee_cents)}</span></div>
+      ${h.credit_cents > 0 ? `<div class="g"><span>Paid from your ${esc(CREDIT)}</span><span>−${money(h.credit_cents)}</span></div>` : ""}
+      ${h.credit_kept_cents > 0 && h.amount_due_cents > 0 ? `<div class="k"><span>${money(h.credit_kept_cents)} credit saved for a fee it covers in full</span></div>` : ""}
+      <div class="tot"><span>To pay now</span><span>${money(due())}</span></div>
+      <div class="g"><span>${ic("check")} Est. savings on food</span><span>${m0(h.saving_cents)}</span></div>
+      ${cfg.reward_per_booking_cents > 0 ? `<div class="n"><span>${ic("bird")} ${esc(CREDIT)} you'll earn</span><span>+${money(cfg.reward_per_booking_cents)}</span></div>` : ""}</div>`;
+  };
+  const field = (id, label, input, hint = "") => `<div class="grow-f" id="w-${id}"><label for="${id}">${label}</label>${input}${hint ? `<div class="fhint">${hint}</div>` : ""}<div class="ferr" id="e-${id}" role="alert" hidden></div></div>`;
+
+  function formHtml(msg) {
+    const d = C.details, h = hd();
+    return `${msg ? `<div class="msg err" role="alert">${esc(msg)}</div>` : ""}
+      <section class="grp"><h2 class="grp-h">Your table</h2>
+        <div class="grow"><span>Diners</span><div class="stepper"><button type="button" id="d-minus" aria-label="Fewer diners" ${h.diners <= 1 ? "disabled" : ""}>−</button><span id="d-n" aria-live="polite">${h.diners}</span><button type="button" id="d-plus" aria-label="More diners" ${h.diners >= h.max_diners ? "disabled" : ""}>+</button></div></div>
+        ${h.nodrink_discount ? `<div class="grow col"><span>Discount</span><div class="seg" role="radiogroup" aria-label="Discount option">
+          <button type="button" role="radio" data-opt="standard" aria-checked="${h.option === "standard"}"><b>${h.standard_discount}% off food</b><small>${reqText() ? esc(reqText()) : "Nothing extra"}</small></button>
+          <button type="button" role="radio" data-opt="nodrink" aria-checked="${h.option === "nodrink"}"><b>${h.nodrink_discount}% off food</b><small>No drinks needed</small></button></div></div>` : ""}
+      </section>
+      ${h.reservation_url ? `<section class="grp"><h2 class="grp-h">Book with ${esc(v.name)} first</h2>
+        <p class="small muted" style="margin:0 0 10px">This restaurant takes reservations on its own site. Book ${time12(h.time)}, ${esc(fmtLong(h.date))} for ${h.diners}, then come back to add your ${h.discount}% off.</p>
+        <a class="btn pale" href="${esc(h.reservation_url)}" target="_blank" rel="noopener">Open ${esc(v.name)} booking</a>
+        ${field("c-ref", "Reservation name or number <span class=\"optl\">optional</span>", `<input id="c-ref" type="text" maxlength="80" value="${esc(d.venueRef)}">`)}
+        <div class="grow-f" id="w-c-bv"><label class="check" style="margin:0"><input type="checkbox" id="c-bv" ${d.bookedWithVenue ? "checked" : ""}><span>I've booked ${time12(h.time)} with ${esc(v.name)}</span></label><div class="ferr" id="e-c-bv" role="alert" hidden></div></div></section>` : ""}
+      <section class="grp"><h2 class="grp-h">Your details</h2>
+        ${field("c-name", "Name", `<input id="c-name" type="text" autocomplete="name" maxlength="80" value="${esc(d.name)}" placeholder="First and last name">`)}
+        ${field("c-phone", "Mobile", `<input id="c-phone" type="tel" autocomplete="tel" inputmode="tel" maxlength="32" placeholder="(310) 555-0101" value="${esc(d.phone)}">`, "Only for this booking, if the restaurant needs to reach you.")}
+        ${field("c-req", "Request <span class=\"optl\">optional</span>", `<input id="c-req" type="text" maxlength="500" value="${esc(d.request)}" placeholder="Allergies, a high chair, a window seat…">`)}
+      </section>
+      ${payNeeded() ? `<section class="grp"><h2 class="grp-h">Payment</h2><div id="express-element"></div><div id="pay-element"></div><div class="ferr" id="e-card" role="alert" hidden></div></section>` : ""}
+      <details class="disc"><summary><b>Early Bird conditions</b><span>${esc(rules().slice(0, 2).join(" · "))}</span></summary><ul class="rules">${rules().map((c) => `<li>${ic("check")}<span>${esc(c)}</span></li>`).join("")}</ul></details>
+      <details class="disc"><summary><b>Cancellation policy</b><span>All of the fee back as ${esc(CREDIT)} within ${cfg.cancel_full_credit_minutes} minutes</span></summary>
+        <div class="policy">Cancellations come back as ${esc(CREDIT)} for booking fees on other Early Bird bookings, used first on your next one, for ${cfg.credit_valid_days} days.
+        <table><tr><td>Within ${cfg.cancel_full_credit_minutes} minutes of booking</td><td>The whole fee</td></tr><tr><td>Later, before the day</td><td>${cfg.cancel_before_day_percent}% of the fee</td></tr><tr><td>On the day, or no-show</td><td>Nothing</td></tr></table></div></details>
+      ${isDesk() ? "" : linesHtml()}
+      <div class="grow-f agree" id="w-c-ok"><label class="check"><input type="checkbox" id="c-ok" ${d.accepted ? "checked" : ""}><span>I agree to the Early Bird conditions, the cancellation policy and the <a href="../terms.html" target="_blank" rel="noopener">booking terms</a></span></label><div class="ferr" id="e-c-ok" role="alert" hidden></div></div>
+      <label class="check small"><input type="checkbox" id="c-mk" ${d.marketing ? "checked" : ""}><span>Let ${esc(v.name)} send me offers through Early Bird</span></label>
+      <div class="paybar"><div class="paysum"><b>${money(due())}</b><span>${payNeeded() ? "to pay now" : due() === 0 && h.credit_cents > 0 ? "covered by credit" : "nothing to pay"}</span></div><button class="btn" id="c-go" type="button">${goLabel()}</button></div>
+      ${testBadge(C.intent?.mode || h.stripe_mode)}`;
+  }
+
+  function draw(msg) {
+    unmount();
+    const body = formHtml(msg);
+    if (isDesk()) showPage(`<div id="co"><div class="cotop"><a href="#/r/${esc(v.slug)}">‹ Back to ${esc(v.name)}</a></div><h1 class="cohead">Finalise your booking</h1><div class="cogrid"><div class="coleft">${body}</div>${summaryDesk()}</div></div>`, { size: "wide" });
+    else showPage(`<div id="co">${summaryMobile()}${body}</div>`, { wash: false });
     startTimer();
-    document.getElementById("p-back").onclick = async () => {
-      clearInterval(C.timer); C.intent = null; // a payment was started for this hold, so take a fresh hold with the new choices
-      try { await makeHold(); drawDetails("Change your details, then continue."); } catch (e) { out(friendly(e)); }
-    };
-    const stripe = Stripe(info.publishable_key);
-    const elements = stripe.elements({ clientSecret: info.client_secret, appearance: { theme: "stripe", variables: { colorPrimary: "#34548A", colorText: "#14171F", fontFamily: "-apple-system, system-ui, sans-serif", borderRadius: "12px", fontSizeBase: "16px" } } });
-    const returnUrl = `${location.origin}${location.pathname}?pay=${h.booking_id}`;
-    const errBox = (m) => { const e = document.getElementById("p-err"); if (e) { e.textContent = m || ""; e.hidden = !m; } };
+    bind();
+    if (C.intent) mountPayment();
+  }
+  const capture = () => {
+    const d = C.details;
+    d.name = val("c-name"); d.phone = val("c-phone"); d.request = val("c-req");
+    d.marketing = !!document.getElementById("c-mk")?.checked; d.accepted = !!document.getElementById("c-ok")?.checked;
+    if (document.getElementById("c-ref")) { d.venueRef = val("c-ref"); d.bookedWithVenue = document.getElementById("c-bv").checked; }
+  };
+  // Change party size or discount option: take a fresh hold with the new choice (a started card payment can't be re-priced).
+  async function rehold(change) {
+    if (C.busy) return; C.busy = true;
+    capture(); Object.assign(wanted, change);
+    try { await makeHold(); await prepPayment(); C.busy = false; draw(); }
+    catch (e) { C.busy = false; if (e.code === "not_signed_in") throw e; draw(friendly(e)); }
+  }
+  const clearErr = (id) => { document.getElementById("w-" + id)?.classList.remove("bad"); const e = document.getElementById("e-" + id); if (e) e.hidden = true; };
+  const showErr = (id, text) => {
+    const w = document.getElementById("w-" + id) || document.getElementById(id), e = document.getElementById("e-" + id);
+    w?.classList.add("bad"); if (e) { e.textContent = text; e.hidden = false; }
+    (w || e)?.scrollIntoView({ block: "center", behavior: "smooth" });
+    const input = document.getElementById(id); if (input && input.focus) setTimeout(() => input.focus({ preventScroll: true }), 300);
+  };
+  // The first thing missing, in the order it appears on the page.
+  function firstProblem({ skipCard = false } = {}) {
+    capture();
+    const d = C.details, h = hd();
+    if (d.name.trim().length < 2) return ["c-name", "Add your name for the booking."];
+    if (!normalisePhone(d.phone)) return ["c-phone", d.phone ? "That doesn't look like a mobile number. Use 10 digits, or + and your country code." : "Add your mobile number."];
+    if (h.reservation_url && !d.bookedWithVenue) return ["c-bv", `Book with ${v.name} first, then tick this.`];
+    if (!skipCard && payNeeded() && !C.cardComplete) return ["card", "Add your card details, or use Apple Pay / Google Pay above."];
+    if (!d.accepted) return ["c-ok", "Tick to agree to the conditions."];
+    return null;
+  }
+  function bind() {
+    const h = hd();
+    document.getElementById("d-minus").onclick = () => h.diners > 1 && rehold({ diners: h.diners - 1 });
+    document.getElementById("d-plus").onclick = () => h.diners < h.max_diners && rehold({ diners: h.diners + 1 });
+    document.querySelectorAll("[data-opt]").forEach((b) => (b.onclick = () => b.dataset.opt !== h.option && rehold({ option: b.dataset.opt })));
+    ["c-name", "c-phone", "c-ref"].forEach((id) => document.getElementById(id)?.addEventListener("input", () => clearErr(id)));
+    document.getElementById("c-ok").addEventListener("change", () => clearErr("c-ok"));
+    document.getElementById("c-bv")?.addEventListener("change", () => clearErr("c-bv"));
+    document.getElementById("c-go").onclick = submit;
+  }
+  async function submit() {
+    if (C.busy || C.paying) return;
+    const p = firstProblem();
+    if (p) return showErr(p[0], p[1]);
+    C.details.phone = normalisePhone(C.details.phone);
+    const btn = document.getElementById("c-go");
+    if (!payNeeded()) {
+      btn.disabled = true; btn.textContent = "Booking…";
+      try { const b = await rpc("confirm", confirmParams(hd().booking_id)); C.done = true; after(b); }
+      catch (e) { if (e.code === "hold_expired") { clearInterval(C.timer); C.done = true; return out(friendly(e)); } btn.disabled = false; btn.textContent = goLabel(); draw(friendly(e)); }
+      return;
+    }
+    btn.disabled = true; btn.textContent = "Paying…"; C.paying = true; clearErr("card");
+    sstore.set("eb.web.pending", JSON.stringify({ id: hd().booking_id, details: C.details }));
+    const { error } = await C.stripe.confirmPayment({ elements: C.elements, confirmParams: { return_url: returnUrl(), payment_method_data: { billing_details: { name: C.details.name, email: C.profile.email || undefined, phone: C.details.phone } } }, redirect: "if_required" });
+    if (error) { C.paying = false; btn.disabled = false; btn.textContent = goLabel(); return showErr("card", error.message || "The payment didn't go through. Try another card."); }
+    await finishPayment();
+  }
+  const returnUrl = () => `${location.origin}${location.pathname}?pay=${hd().booking_id}`;
+  function mountPayment() {
+    const info = C.intent;
+    C.cardComplete = false;
+    C.stripe = C.stripe && C.stripeKey === info.publishable_key ? C.stripe : Stripe(info.publishable_key); C.stripeKey = info.publishable_key;
+    const elements = (C.elements = C.stripe.elements({ clientSecret: info.client_secret, appearance: { theme: "stripe", variables: { colorPrimary: "#34548A", colorText: "#14171F", colorDanger: "#C8402F", fontFamily: "-apple-system, BlinkMacSystemFont, system-ui, sans-serif", borderRadius: "12px", fontSizeBase: "16px", spacingUnit: "4px" } } }));
     let express = null;
     try {
       express = C.expressEl = elements.create("expressCheckout", { buttonHeight: 50, buttonType: { applePay: "book", googlePay: "book" }, paymentMethods: { link: "never", amazonPay: "never", paypal: "never" } });
@@ -1094,26 +1138,31 @@ async function viewCheckout(q) {
       express.on("ready", (e) => {
         const any = e.availablePaymentMethods && Object.values(e.availablePaymentMethods).some(Boolean);
         const box = document.getElementById("express-element");
-        if (!any) box?.remove(); else box?.insertAdjacentHTML("afterend", '<p class="tiny muted center" style="margin:6px 0 10px">or pay by card</p>');
+        if (!any) box?.remove(); else box?.insertAdjacentHTML("afterend", '<div class="ordiv"><span>or pay by card</span></div>');
       });
+      // Apple Pay / Google Pay: check the form first; the wallet sheet only opens when nothing is missing.
+      express.on("click", (event) => { const p = firstProblem({ skipCard: true }); if (p) { showErr(p[0], p[1]); return; } C.details.phone = normalisePhone(C.details.phone); event.resolve(); });
       express.on("confirm", async () => {
-        C.paying = true; errBox("");
-        const { error } = await stripe.confirmPayment({ elements, clientSecret: info.client_secret, confirmParams: { return_url: returnUrl }, redirect: "if_required" });
-        if (error) { C.paying = false; errBox(error.message); return; }
+        C.paying = true; clearErr("card");
+        sstore.set("eb.web.pending", JSON.stringify({ id: hd().booking_id, details: C.details }));
+        const { error } = await C.stripe.confirmPayment({ elements, clientSecret: info.client_secret, confirmParams: { return_url: returnUrl() }, redirect: "if_required" });
+        if (error) { C.paying = false; showErr("card", error.message); return; }
         await finishPayment();
       });
-    } catch { /* express checkout unavailable: the card form below still works */ }
+    } catch { /* express checkout unavailable: the card form still works */ }
     const pe = (C.paymentEl = elements.create("payment", { layout: "tabs", wallets: { applePay: express ? "never" : "auto", googlePay: express ? "never" : "auto" } }));
     pe.mount("#pay-element");
-    pe.on("ready", () => { const b = document.getElementById("p-go"); if (b) b.disabled = false; });
-    document.getElementById("p-go").onclick = async () => {
-      const b = document.getElementById("p-go"); b.disabled = true; b.textContent = "Processing…"; errBox(""); C.paying = true;
-      const { error } = await stripe.confirmPayment({ elements, confirmParams: { return_url: returnUrl, payment_method_data: { billing_details: { name: C.details.name, email: C.profile.email || undefined, phone: C.details.phone } } }, redirect: "if_required" });
-      if (error) { C.paying = false; b.disabled = false; b.textContent = `Pay ${money(info.amount_cents)} and book`; errBox(error.message || "The payment didn't go through. Try another card."); return; }
-      await finishPayment();
-    };
+    pe.on("change", (e) => { C.cardComplete = !!e.complete; if (e.complete) clearErr("card"); });
+  }
+  const confirmParams = (id) => ({ p_device: deviceId, p_claim: id, p_name: C.details.name.trim(), p_phone: C.details.phone, p_request: C.details.request || null, p_external_ref: C.details.venueRef || null, p_share_contact: null, p_marketing: C.details.marketing ? true : null });
+  function after(b) {
+    const n = C.details.name.trim().split(/\s+/);
+    rpc("save_profile", { p_first: n[0], p_last: n.slice(1).join(" ") || null, p_phone: C.details.phone }).catch(() => {});
+    sstore.set("eb.web.pending", null);
+    go("/booking/" + b.id, { new: 1 });
   }
   async function finishPayment() {
+    unmount();
     showPage(`<div class="gate"><h1 class="display">Finishing your booking…</h1><p class="muted">Confirming your payment. Please don't close this page.</p></div>`, { wash: false });
     clearInterval(C.timer);
     try { const b = await settleBooking(hd().booking_id, C.details); C.done = true; if (b) after(b); }
@@ -1122,7 +1171,7 @@ async function viewCheckout(q) {
         <p>If you were charged, don't pay again: your booking will appear under <a href="#/bookings">Bookings</a> as soon as the payment is confirmed, or contact <a href="../support.html">support</a>.</p>`, { wash: false });
     }
   }
-  drawDetails();
+  draw();
 }
 
 // Ask the server to check the payment with Stripe (it confirms the booking), then save the diner's details.

@@ -19,11 +19,12 @@ const sstore = {
   get(k) { try { return sessionStorage.getItem(k); } catch { return null; } },
   set(k, v) { try { v == null ? sessionStorage.removeItem(k) : sessionStorage.setItem(k, v); } catch { /* ignore */ } },
 };
-const deviceId = (() => {
+function loadDeviceId() {
   let id = store.get("eb.web.device");
   if (!id) { id = (crypto.randomUUID ? crypto.randomUUID() : "xxxxxxxx-xxxx-4xxx-8xxx-xxxxxxxxxxxx".replace(/x/g, () => ((Math.random() * 16) | 0).toString(16))).toLowerCase(); store.set("eb.web.device", id); }
   return id;
-})();
+}
+let deviceId = loadDeviceId();
 const CREDIT = CFG.creditName || "Early Bird credit";
 
 const time12 = (t) => { // "17:30" → "5:30PM" (the app's style)
@@ -96,8 +97,22 @@ const Auth = {
     } catch { return null; }
   },
   save(s) { store.set(SKEY, s ? JSON.stringify({ ...s, url: CFG.url }) : null); },
+  // Stay signed in (owner, 21 Nov: "have cookies so they stay signed in"): the session lives in this browser's local storage
+  // until the diner signs out. The short-lived access token is renewed quietly with the refresh token whenever it is near
+  // its end; one tab renews at a time (Web Locks) and every tab re-reads the stored session, so two tabs never spend the
+  // same refresh token. The sign-in screen only shows once Supabase has refused the refresh token itself.
   async token() {
     const s = this.session();
+    if (!s) return null;
+    if (s.expires_at * 1000 - Date.now() > 60000) return s.access_token;
+    if (!this._renewing) {
+      const renew = () => this._renew().finally(() => { this._renewing = null; });
+      this._renewing = navigator.locks?.request ? navigator.locks.request("eb.web.renew", renew) : renew();
+    }
+    return this._renewing;
+  },
+  async _renew() {
+    const s = this.session(); // re-read: another tab may have renewed it while this one waited for the lock
     if (!s) return null;
     if (s.expires_at * 1000 - Date.now() > 60000) return s.access_token;
     try {
@@ -105,8 +120,9 @@ const Auth = {
       this.save(n);
       return n.access_token;
     } catch (e) {
-      if (e.status && e.status < 500 && e.status !== 429) this.save(null);
-      return e.status ? null : s.access_token; // offline: try the old token
+      if (!e.status || e.status >= 500 || e.status === 429) return s.access_token; // offline or busy: keep the session, try later
+      if (this.session()?.refresh_token === s.refresh_token) this.save(null); // refused for good: signed out
+      return this.session()?.access_token || null;
     }
   },
   async call(path, body, { method = "POST", token } = {}) {
@@ -134,12 +150,24 @@ const Auth = {
     return j;
   },
   async reset(email) { await this.call("recover" + redirectQuery(), { email: email.toLowerCase() }); },
+  // Sign out leaves nothing of this diner in the browser: the session, any half-finished payment and the device id
+  // (a new one is made on the next booking) are removed, and the refresh token is revoked on the server.
   async signOut() {
     const s = this.session();
     this.save(null);
+    sstore.set("eb.web.pending", null);
+    store.set("eb.web.device", null); deviceId = loadDeviceId();
     if (s) fetch(`${CFG.url}/auth/v1/logout`, { method: "POST", headers: { apikey: CFG.key, Authorization: `Bearer ${s.access_token}` } }).catch(() => {});
   },
 };
+// Other tabs: signing in or out in one tab updates the others; a renewed token alone changes nothing on screen.
+addEventListener("storage", (e) => {
+  if (e.key !== SKEY && e.key !== null) return;
+  const who = (v) => { try { return JSON.parse(v || "null")?.user?.id || null; } catch { return null; } };
+  if (e.key === null || who(e.oldValue) !== who(e.newValue)) route();
+});
+// Coming back to a tab: renew the session quietly so the next tap doesn't wait on it.
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && Auth.session()) Auth.token(); });
 const redirectQuery = () => (CFG.env === "production" ? `?redirect_to=${encodeURIComponent(CFG.siteUrl + "/reset-password.html")}` : "");
 function authMessage(j, status) {
   const code = j.error_code || j.error || "";
@@ -977,7 +1005,7 @@ async function viewCheckout(q) {
   const payNeeded = () => hd().payment_mode === "stripe" && hd().amount_due_cents > 0;
   const prepPayment = async () => { C.intent = payNeeded() ? await pay("intent", { claim_id: hd().booking_id }) : null; };
   try { await makeHold(); await prepPayment(); } catch (e) { if (e.code === "not_signed_in") throw e; return out(friendly(e)); }
-  C.details = { name: [profile.first_name, profile.last_name].filter(Boolean).join(" ").replace(/^Early Bird diner$/, ""), phone: profile.phone || "", request: "", marketing: false, accepted: false, venueRef: "", bookedWithVenue: false };
+  C.details = { name: [profile.first_name, profile.last_name].filter(Boolean).join(" ").replace(/^Early Bird diner$/, ""), phone: profile.phone || "", request: "", share: true, marketing: false, accepted: false, venueRef: "", bookedWithVenue: false };
   const unmount = () => { try { C.paymentEl?.destroy(); C.expressEl?.destroy(); } catch { /* ignore */ } C.paymentEl = C.expressEl = null; };
   view.cleanup = () => { clearInterval(C.timer); unmount(); if (C.hold && !C.intent && !C.done) rpc("release_hold", { p_device: deviceId, p_claim: C.hold.booking_id }).catch(() => {}); };
 
@@ -1056,6 +1084,7 @@ async function viewCheckout(q) {
         <table><tr><td>Within ${cfg.cancel_full_credit_minutes} minutes of booking</td><td>The whole fee</td></tr><tr><td>Later, before the day</td><td>${cfg.cancel_before_day_percent}% of the fee</td></tr><tr><td>On the day, or no-show</td><td>Nothing</td></tr></table></div></details>
       <div class="lines-m">${linesHtml()}</div>
       <div class="grow-f agree" id="w-c-ok"><label class="check"><input type="checkbox" id="c-ok" ${d.accepted ? "checked" : ""}><span>I agree to the Early Bird conditions, the cancellation policy and the <a href="../terms.html" target="_blank" rel="noopener">booking terms</a></span></label><div class="ferr" id="e-c-ok" role="alert" hidden></div></div>
+      <label class="check small"><input type="checkbox" id="c-sh" ${d.share ? "checked" : ""}><span>Share my name, mobile number and email with ${esc(v.name)}, so they can contact me about my bookings</span></label>
       <label class="check small"><input type="checkbox" id="c-mk" ${d.marketing ? "checked" : ""}><span>Let ${esc(v.name)} send me offers through Early Bird</span></label>
       <div class="paybar"><div class="paysum"><b>${money(due())}</b><span>${payNeeded() ? "to pay now" : due() === 0 && h.credit_cents > 0 ? "covered by credit" : "nothing to pay"}</span></div><button class="btn" id="c-go" type="button">${goLabel()}</button></div>
       ${testBadge(C.intent?.mode || h.stripe_mode)}`;
@@ -1073,7 +1102,7 @@ async function viewCheckout(q) {
   const capture = () => {
     const d = C.details;
     d.name = val("c-name"); d.phone = val("c-phone"); d.request = val("c-req");
-    d.marketing = !!document.getElementById("c-mk")?.checked; d.accepted = !!document.getElementById("c-ok")?.checked;
+    d.share = !!document.getElementById("c-sh")?.checked; d.marketing = !!document.getElementById("c-mk")?.checked; d.accepted = !!document.getElementById("c-ok")?.checked;
     if (document.getElementById("c-ref")) { d.venueRef = val("c-ref"); d.bookedWithVenue = document.getElementById("c-bv").checked; }
   };
   // Change party size or discount option: take a fresh hold with the new choice (a started card payment can't be re-priced).
@@ -1158,7 +1187,7 @@ async function viewCheckout(q) {
     pe.mount("#pay-element");
     pe.on("change", (e) => { C.cardComplete = !!e.complete; if (e.complete) clearErr("card"); });
   }
-  const confirmParams = (id) => ({ p_device: deviceId, p_claim: id, p_name: C.details.name.trim(), p_phone: C.details.phone, p_request: C.details.request || null, p_external_ref: C.details.venueRef || null, p_share_contact: null, p_marketing: C.details.marketing ? true : null });
+  const confirmParams = (id) => ({ p_device: deviceId, p_claim: id, p_name: C.details.name.trim(), p_phone: C.details.phone, p_request: C.details.request || null, p_external_ref: C.details.venueRef || null, p_share_contact: C.details.share ? true : null, p_marketing: C.details.marketing ? true : null });
   function after(b) {
     const n = C.details.name.trim().split(/\s+/);
     rpc("save_profile", { p_first: n[0], p_last: n.slice(1).join(" ") || null, p_phone: C.details.phone }).catch(() => {});
@@ -1192,7 +1221,7 @@ async function settleBooking(id, d) {
     showPage(`<div class="gate"><h1 class="display">That table was taken</h1></div><div class="msg info">Your payment arrived after your hold ran out and the table had gone, so we've kept your fee as ${esc(CREDIT)}. You can use it on your next booking.</div><a class="btn" href="#/">Find another table</a>`, { wash: false });
     return null;
   }
-  return rpc("confirm", { p_device: deviceId, p_claim: id, p_name: d.name.trim(), p_phone: d.phone, p_request: d.request || null, p_external_ref: d.venueRef || null, p_share_contact: null, p_marketing: d.marketing ? true : null });
+  return rpc("confirm", { p_device: deviceId, p_claim: id, p_name: d.name.trim(), p_phone: d.phone, p_request: d.request || null, p_external_ref: d.venueRef || null, p_share_contact: d.share ? true : null, p_marketing: d.marketing ? true : null });
 }
 // Stripe sends the diner back here after a redirect-based payment method (?pay=<booking id>).
 async function viewReturn(q) {
@@ -1201,7 +1230,7 @@ async function viewReturn(q) {
   showPage(`<div class="gate"><h1 class="display">Finishing your booking…</h1><p class="muted">Confirming your payment.</p></div>`, { wash: false });
   let pending = null;
   try { pending = JSON.parse(sstore.get("eb.web.pending") || "null"); } catch { /* ignore */ }
-  const d = pending?.id === id ? pending.details : { name: "", phone: "", request: "", marketing: false, venueRef: "" };
+  const d = pending?.id === id ? pending.details : { name: "", phone: "", request: "", share: false, marketing: false, venueRef: "" };
   history.replaceState(null, "", location.pathname + "#/");
   try {
     if (q.redirect_status === "failed") throw new ApiError("payment_failed", "The payment didn't go through. Please try booking again.");

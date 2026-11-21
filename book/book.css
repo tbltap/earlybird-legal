@@ -472,6 +472,8 @@ button.pill.near[aria-pressed=true]{background:var(--navy);color:#fff}
 .grow-f.bad input[type=text],.grow-f.bad input[type=tel]{border-color:var(--red);background:#FFF6F5}
 .grow-f.bad .check{color:var(--red)}
 .grow-f.agree{border-top:0;padding:4px 0 0}
+.grow-f.agree>label.check{display:flex;font-size:16px;font-weight:400;margin:12px 0}
+.grow-f.agree:not(.bad)>label.check{color:var(--ink)}
 #co .grp .ferr#e-card{margin-bottom:6px}
 .ordiv{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:13px;margin:10px 0}
 .ordiv::before,.ordiv::after{content:"";flex:1;border-top:1px solid var(--hairline)}

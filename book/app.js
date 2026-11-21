@@ -219,9 +219,75 @@ function drawTabs(path) {
   const tab = (k, href, icon, label) => `<a href="${href}" class="${on === k ? "on" : ""}" ${on === k ? 'aria-current="page"' : ""}>${ic(icon)}${label}</a>`;
   el.innerHTML = tab("home", "#/", "home", "Home") + tab("bookings", "#/bookings", "cal", "Bookings") + tab("account", "#/account", "person", "Profile");
 }
+// Desktop (1024 px and wider) follows the First Table-style website layout (FIRST_TABLE_WEB_FLOW.md): a white header with
+// search and city, a navy footer, wide pages. Phones keep the app-style layout and the floating tab bar.
+const DESK_MQ = matchMedia("(min-width: 1024px)");
+const isDesk = () => DESK_MQ.matches;
+DESK_MQ.addEventListener?.("change", () => route());
+async function drawChrome(path) {
+  const desk = isDesk(), signedIn = !!Auth.session(), minimal = path === "/book";
+  document.body.classList.toggle("desk", desk);
+  const head = document.getElementById("dhead"), foot = document.getElementById("dfoot");
+  head.hidden = foot.hidden = !desk;
+  if (!desk) return;
+  const logo = `<a class="dlogo" href="../"><img src="../img/icon.png" alt="" width="34" height="34">Early Bird</a>`;
+  const legal = `<div class="df-legal"><a href="../terms.html">Terms</a><a href="../privacy.html">Privacy</a><a href="../credit-terms.html">${esc(CREDIT)} terms</a><a href="../support.html">Support</a><span>© 2026 Early Bird</span></div>`;
+  if (minimal) {
+    head.innerHTML = `<div class="dh-in dh-min">${logo}</div>`;
+    foot.innerHTML = `<div class="df-in df-min">${legal}</div>`;
+    return;
+  }
+  const on = (k) => ((k === "home" && (path === "/" || path.startsWith("/r/"))) || (k === "bookings" && path.startsWith("/booking")) || (k === "account" && path === "/account") ? ' class="on"' : "");
+  head.innerHTML = `<div class="dh-in">${logo}
+    ${signedIn ? `<div class="hsearch" id="hsearch">${ic("search")}<input id="hs" type="search" placeholder="Search restaurants" autocomplete="off" aria-label="Search restaurants"><div id="hs-list" class="hs-list" role="listbox" hidden></div></div>
+      <label class="hcity">${ic("pin")}<select id="hcity" aria-label="City"><option>City</option></select></label>` : ""}
+    <nav class="hnav" aria-label="Main"><a class="hhow" href="../#how">How it works</a>${signedIn ? `<a href="#/"${on("home")}>Find a table</a><a href="#/bookings"${on("bookings")}>My bookings</a><a href="#/account"${on("account")}>Profile</a>` : `<a href="#/signin" class="hsign">Sign in</a>`}
+      <a class="hout" href="../restaurant-terms.html">For restaurants</a></nav></div>`;
+  foot.innerHTML = `<div class="df-in"><div class="df-cols">
+      <div><h3>Diners</h3><p>Book an early table and get 50% off the food bill. A small booking fee holds it.</p><a class="dbtn" href="#/">Find a table</a></div>
+      <div><h3>Restaurants</h3><p>List your early tables on Early Bird for free and fill your quiet hours.</p><a class="dbtn ghost" href="../restaurant-terms.html">Restaurant terms</a></div>
+      <div><h3>Get the app</h3><p>Early Bird for iPhone: your bookings, codes and ${esc(CREDIT)} in your pocket.</p><a class="dbtn ghost" href="../">Learn more</a></div>
+    </div>${legal}</div>`;
+  if (!signedIn) return;
+  // city picker
+  loadCities().then(() => {
+    const sel = document.getElementById("hcity"); if (!sel) return;
+    sel.innerHTML = S.cities.map((c) => `<option value="${esc(c.slug)}" ${c.slug === S.city.slug ? "selected" : ""}>${esc(c.name)}</option>`).join("");
+    sel.onchange = () => { S.city = S.cities.find((c) => c.slug === sel.value) || S.city; store.set("eb.web.city", S.city.slug); go("/", { city: S.city.slug }); };
+  }).catch(() => {});
+  // type-ahead search: restaurant names (api.suggest), opens the restaurant page
+  const hs = document.getElementById("hs"), list = document.getElementById("hs-list");
+  let t = null, seq = 0;
+  const close = () => { list.hidden = true; };
+  hs.addEventListener("input", () => {
+    clearTimeout(t);
+    const q = hs.value.trim();
+    if (q.length < 2) return close();
+    t = setTimeout(async () => {
+      const my = ++seq;
+      const rows = await rpc("suggest", { p_q: q, p_lat: S.city?.lat ?? null, p_lng: S.city?.lng ?? null }).catch(() => []);
+      if (my !== seq) return;
+      const re = new RegExp("(" + q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + ")", "ig");
+      list.innerHTML = rows.length ? rows.map((r) => `<a role="option" href="#/r/id:${esc(r.id)}"><b>${esc(r.name).replace(re, "<mark>$1</mark>")}</b><span>${esc(r.area || "")}</span></a>`).join("")
+        : `<div class="hs-empty">No restaurants match “${esc(q)}”.</div>`;
+      list.hidden = false;
+    }, 180);
+  });
+  hs.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") { close(); hs.blur(); }
+    if (e.key === "Enter") { e.preventDefault(); const first = list.querySelector("a"); if (first) location.hash = first.getAttribute("href"); else go("/", { city: S.city?.slug || "", q: hs.value.trim() }); close(); }
+  });
+  list.addEventListener("click", () => { close(); hs.value = ""; });
+  document.addEventListener("click", (e) => { if (!e.target.closest("#hsearch")) close(); });
+}
 const legalLinks = `<div class="legal"><a href="../terms.html">Terms</a><a href="../privacy.html">Privacy</a><a href="../credit-terms.html">${esc(CREDIT)} terms</a><a href="../support.html">Support</a></div>`;
 const topbar = (right = "") => `<div class="wash"><div class="col"><div class="topbar"><a class="brand" href="../"><img src="../img/icon.png" alt="" width="30" height="30">Early Bird</a>${right}</div></div></div>`;
-const showPage = (inner, { wash = true, right = "" } = {}) => { APP.innerHTML = (wash ? topbar(right) : "") + `<div class="col">${inner}${legalLinks}</div>`; };
+const showPage = (inner, { wash = true, right = "", size = "" } = {}) => {
+  if (isDesk()) { APP.innerHTML = `<div class="col ${size || (Auth.session() ? "" : "narrow")}">${inner}</div>`; return; }
+  APP.innerHTML = (wash ? topbar(right) : "") + `<div class="col">${inner}${legalLinks}</div>`;
+};
+// A desktop page that brings its own full-width sections (hero, gallery): no wrapping column.
+const showRaw = (html) => { APP.innerHTML = html; };
 const plainPage = (inner) => showPage(inner, { wash: false });
 
 /* ───────────────────────────── router ───────────────────────────── */
@@ -242,6 +308,7 @@ async function route() {
   const { path, q } = parseHash();
   window.scrollTo(0, 0);
   drawTabs(path);
+  drawChrome(path);
   APP.innerHTML = '<div class="col"><p class="loading">Loading…</p></div>';
   try {
     // Signed-out visitors get the sign-in screen for every address (a link to a restaurant or booking is kept and opened after sign-in).
@@ -277,9 +344,9 @@ function confirmDialog({ title, body, ok = "OK", cancel = "Cancel" }) {
 }
 
 /* ───────────────────────────── availability columns (results and restaurant page) ───────────────────────────── */
-async function loadAvail(ids, meal, diners) {
+async function loadAvail(ids, meal, diners, from = null) {
   const out = {};
-  const rows = await rpc("availability", { p_venues: ids, p_meal: meal, p_days: 8, p_diners: diners });
+  const rows = await rpc("availability", { p_venues: ids, p_meal: meal, p_days: 8, p_diners: diners, ...(from ? { p_from: from } : {}) });
   rows.forEach((r) => (out[r.venue_id] = r));
   return out;
 }
@@ -289,14 +356,26 @@ function checkoutHref(v, deal, date, time, meal, diners) {
 }
 
 /* ───────────────────────────── Home: search, quick search, results ───────────────────────────── */
-const H = { q: "", cuisine: "", meal: "dinner", diners: 2, rows: [], offset: 0, more: false };
+const H = { q: "", cuisines: [], areas: [], prices: [], sort: "featured", date: "", map: false, meal: "dinner", diners: 2, rows: [], offset: 0, more: false, loading: false };
+const SORTS = [["featured", "Featured first"], ["distance", "Nearest first"], ["highest_rated", "Highest rated"], ["new", "Newest"], ["alphabetical", "A to Z"]];
+const list = (v) => String(v || "").split("|").filter(Boolean);
+function homeParams(extra = {}) {
+  const p = { city: S.city.slug, meal: H.meal, diners: H.diners, ...(H.q ? { q: H.q } : {}), ...(H.cuisines.length ? { c: H.cuisines.join("|") } : {}),
+    ...(H.areas.length ? { a: H.areas.join("|") } : {}), ...(H.prices.length ? { p: H.prices.join("|") } : {}), ...(H.sort !== "featured" ? { sort: H.sort } : {}),
+    ...(H.date ? { date: H.date } : {}), ...(H.map ? { map: 1 } : {}), ...extra };
+  Object.keys(p).forEach((k) => (p[k] === "" || p[k] == null) && delete p[k]);
+  return p;
+}
 async function viewHome(q) {
   setTitle("");
   await Promise.all([loadCities(), loadConfig()]);
   if (q.city) { const c = S.cities.find((x) => x.slug === q.city); if (c) { S.city = c; store.set("eb.web.city", c.slug); } }
-  H.q = q.q || ""; H.cuisine = q.c || "";
+  H.q = q.q || ""; H.cuisines = list(q.c); H.areas = list(q.a); H.prices = list(q.p).map(Number).filter((n) => n >= 1 && n <= 4);
+  H.sort = SORTS.some(([k]) => k === q.sort) ? q.sort : "featured"; H.date = /^\d{4}-\d{2}-\d{2}$/.test(q.date || "") ? q.date : ""; H.map = q.map === "1";
   H.meal = ["breakfast", "lunch", "dinner"].includes(q.meal) ? q.meal : H.meal;
   H.diners = Math.min(Math.max(Number(q.diners) || H.diners, 1), S.config.max_party || 12);
+  if (isDesk()) return viewHomeDesk();
+  H.cuisine = H.cuisines[0] || "";
   const params = () => ({ city: S.city.slug, meal: H.meal, diners: H.diners, ...(H.q ? { q: H.q } : {}), ...(H.cuisine ? { c: H.cuisine } : {}) });
   const maxD = Math.min(S.config.max_party || 12, 12);
   showPage(`
@@ -320,33 +399,47 @@ async function viewHome(q) {
   document.getElementById("f-meal").onchange = (e) => go("/", { ...params(), meal: e.target.value });
   document.getElementById("f-diners").onchange = (e) => go("/", { ...params(), diners: e.target.value });
   document.getElementById("more").onclick = () => loadResults(true);
-  rpc("cuisines", { p_lat: S.city.lat, p_lng: S.city.lng, p_radius_km: S.city.radius_km || 25 }).then((cs) => {
+  const chipsP = rpc("cuisines", { p_lat: S.city.lat, p_lng: S.city.lng, p_radius_km: S.city.radius_km || 25 }).catch(() => []);
+  await loadResults(false);
+  chipsP.then((cs) => {
     const el = document.getElementById("chips");
     if (!el) return;
-    el.innerHTML = cs.slice(0, 12).map((c) => `<button class="pill" type="button" aria-pressed="${c.name === H.cuisine}" data-c="${esc(c.name)}">${esc(c.name)}</button>`).join("");
+    let names = cs.map((c) => c.name);
+    if (!names.length) names = [...new Set(H.rows.flatMap((r) => r.cuisines || []))].sort(); // no cuisine list yet: use what the results show
+    if (H.cuisine && !names.includes(H.cuisine)) names.unshift(H.cuisine);
+    el.innerHTML = names.slice(0, 12).map((n) => `<button class="pill" type="button" aria-pressed="${n === H.cuisine}" data-c="${esc(n)}">${esc(n)}</button>`).join("");
     el.onclick = (e) => {
       const b = e.target.closest("[data-c]"); if (!b) return;
       const p = params(); if (b.dataset.c === H.cuisine) delete p.c; else p.c = b.dataset.c;
       go("/", p);
     };
   }).catch(() => {});
-  await loadResults(false);
 }
 async function loadResults(append) {
   const grid = document.getElementById("grid");
+  if (!grid || (append && (H.loading || !H.more))) return;
+  H.loading = true;
+  const seq = append ? H.seq : (H.seq = (H.seq || 0) + 1); // a newer search wins over an older one still loading
   if (!append) { H.rows = []; H.offset = 0; grid.innerHTML = '<p class="loading">Finding tables…</p>'; }
-  const rows = await rpc("search_venues", {
-    p_query: H.q || null, p_lat: S.city.lat, p_lng: S.city.lng, p_radius_km: S.city.radius_km || 25,
-    p_cuisines: H.cuisine ? [H.cuisine] : null, p_limit: 24, p_offset: H.offset, p_sort: "featured",
-  });
-  const avail = rows.length ? await loadAvail(rows.map((r) => r.id), H.meal, H.diners).catch(() => ({})) : {};
-  if (!document.getElementById("grid")) return;
-  rows.forEach((r) => (r._avail = avail[r.id]));
-  H.rows = H.rows.concat(rows);
-  H.offset += rows.length;
-  H.more = rows.length === 24;
-  grid.innerHTML = H.rows.length ? H.rows.map(resultHtml).join("") : `<div class="card center muted">No restaurants found${H.q ? ` for “${esc(H.q)}”` : ""}. Try another search or city.</div>`;
-  document.getElementById("more").hidden = !H.more;
+  try {
+    const rows = await rpc("search_venues", {
+      p_query: H.q || null, p_lat: S.city.lat, p_lng: S.city.lng, p_radius_km: S.city.radius_km || 25,
+      p_cuisines: H.cuisines.length ? H.cuisines : null, p_areas: H.areas.length ? H.areas : null, p_price: H.prices.length ? H.prices : null,
+      p_limit: 24, p_offset: H.offset, p_sort: H.sort || "featured",
+    });
+    const avail = rows.length ? await loadAvail(rows.map((r) => r.id), H.meal, H.diners, H.date || null).catch(() => ({})) : {};
+    if (!document.getElementById("grid") || seq !== H.seq) return;
+    rows.forEach((r) => (r._avail = avail[r.id]));
+    H.rows = H.rows.concat(rows);
+    H.offset += rows.length;
+    H.more = rows.length === 24;
+    const desk = isDesk();
+    grid.innerHTML = H.rows.length ? H.rows.map(desk ? resultHtmlDesk : resultHtml).join("")
+      : `<div class="card center muted">No restaurants found${H.q ? ` for “${esc(H.q)}”` : ""}. Try fewer filters, another search or another city.</div>`;
+    const more = document.getElementById("more"); if (more) more.hidden = !H.more;
+    const cnt = document.getElementById("count"); if (cnt) cnt.textContent = H.rows.length ? `${H.rows.length}${H.more ? "+" : ""} restaurant${H.rows.length === 1 && !H.more ? "" : "s"}` : "";
+    if (H.map) drawMap();
+  } finally { H.loading = false; }
 }
 function thumbHtml(v) {
   const img = v.photo || (v.dish_photos || [])[0];
@@ -373,15 +466,142 @@ function resultHtml(v) {
     ${cols ? `<div class="days">${cols}</div>` : d ? `<p class="muted small" style="padding:12px 18px 0">No ${H.meal} tables listed.</p>` : ""}</article>`;
 }
 
+
+/* ───────────────────────────── desktop list (the First Table-style region page) ───────────────────────────── */
+const stars5 = (r) => { const n = Math.round(Number(r) || 0); return `<span class="stars" aria-label="${Number(r).toFixed(1)} out of 5">${"★".repeat(n)}<span class="off">${"★".repeat(5 - n)}</span></span>`; };
+const MEALS = ["breakfast", "lunch", "dinner"];
+const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+async function viewHomeDesk() {
+  const city = S.city, maxD = Math.min(S.config.max_party || 12, 12);
+  const today = todayAt(city.timezone);
+  const dates = Array.from({ length: Math.min(S.config.max_days_ahead || 14, 14) }, (_, i) => { const d = dateObj(today); d.setUTCDate(d.getUTCDate() + i); return d.toISOString().slice(0, 10); });
+  const filterOn = H.cuisines.length || H.areas.length || H.prices.length || H.q;
+  showRaw(`
+    <section class="dhero"><div class="wide dhero-in">
+      <div><div class="crumbs"><a href="#/">Early Bird</a><span>/</span>${esc(city.name)}</div>
+        <h1>${esc(city.name)} restaurants</h1><p>Dine early and save 50% on your food bill</p></div>
+      <a class="teaser" href="../#how"><b>Your table, early</b><span>Pick a time, pay a small booking fee per diner, and the food is half price when you dine.</span><span class="go" aria-hidden="true">${ic("arrow")}</span></a>
+    </div></section>
+    <div class="wide">
+      <div class="fbar" id="fbar">
+        <label>${ic("fork")}<select id="f-meal" aria-label="Meal">${MEALS.map((m) => `<option value="${m}" ${m === H.meal ? "selected" : ""}>${cap(m)}</option>`).join("")}</select></label>
+        <label>${ic("cal")}<select id="f-date" aria-label="Date"><option value="">All dates</option>${dates.map((d) => `<option value="${d}" ${d === H.date ? "selected" : ""}>${d === today ? "Today, " : ""}${esc(fmtDate(d, { weekday: "short", day: "numeric", month: "short" }))}</option>`).join("")}</select></label>
+        <label>${ic("person")}<select id="f-diners" aria-label="Diners">${Array.from({ length: maxD }, (_, i) => i + 1).map((n) => `<option value="${n}" ${n === H.diners ? "selected" : ""}>${n} ${n === 1 ? "diner" : "diners"}</option>`).join("")}</select></label>
+      </div>
+      <div class="lcols">
+        <div class="lmain">
+          <div class="sortrow"><span id="count" class="muted"></span>${H.q ? `<span class="qchip">“${esc(H.q)}” <a href="#/?${new URLSearchParams(homeParams({ q: "" }))}" aria-label="Clear search">×</a></span>` : ""}
+            <label>Sort by <select id="f-sort">${SORTS.map(([k, l]) => `<option value="${k}" ${k === H.sort ? "selected" : ""}>${l}</option>`).join("")}</select></label></div>
+          ${H.map ? `<div id="map" class="mapbox"><p class="loading" style="padding:20px">Loading the map…</p></div><div id="grid" hidden></div>` : `${filterOn ? "" : '<div id="newarr" class="newarr"></div>'}<div id="grid"></div><div id="sentinel"></div><button class="btn pale" id="more" hidden style="margin-top:10px">Show more</button>`}
+          <section class="howband"><h2>Enjoy 50% off your food bill</h2><ol>
+            <li><b>Find a restaurant</b><span>Pick an early time that suits you.</span></li>
+            <li><b>Book the early table</b><span>Pay a small booking fee per diner to hold it.</span></li>
+            <li><b>Enjoy 50% off food</b><span>Show your code when you order. Drinks are full price.</span></li></ol></section>
+        </div>
+        <aside class="lside">
+          <button class="btn outline" id="mapbtn" type="button">${ic(H.map ? "book" : "pin")} ${H.map ? "View list" : "View map"}</button>
+          <div class="fgroup" id="g-cuisine"><h3>Cuisine</h3><div class="fl" id="fl-cuisine"><p class="loading">…</p></div></div>
+          <div class="fgroup"><h3>Area</h3><input type="search" id="area-q" placeholder="Search areas" aria-label="Search areas"><div class="fl" id="fl-area">${(city.areas || []).map((a) => `<label class="ck"><span>${esc(a.name)}</span><input type="checkbox" data-area="${esc(a.name)}" ${H.areas.includes(a.name) ? "checked" : ""}></label>`).join("") || '<p class="muted small">No areas yet.</p>'}</div></div>
+          <div class="fgroup"><h3>Price</h3><div class="fl">${[1, 2, 3, 4].map((n) => `<label class="ck"><span>${"$".repeat(n)}</span><input type="checkbox" data-price="${n}" ${H.prices.includes(n) ? "checked" : ""}></label>`).join("")}</div></div>
+          ${filterOn ? `<button class="linklike" id="clear" type="button">Clear filters</button>` : ""}
+        </aside>
+      </div>
+      ${(city.areas || []).length ? `<section class="areas"><h2>Areas in ${esc(city.name)}</h2><div class="areacols">${city.areas.map((a) => `<a href="#/?${new URLSearchParams({ city: city.slug, a: a.name })}">${esc(a.name)}</a>`).join("")}</div></section>` : ""}
+    </div>`);
+  const nav = (extra) => go("/", homeParams(extra));
+  document.getElementById("f-meal").onchange = (e) => nav({ meal: e.target.value });
+  document.getElementById("f-date").onchange = (e) => nav({ date: e.target.value });
+  document.getElementById("f-diners").onchange = (e) => nav({ diners: e.target.value });
+  document.getElementById("f-sort").onchange = (e) => nav({ sort: e.target.value });
+  document.getElementById("mapbtn").onclick = () => nav({ map: H.map ? "" : 1 });
+  const clr = document.getElementById("clear"); if (clr) clr.onclick = () => go("/", { city: city.slug, meal: H.meal, diners: H.diners });
+  document.querySelectorAll("[data-area]").forEach((c) => (c.onchange = () => nav({ a: [...document.querySelectorAll("[data-area]:checked")].map((x) => x.dataset.area).join("|") })));
+  document.querySelectorAll("[data-price]").forEach((c) => (c.onchange = () => nav({ p: [...document.querySelectorAll("[data-price]:checked")].map((x) => x.dataset.price).join("|") })));
+  document.getElementById("area-q").oninput = (e) => { const t = e.target.value.toLowerCase(); document.querySelectorAll("#fl-area .ck").forEach((l) => (l.hidden = !l.textContent.toLowerCase().includes(t))); };
+  const cuisinesP = rpc("cuisines", { p_lat: city.lat, p_lng: city.lng, p_radius_km: city.radius_km || 25 }).catch(() => []);
+  const drawCuisines = (cs) => {
+    const el = document.getElementById("fl-cuisine"); if (!el) return;
+    let names = cs.map((c) => c.name);
+    if (!names.length) names = [...new Set(H.rows.flatMap((r) => r.cuisines || []))].sort(); // no cuisine list yet: use what the results show H.cuisines.forEach((c) => names.includes(c) || names.unshift(c));
+    el.innerHTML = names.map((n, i) => `<label class="ck" ${i >= 10 && !H.cuisines.includes(n) ? "data-extra hidden" : ""}><span>${esc(n)}</span><input type="checkbox" data-cuisine="${esc(n)}" ${H.cuisines.includes(n) ? "checked" : ""}></label>`).join("")
+      + (names.length > 10 ? `<button class="linklike small" type="button" id="cu-more">Show all ${names.length}</button>` : "");
+    el.querySelectorAll("[data-cuisine]").forEach((c) => (c.onchange = () => nav({ c: [...el.querySelectorAll("[data-cuisine]:checked")].map((x) => x.dataset.cuisine).join("|") })));
+    const m = document.getElementById("cu-more"); if (m) m.onclick = () => { el.querySelectorAll("[data-extra]").forEach((x) => (x.hidden = false)); m.remove(); };
+    if (!names.length) el.innerHTML = '<p class="muted small">No cuisines to filter yet.</p>';
+  };
+  if (!H.map && !filterOn) rpc("search_venues", { p_lat: city.lat, p_lng: city.lng, p_radius_km: city.radius_km || 25, p_sort: "new", p_limit: 4 }).then((rows) => {
+    const el = document.getElementById("newarr"); if (!el || !rows.length) return;
+    el.innerHTML = `<div class="sechead"><h2>New on Early Bird</h2><a href="#/?${new URLSearchParams(homeParams({ sort: "new" }))}">See all</a></div><div class="ncards">${rows.map((v) => `
+      <a class="ncard" href="#/r/${esc(v.slug)}?meal=${H.meal}&diners=${H.diners}"><div class="nph">${esc(v.name.charAt(0))}${(v.photo || v.dish_photos?.[0]) ? `<img src="${esc(v.photo || v.dish_photos[0])}" alt="" loading="lazy" onerror="this.remove()">` : ""}</div>
+        <b>${esc(v.name)}</b><span>${esc([v.area, (v.cuisines || [])[0]].filter(Boolean).join(" • "))}</span>${v.rating != null ? `<span>${stars5(v.rating)} ${Number(v.rating).toFixed(1)} (${v.review_count})</span>` : `<span class="muted">New</span>`}</a>`).join("")}</div>`;
+  }).catch(() => {});
+  await loadResults(false);
+  drawCuisines(await cuisinesP);
+  const sentinel = document.getElementById("sentinel");
+  if (sentinel && "IntersectionObserver" in window) {
+    const io = new IntersectionObserver((es) => { if (es.some((e) => e.isIntersecting)) loadResults(true); }, { rootMargin: "600px" });
+    io.observe(sentinel);
+    view.cleanup = () => io.disconnect();
+  }
+  const more = document.getElementById("more"); if (more) more.onclick = () => loadResults(true);
+}
+function resultHtmlDesk(v) {
+  const d = v.deal, a = v._avail;
+  const href = `#/r/${esc(v.slug)}?meal=${H.meal}&diners=${H.diners}`;
+  let cols = "";
+  if (d && a) {
+    cols = (a.days || []).slice(0, 7).map((day) => {
+      const slots = (day.slots || []).filter((s) => s.left > 0);
+      const head = `<div class="dh ${slots.length && day.open ? "" : "off"}">${d && day.date === todayAt(v.timezone) ? "Today" : esc(fmtDate(day.date, { weekday: "short" }))} ${esc(fmtDate(day.date, { day: "numeric" }))}</div>`;
+      if (!day.open || !slots.length) return `<div class="dcol">${head}<span class="badge ghost">–</span><div class="none">No tables</div></div>`;
+      const shown = slots.slice(0, 2), rest = slots.length - shown.length;
+      return `<div class="dcol">${head}<span class="badge">${slots[0].discount}% off</span>
+        ${shown.map((s) => `<a class="slot" href="${checkoutHref(v, d.id, day.date, s.time, H.meal, H.diners)}">${time12(s.time)}</a>`).join("")}
+        ${rest > 0 ? `<a class="more-t" href="${href}&date=${day.date}">More times</a>` : ""}</div>`;
+    }).join("");
+  }
+  const where = [v.area && `${ic("pin")}${esc(v.area)}`, cuisineText(v) && `${ic("fork")}${esc(cuisineText(v))}`, priceTxt(v)].filter(Boolean).join("");
+  return `<article class="drow"><a class="dthumb" href="${href}">${esc((v.name || "?").charAt(0))}${(v.photo || v.dish_photos?.[0]) ? `<img src="${esc(v.photo || v.dish_photos[0])}" alt="" loading="lazy" onerror="this.remove()">` : ""}${v.rating >= 4.7 && v.review_count >= 20 ? '<span class="ribbon">Top rated</span>' : ""}</a>
+    <div class="dbody"><div class="dtop"><a class="dname" href="${href}">${esc(v.name)} <span aria-hidden="true">›</span></a>${v.rating != null ? `<span class="drate">${Number(v.rating).toFixed(1)} ${stars5(v.rating)} <span class="muted">(${v.review_count})</span></span>` : '<span class="drate muted">New on Early Bird</span>'}</div>
+      <div class="dwhere">${where}</div>
+      ${d ? `<div class="dfacts"><span>${ic("card")}${m0(d.fee_per_diner_cents)} booking fee per diner</span><span>${ic("bird")}+${m0(S.config.reward_per_booking_cents || 0)} ${esc(CREDIT)}</span></div>` : ""}
+      ${cols ? `<div class="ddays">${cols}</div>` : d ? `<p class="muted small">No ${H.meal} tables in these days.</p>` : ""}</div></article>`;
+}
+const priceTxt = (v) => (v.price_tier ? `<span class="price">${"$".repeat(v.price_tier)}</span>` : "");
+// Map of the current results: Leaflet + OpenStreetMap tiles, loaded only when the map is opened.
+let leafletReady = null;
+function loadLeaflet() {
+  if (window.L) return Promise.resolve();
+  if (leafletReady) return leafletReady;
+  leafletReady = new Promise((res, rej) => {
+    const css = document.createElement("link"); css.rel = "stylesheet"; css.href = "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"; document.head.appendChild(css);
+    const js = document.createElement("script"); js.src = "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"; js.onload = res; js.onerror = rej; document.head.appendChild(js);
+  });
+  return leafletReady;
+}
+async function drawMap() {
+  const box = document.getElementById("map"); if (!box) return;
+  try { await loadLeaflet(); } catch { box.innerHTML = '<p class="muted" style="padding:20px">The map could not load. Use the list instead.</p>'; return; }
+  box.innerHTML = "";
+  const pts = H.rows.filter((v) => v.lat && v.lng);
+  const map = L.map(box, { scrollWheelZoom: true }).setView([S.city.lat, S.city.lng], 12);
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap contributors" }).addTo(map);
+  const pin = L.divIcon({ className: "ebpin", html: "<span></span>", iconSize: [22, 22], iconAnchor: [11, 22] });
+  pts.forEach((v) => L.marker([v.lat, v.lng], { icon: pin }).addTo(map).bindPopup(`<a href="#/r/${esc(v.slug)}?meal=${H.meal}&diners=${H.diners}"><b>${esc(v.name)}</b></a><br>${esc(v.area || "")}${v.deal ? `<br>${v.deal.max_discount || v.deal.discount}% off food · ${m0(v.deal.fee_per_diner_cents)} fee` : ""}`));
+  if (pts.length > 1) map.fitBounds(pts.map((v) => [v.lat, v.lng]), { padding: [40, 40] });
+}
+
 /* ───────────────────────────── restaurant page ───────────────────────────── */
 async function viewVenue(slug, q) {
-  const [page] = await Promise.all([rpc("venue_page", { p_slug: slug }), loadConfig()]);
+  const byId = slug.startsWith("id:") ? slug.slice(3) : null; // header search links by id
+  const [page] = await Promise.all([rpc("venue_page", byId ? { p_id: byId } : { p_slug: slug }), loadConfig()]);
   if (!page || !page.venue) {
     showPage(`<div class="gate"><h1 class="display">We couldn't find that restaurant</h1><p><a class="btn" href="#/">Back to Home</a></p></div>`);
     return;
   }
   const v = page.venue, deal = v.deal;
   setTitle(v.name);
+  if (isDesk()) return viewVenueDesk(v, q);
   const meals = deal?.meals?.length ? deal.meals : ["dinner"];
   const maxD = Math.min(deal?.max_diners || 6, S.config.max_party || 12);
   const B = { diners: Math.min(Number(q.diners) || 2, maxD), meal: meals.includes(q.meal) ? q.meal : meals.includes("dinner") ? "dinner" : meals[0], date: q.date || null, time: null, avail: null, loading: true };
@@ -452,6 +672,128 @@ async function viewVenue(slug, q) {
   goBtn.onclick = () => B.time && go("/book", { v: v.slug, deal: deal.id, date: B.date, time: B.time, meal: B.meal, diners: B.diners });
   await fetchAvail();
   if (q.date) document.querySelector(`[data-date="${q.date}"]`)?.scrollIntoView({ inline: "center", block: "nearest" });
+}
+
+
+/* ───────────────────────────── desktop restaurant page ───────────────────────────── */
+async function viewVenueDesk(v, q) {
+  const deal = v.deal;
+  await loadCities().catch(() => {});
+  const city = (S.cities || []).find((c) => c.name === v.city);
+  const meals = deal?.meals?.length ? deal.meals : ["dinner"];
+  const maxD = Math.min(deal?.max_diners || 6, S.config.max_party || 12);
+  const B = { diners: Math.min(Number(q.diners) || 2, maxD), meal: meals.includes(q.meal) ? q.meal : meals.includes("dinner") ? "dinner" : meals[0], avail: null, loading: true };
+  const photos = [...new Set([v.photo, ...(v.dish_photos || []), ...(v.photos || [])].filter(Boolean))];
+  const today = todayAt(v.timezone), dow = dateObj(today).getUTCDay();
+  const hoursRows = [1, 2, 3, 4, 5, 6, 0].map((d) => {
+    const h = (v.hours || []).filter((x) => x.d === d);
+    return `<tr class="${d === dow ? "today" : ""}"><td>${["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][d]}</td><td>${h.length ? h.map((x) => `${time12(x.o)} – ${time12(x.c)}`).join(", ") : "Closed"}</td></tr>`;
+  }).join("");
+  const menu = (v.menu || []).filter((s) => (s.items || []).length);
+  const reviews = v.reviews || [];
+  const rules = [...(deal?.requirements || []).map((r) => `Order ${r.per_person} ${r.label.toLowerCase()} per person`), ...(deal?.conditions || [])];
+  const about = v.description || `${v.name}${cuisineText(v) ? ` serves ${cuisineText(v)}` : " is a restaurant"}${v.area ? ` in ${v.area}` : ""}. Book an early table on Early Bird and get ${deal ? deal.max_discount || deal.discount : 50}% off your food bill.`;
+  const tile = (src, i) => `<button type="button" class="gtile" data-ph="${i}">${src ? `<img src="${esc(src)}" alt="" loading="lazy" onerror="this.remove()">` : ""}</button>`;
+  showRaw(`<div class="wide">
+    <div class="crumbs vcrumbs"><a href="#/">${esc(v.city || "Restaurants")}</a>${v.area ? `<span>/</span><a href="#/?${new URLSearchParams({ city: city?.slug || "", a: v.area })}">${esc(v.area)}</a>` : ""}<span>/</span>${esc(v.name)}</div>
+    <div class="vhead"><div><h1>${esc(v.name)}</h1>
+      <div class="vrate">${v.rating != null ? `${stars5(v.rating)} <a href="#reviews" id="to-rev">${v.review_count} review${v.review_count === 1 ? "" : "s"}</a>` : `${ic("bird")} New on Early Bird`}</div></div>
+      <div class="vlinks">${v.website ? `<a href="${esc(v.website)}" target="_blank" rel="noopener" aria-label="Website">${ic("share")}</a>` : ""}${v.phone ? `<a href="tel:${esc(v.phone)}" aria-label="Phone">${ic("info")}</a>` : ""}</div></div>
+  </div>
+  <div class="gallery ${photos.length > 1 ? "" : "one"}">
+    <button type="button" class="gbig" data-ph="0">${photos[0] ? `<img src="${esc(photos[0])}" alt="" onerror="this.remove()">` : `<span>${esc(v.name.charAt(0))}</span>`}</button>
+    ${photos.length > 1 ? `<div class="ggrid n${Math.min(photos.length - 1, 4)}">${photos.slice(1, 5).map((p, i) => tile(p, i + 1)).join("")}${photos.length > 5 ? `<button type="button" class="gmore" data-ph="5">+${photos.length - 5} photos</button>` : ""}</div>` : ""}
+  </div>
+  <div class="wide vcols">
+    <div class="vleft">
+      <h2 class="serif">Overview</h2>
+      <div class="vinline">${cuisineText(v) ? `<span>${ic("fork")}${esc(cuisineText(v))}</span>` : ""}${v.address ? `<button type="button" class="linklike" id="loc-btn">${ic("pin")}Location</button>` : ""}${menu.length ? `<a href="#menu" id="to-menu">${ic("book")}Menu</a>` : ""}<a href="#contact" id="to-contact">${ic("info")}Contact</a></div>
+      <div class="about" id="about"><p>${esc(about)}</p></div>
+      ${deal ? `<h3 class="vh3">The deal</h3><p><b>${deal.max_discount || deal.discount}% off your food bill</b>${deal.nodrink_discount ? `, or ${deal.nodrink_discount}% off with nothing extra to order` : ""}. A booking fee of ${m0(deal.fee_per_diner_cents)} per diner holds the table.</p>` : ""}
+      ${menu.length ? `<div class="menu" id="menu"><h2 class="serif">Menu</h2>${v.deal_menu ? '<p class="muted small">Items marked “On the deal” are covered by the discount.</p>' : ""}
+        ${menu.map((s, i) => `<details ${i < 2 ? "open" : ""}><summary>${esc(s.title)}</summary>${s.items.map((it) => `
+          <div class="item"><div><span>${esc(it.name)}</span>${v.deal_menu && it.on_deal ? ' <span class="badge">On the deal</span>' : ""}${it.description ? `<div class="d">${esc(it.description)}</div>` : ""}</div><div class="p">${it.price_cents != null ? money(it.price_cents) : ""}</div></div>`).join("")}</details>`).join("")}</div>` : ""}
+      <div id="reviews"><h2 class="serif">What people say</h2>
+        ${reviews.length ? `<div class="revsum">${stars5(v.rating)} <b>${Number(v.rating).toFixed(1)}</b> <span class="muted">from ${v.review_count} review${v.review_count === 1 ? "" : "s"}</span></div>
+          ${reviews.map((r) => `<div class="drev"><span class="ava">${esc((r.author || "?").charAt(0))}</span><div><b>${esc(r.author)}</b><div class="muted small">${r.verified ? `Dined at ${esc(v.name)}` : "Reviewed"}${r.date ? ` on ${esc(fmtStamp(r.date))}` : ""}</div><div>${stars5(r.rating)}</div>${r.text ? `<p>${esc(r.text)}</p>` : ""}</div></div>`).join("")}`
+        : `<p class="muted">No reviews yet. Diners can review after their visit.</p>`}</div>
+      <div id="contact"><h2 class="serif">Opening hours and contact</h2>
+        <div class="contact"><table class="hours">${hoursRows}</table>
+          <dl class="kv">${v.address ? `<dt>Address</dt><dd><a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(v.name + " " + v.address)}" target="_blank" rel="noopener">${esc(v.address)}</a></dd>` : ""}${v.phone ? `<dt>Phone</dt><dd><a href="tel:${esc(v.phone)}">${esc(v.phone)}</a></dd>` : ""}${v.website ? `<dt>Website</dt><dd><a href="${esc(v.website)}" target="_blank" rel="noopener">${esc(v.website.replace(/^https?:\/\/(www\.)?/, "").replace(/\/$/, ""))}</a></dd>` : ""}</dl></div></div>
+    </div>
+    <aside class="vbook" id="vbook">
+      ${deal ? `<h2 class="serif">Book early and save ${deal.max_discount || deal.discount}% on food</h2>
+        <div class="assure"><span>${ic("check")}Guaranteed booking</span><span>${ic("cancel")}Flexible cancellation</span></div>
+        <div class="vsel"><label>${ic("fork")}<select id="b-meal" aria-label="Meal">${meals.map((m) => `<option value="${m}" ${m === B.meal ? "selected" : ""}>${cap(m)}</option>`).join("")}</select></label>
+          <label>${ic("person")}<select id="b-diners" aria-label="Diners">${Array.from({ length: maxD }, (_, i) => i + 1).map((n) => `<option ${n === B.diners ? "selected" : ""} value="${n}">${n} ${n === 1 ? "diner" : "diners"}</option>`).join("")}</select></label></div>
+        <div class="dfacts"><span>${ic("card")}${m0(deal.fee_per_diner_cents)} booking fee per diner</span><span>${ic("bird")}+${m0(S.config.reward_per_booking_cents || 0)} ${esc(CREDIT)}</span></div>
+        <div id="slots"></div>
+        <div class="spc"><span>${ic("info")}Special conditions</span><button type="button" class="linklike" id="spc-btn">View</button></div>
+        <ul class="rules" id="spc" hidden>${rules.map((c) => `<li>${ic("check")}<span>${esc(c)}</span></li>`).join("")}</ul>
+        <p class="tiny muted" style="margin:10px 0 0">${deal.booking_type === "walk_in" ? "Walk-in deal: arrive at your time and show your code." : `Pick a time to start booking. We hold the table for ${S.config.hold_minutes || 7} minutes while you check out.`}</p>`
+      : `<h2 class="serif">No early tables right now</h2><p class="muted">This restaurant doesn't have early tables listed at the moment.</p>`}
+    </aside>
+  </div>
+  <div class="wide"><section class="nearby" id="nearby"></section></div>`);
+  const jump = (id, sel) => { const a = document.getElementById(id); if (a) a.onclick = (e) => { e.preventDefault(); document.querySelector(sel).scrollIntoView({ behavior: "smooth" }); }; };
+  jump("to-menu", "#menu"); jump("to-contact", "#contact"); jump("to-rev", "#reviews");
+  document.querySelectorAll("[data-ph]").forEach((b) => (b.onclick = () => photoDialog(photos, +b.dataset.ph)));
+  const lb = document.getElementById("loc-btn"); if (lb) lb.onclick = () => mapDialog(v);
+  const sb = document.getElementById("spc-btn"); if (sb) sb.onclick = () => { const u = document.getElementById("spc"); u.hidden = !u.hidden; sb.textContent = u.hidden ? "View" : "Hide"; };
+  // nearby restaurants
+  if (v.lat && v.lng) rpc("search_venues", { p_lat: v.lat, p_lng: v.lng, p_radius_km: 8, p_limit: 9, p_sort: "distance" }).then((rows) => {
+    rows = rows.filter((r) => r.id !== v.id).slice(0, 8);
+    const el = document.getElementById("nearby"); if (!el || !rows.length) return;
+    el.innerHTML = `<h2 class="serif">Nearby${v.area ? ` ${esc(v.area)}` : ""} restaurants</h2><div class="ncards scroll">${rows.map((r) => `
+      <a class="ncard" href="#/r/${esc(r.slug)}?meal=${B.meal}&diners=${B.diners}"><div class="nph">${esc(r.name.charAt(0))}${(r.photo || r.dish_photos?.[0]) ? `<img src="${esc(r.photo || r.dish_photos[0])}" alt="" loading="lazy" onerror="this.remove()">` : ""}</div>
+        <b>${esc(r.name)}</b><span>${esc([r.area, (r.cuisines || [])[0]].filter(Boolean).join(" • "))}</span>${r.rating != null ? `<span>${stars5(r.rating)} ${Number(r.rating).toFixed(1)}</span>` : ""}</a>`).join("")}</div>`;
+  }).catch(() => {});
+  if (!deal) return;
+  const slotsEl = document.getElementById("slots");
+  async function fetchAvail() {
+    slotsEl.innerHTML = '<p class="loading">Checking tables…</p>';
+    const r = await loadAvail([v.id], B.meal, B.diners).catch(() => ({}));
+    B.avail = (r[v.id] || {}).days || [];
+    const days = B.avail.slice(0, 7);
+    if (!days.some((d) => d.open && d.slots.some((s) => s.left > 0))) { slotsEl.innerHTML = `<p class="muted" style="margin:12px 0">No ${B.meal} tables in the next days. Try another meal or number of diners.</p>`; return; }
+    slotsEl.innerHTML = `<div class="ddays">${days.map((day) => {
+      const slots = day.slots || [], open = day.open && slots.some((s) => s.left > 0);
+      const head = `<div class="dh ${open ? "" : "off"}">${day.date === today ? "Today" : esc(fmtDate(day.date, { weekday: "short" }))} ${esc(fmtDate(day.date, { day: "numeric" }))}</div>`;
+      if (!open) return `<div class="dcol">${head}<span class="badge ghost">–</span><div class="none">No tables</div></div>`;
+      return `<div class="dcol">${head}<span class="badge">${slots.find((s) => s.left > 0).discount}% off</span>${slots.map((s) => s.left > 0
+        ? `<a class="slot" href="${checkoutHref(v, deal.id, day.date, s.time, B.meal, B.diners)}">${time12(s.time)}${s.discount !== deal.discount ? `<small>${s.discount}% off</small>` : ""}</a>`
+        : `<span class="slot off">${time12(s.time)}</span>`).join("")}</div>`;
+    }).join("")}</div>`;
+  }
+  document.getElementById("b-meal").onchange = (e) => { B.meal = e.target.value; fetchAvail(); };
+  document.getElementById("b-diners").onchange = (e) => { B.diners = +e.target.value; fetchAvail(); };
+  await fetchAvail();
+}
+function photoDialog(photos, start) {
+  if (!photos.length) return;
+  const d = document.getElementById("dlg");
+  d.classList.add("wide-dlg");
+  let i = Math.min(start, photos.length - 1);
+  const draw = () => { d.innerHTML = `<div class="phv"><img src="${esc(photos[i])}" alt=""><div class="phbar"><button class="btn grey" type="button" id="ph-p">‹ Previous</button><span>${i + 1} / ${photos.length}</span><button class="btn grey" type="button" id="ph-n">Next ›</button><button class="btn" type="button" id="ph-x">Close</button></div></div>`;
+    d.querySelector("#ph-p").onclick = () => { i = (i - 1 + photos.length) % photos.length; draw(); };
+    d.querySelector("#ph-n").onclick = () => { i = (i + 1) % photos.length; draw(); };
+    d.querySelector("#ph-x").onclick = () => d.close(); };
+  d.onclose = () => d.classList.remove("wide-dlg");
+  draw(); d.showModal();
+}
+async function mapDialog(v) {
+  const d = document.getElementById("dlg");
+  d.classList.add("wide-dlg");
+  d.innerHTML = `<h2>${esc(v.name)}</h2><p class="muted">${esc(v.address || "")}</p><div id="vmap" class="mapbox small"></div><div class="actions"><a class="btn grey" target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(v.name + " " + (v.address || ""))}">Open in Google Maps</a><button class="btn" type="button" id="mx">Close</button></div>`;
+  d.querySelector("#mx").onclick = () => d.close();
+  d.onclose = () => d.classList.remove("wide-dlg");
+  d.showModal();
+  try {
+    await loadLeaflet();
+    const m = L.map("vmap").setView([v.lat, v.lng], 16);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap contributors" }).addTo(m);
+    L.marker([v.lat, v.lng], { icon: L.divIcon({ className: "ebpin", html: "<span></span>", iconSize: [22, 22], iconAnchor: [11, 22] }) }).addTo(m);
+  } catch { document.getElementById("vmap").innerHTML = '<p class="muted" style="padding:16px">The map could not load.</p>'; }
 }
 
 /* ───────────────────────────── sign in: phone code (like the app) or email ───────────────────────────── */
@@ -639,10 +981,26 @@ async function viewCheckout(q) {
   const head = () => `<div class="sheethead"><div><h1>Make a booking</h1><div class="green small" style="margin-top:6px;display:flex;gap:8px;align-items:center">${ic("seal")}Guaranteed booking • Flexible cancellation</div></div><a class="x" href="#/r/${esc(v.slug)}" aria-label="Close">${ic("x")}</a></div>`;
   const holdLine = () => `<div class="holdline">Holding your table for <span class="timer" id="timer">–</span></div><div id="expired" class="msg err" hidden>Your hold ran out. <a href="#/r/${esc(v.slug)}">Choose a time again</a>.</div>`;
   const testBadge = (mode) => (mode === "test" ? '<span class="testbadge">TEST MODE</span>' : "");
+  // Desktop: "Finalise your booking", form on the left, the held table on the right (FIRST_TABLE_WEB_FLOW.md).
+  const deskSummary = () => {
+    const h = hd();
+    return `<aside class="coright"><div class="holdbar">We're holding this table for you for the next <b id="timer">–</b></div>
+      <div id="expired" class="msg err" hidden>Your hold ran out. <a href="#/r/${esc(v.slug)}">Choose a time again</a>.</div>
+      <div class="cowhen">${time12(h.time)}, ${esc(fmtDate(h.date, { weekday: "long", day: "numeric", month: "long" }))}</div>
+      <span class="deal-pill">${ic("tag")}${h.discount}% off food bill</span>
+      <div class="covenue">${thumbHtml(v)}<div><b>${esc(v.name)}</b>${v.rating != null ? `<div>${stars5(v.rating)} ${Number(v.rating).toFixed(1)} (${v.review_count})</div>` : ""}
+        ${v.address ? `<div class="muted">${ic("pin")}${esc(v.address)}</div>` : ""}${cuisineText(v) ? `<div class="muted">${ic("fork")}${esc(cuisineText(v))}</div>` : ""}
+        ${S.config.reward_per_booking_cents > 0 ? `<div class="muted">${ic("bird")}Earn ${money(S.config.reward_per_booking_cents)} ${esc(CREDIT)}</div>` : ""}</div></div>
+      <div class="savebox"><div><b>Estimated savings on food</b><span>Based on one main each. Results may vary.</span></div><div class="amt">${m0(h.saving_cents)}</div></div>
+      <div class="assure"><span>${ic("check")}Guaranteed booking</span><span>${ic("cancel")}Flexible cancellation</span></div></aside>`;
+  };
+  const coPage = (left) => (isDesk()
+    ? showPage(`<div id="co"><div class="cotop"><a href="#/r/${esc(v.slug)}">‹ Back to ${esc(v.name)}</a></div><h1 class="cohead">Finalise your booking</h1><div class="cogrid"><div class="coleft">${left}</div>${deskSummary()}</div></div>`, { size: "wide" })
+    : showPage(`<div id="co">${head()}${summaryHtml()}${left}${holdLine()}</div>`, { wash: false }));
 
   function drawDetails(msg) {
     const d = C.details, h = hd();
-    showPage(`<div id="co">${head()}${summaryHtml()}
+    coPage(`
       ${msg ? `<div class="msg err" role="alert">${esc(msg)}</div>` : ""}
       <div class="row"><b style="font-size:18px">Diners</b><div class="stepper"><button type="button" id="d-minus" aria-label="Fewer diners">−</button><span id="d-n" aria-live="polite">${h.diners}</span><button type="button" id="d-plus" aria-label="More diners">+</button></div></div>
       ${h.nodrink_discount ? `<div role="radiogroup" aria-label="Drinks option">
@@ -666,7 +1024,7 @@ async function viewCheckout(q) {
       <div id="c-err" class="msg err" role="alert" hidden></div>
       <button class="btn" id="c-go">${h.amount_due_cents > 0 && h.payment_mode === "stripe" ? "Continue to payment" : "Confirm booking"}</button>
       ${h.amount_due_cents === 0 ? `<p class="tiny muted center" style="margin:8px 0 0">Nothing to pay: your ${esc(CREDIT)} covers the fee.</p>` : ""}
-      ${testBadge(h.stripe_mode)}${holdLine()}</div>`, { wash: false });
+      ${testBadge(h.stripe_mode)}`);
     startTimer();
     const capture = () => {
       d.name = val("c-name"); d.phone = val("c-phone"); d.request = val("c-req");
@@ -708,7 +1066,7 @@ async function viewCheckout(q) {
     const info = await pay("intent", { claim_id: h.booking_id });
     C.intent = info;
     sstore.set("eb.web.pending", JSON.stringify({ id: h.booking_id, details: C.details }));
-    showPage(`<div id="co">${head()}${summaryHtml()}
+    coPage(`
       <div class="row"><span>Diners</span><b>${h.diners}</b></div>${breakdownHtml()}
       <div class="complete">Complete booking <span>${money(info.amount_cents)} to pay</span></div>
       <div id="express-element"></div><div id="pay-element"></div>
@@ -716,7 +1074,7 @@ async function viewCheckout(q) {
       <button class="btn" id="p-go" type="button" disabled>Pay ${money(info.amount_cents)} and book</button>
       <p class="center"><button class="linklike" id="p-back" type="button" style="margin-top:12px">Change details</button></p>
       ${testBadge(info.mode)}${info.mode === "test" ? '<p class="tiny muted center" style="margin:6px 0 0">Test card 4242 4242 4242 4242, any future expiry, any CVC. No card is charged.</p>' : ""}
-      <p class="tiny muted center" style="margin:10px 0 0">Secure payment by Stripe.</p>${holdLine()}</div>`, { wash: false });
+      <p class="tiny muted center" style="margin:10px 0 0">Secure payment by Stripe.</p>`);
     startTimer();
     document.getElementById("p-back").onclick = async () => {
       clearInterval(C.timer); C.intent = null; // a payment was started for this hold, so take a fresh hold with the new choices

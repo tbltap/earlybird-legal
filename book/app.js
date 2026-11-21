@@ -1137,7 +1137,7 @@ async function viewCheckout(q) {
     const elements = (C.elements = C.stripe.elements({ clientSecret: info.client_secret, appearance: { theme: "stripe", variables: { colorPrimary: "#34548A", colorText: "#14171F", colorDanger: "#C8402F", fontFamily: "-apple-system, BlinkMacSystemFont, system-ui, sans-serif", borderRadius: "12px", fontSizeBase: "16px", spacingUnit: "4px" } } }));
     let express = null;
     try {
-      express = C.expressEl = elements.create("expressCheckout", { buttonHeight: 50, buttonType: { applePay: "book", googlePay: "book" }, paymentMethods: { link: "never", amazonPay: "never", paypal: "never" } });
+      express = C.expressEl = elements.create("expressCheckout", { buttonHeight: 50, buttonType: { applePay: "book", googlePay: "book" }, paymentMethods: { applePay: "auto", googlePay: "auto", link: "never", amazonPay: "never", paypal: "never", klarna: "never" } });
       express.mount("#express-element");
       express.on("ready", (e) => {
         const any = e.availablePaymentMethods && Object.values(e.availablePaymentMethods).some(Boolean);

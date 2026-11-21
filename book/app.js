@@ -219,9 +219,9 @@ function drawTabs(path) {
 }
 // Desktop (1024 px and wider) follows the First Table-style website layout (FIRST_TABLE_WEB_FLOW.md): a white header with
 // search and city, a navy footer, wide pages. Phones keep the app-style layout and the floating tab bar.
-const DESK_MQ = matchMedia("(min-width: 1024px)");
-const isDesk = () => DESK_MQ.matches;
-DESK_MQ.addEventListener?.("change", () => route());
+// One design at every width (owner, 21 Nov: "on mobile near exact same"): the website layout, made to fit phones in
+// book.css. The older app-style phone screens below stay in the file but are no longer used.
+const isDesk = () => true;
 async function drawChrome(path) {
   const desk = isDesk(), signedIn = !!Auth.session(), minimal = path === "/book";
   document.body.classList.toggle("desk", desk);
@@ -1006,7 +1006,7 @@ async function viewCheckout(q) {
   };
   const summaryDesk = () => {
     const h = hd();
-    return `<aside class="coright"><div class="holdbar">We're holding this table for you for the next <b id="timer">–</b></div>
+    return `<aside class="coright"><div class="holdbar"><span class="hb-l">We're holding this table for you for the next</span><span class="hb-s">Table held for</span> <b id="timer">–</b></div>
       <div id="expired" class="msg err" hidden>Your hold ran out. <a href="#/r/${esc(v.slug)}">Choose a time again</a>.</div>
       <div class="cowhen">${time12(h.time)}, ${esc(fmtDate(h.date, { weekday: "long", day: "numeric", month: "long" }))}</div>
       <span class="deal-pill">${ic("tag")}${h.discount}% off food bill</span>
@@ -1050,7 +1050,7 @@ async function viewCheckout(q) {
       <details class="disc"><summary><b>Cancellation policy</b><span>All of the fee back as ${esc(CREDIT)} within ${cfg.cancel_full_credit_minutes} minutes</span></summary>
         <div class="policy">Cancellations come back as ${esc(CREDIT)} for booking fees on other Early Bird bookings, used first on your next one, for ${cfg.credit_valid_days} days.
         <table><tr><td>Within ${cfg.cancel_full_credit_minutes} minutes of booking</td><td>The whole fee</td></tr><tr><td>Later, before the day</td><td>${cfg.cancel_before_day_percent}% of the fee</td></tr><tr><td>On the day, or no-show</td><td>Nothing</td></tr></table></div></details>
-      ${isDesk() ? "" : linesHtml()}
+      <div class="lines-m">${linesHtml()}</div>
       <div class="grow-f agree" id="w-c-ok"><label class="check"><input type="checkbox" id="c-ok" ${d.accepted ? "checked" : ""}><span>I agree to the Early Bird conditions, the cancellation policy and the <a href="../terms.html" target="_blank" rel="noopener">booking terms</a></span></label><div class="ferr" id="e-c-ok" role="alert" hidden></div></div>
       <label class="check small"><input type="checkbox" id="c-mk" ${d.marketing ? "checked" : ""}><span>Let ${esc(v.name)} send me offers through Early Bird</span></label>
       <div class="paybar"><div class="paysum"><b>${money(due())}</b><span>${payNeeded() ? "to pay now" : due() === 0 && h.credit_cents > 0 ? "covered by credit" : "nothing to pay"}</span></div><button class="btn" id="c-go" type="button">${goLabel()}</button></div>

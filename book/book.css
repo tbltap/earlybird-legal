@@ -496,3 +496,135 @@ details.disc .rules{margin:0 0 10px}
   .paybar{position:sticky;bottom:0;z-index:12;background:rgba(245,246,249,.94);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);margin:14px -18px 0;padding:12px 18px calc(12px + env(safe-area-inset-bottom));border-top:1px solid var(--hairline)}
 }
 body.desk #co .coright .lines{margin:16px 0 8px}
+
+/* ════════════ Phones and tablets: the same website design, fitted to the screen (one design at every width) ════════════ */
+@media (max-width:1023px){
+  body.desk .col.wide,body.desk .wide{padding:0 16px}
+  body.desk .col{padding:0 16px}
+  body.desk main>.col{padding-top:18px}
+  /* header: logo + bookings/profile on row 1, search + city on row 2 */
+  .dh-in{height:auto;flex-wrap:wrap;gap:10px 12px;padding:10px 16px}
+  .dlogo{font-size:22px;order:1}
+  .dlogo img{width:25px;height:auto}
+  .hnav{order:2;gap:16px}
+  .hnav .hhow,.hnav .hout,.hnav a[href="#/"]{display:none}
+  .hnav a{font-size:15px}
+  .hsearch{order:3;flex:1 1 200px;max-width:none;height:42px}
+  .hsearch:focus-within{max-width:none}
+  .hcity{order:4;height:42px;border:1px solid #d9dde4;border-radius:10px;padding:0 10px}
+  .hcity select{font-size:15px}
+  .hs-list{top:46px}
+  .dh-min{justify-content:center}
+  /* list */
+  .dhero{padding:22px 0 54px}
+  .dhero-in{display:block}
+  .dhero h1{font-size:32px;margin:6px 0 4px}
+  .dhero p{font-size:16px}
+  .teaser{display:none}
+  .fbar{height:58px;margin-top:-30px;border-radius:12px}
+  .fbar label{padding:0 10px;gap:6px;min-width:0}
+  .fbar label svg{width:17px;height:17px}
+  .fbar select{font-size:15px;padding:8px 0;min-width:0;width:100%}
+  .lcols{display:flex;flex-direction:column;gap:0;margin-top:18px}
+  .lside{order:-1;position:static;max-height:none;overflow:visible;padding:0;margin-bottom:12px}
+  .lside .fgroup,.lside #clear{display:none}
+  .lside .btn.outline{padding:10px;font-size:15px;border-radius:12px}
+  .qchips{flex-wrap:nowrap;overflow-x:auto;margin:0 -16px 12px;padding:0 16px 4px;scrollbar-width:none}
+  .qchips::-webkit-scrollbar{display:none}
+  .qchips .pill{flex:none}
+  .sortrow{margin-bottom:12px}
+  .sortrow label{font-size:14px}
+  .sortrow select{padding:8px 10px;font-size:14px}
+  .ncards{grid-auto-flow:column;grid-auto-columns:46%;grid-template-columns:none;overflow-x:auto;margin:0 -16px;padding:0 16px 6px;scrollbar-width:none}
+  .ncards::-webkit-scrollbar{display:none}
+  .drow{grid-template-columns:96px minmax(0,1fr);gap:14px;padding:16px 14px;margin:0 0 12px;background:#fff;border:1px solid var(--hairline);border-radius:16px}
+  .drow:first-child{padding-top:16px}
+  .dthumb{width:96px;height:96px;border-radius:12px;font-size:34px;grid-row:span 2}
+  .ribbon{font-size:11px;padding:3px 7px;bottom:6px}
+  .dtop{flex-direction:column;gap:2px}
+  .dname{font-size:18px}
+  .drate{font-size:13px}
+  .dwhere{font-size:14px;gap:4px 12px;margin:4px 0 8px}
+  .dfacts{margin-bottom:10px}
+  .dfacts span{font-size:12px;padding:4px 8px}
+  .ddays{grid-column:1 / -1;grid-template-columns:none;grid-auto-flow:column;grid-auto-columns:74px;overflow-x:auto;scrollbar-width:none;margin:0 -14px;padding:0 14px 2px}
+  .drow .dbody{display:contents}
+  .drow .dtop,.drow .dwhere,.drow .dfacts{grid-column:2}
+  .drow .dfacts{grid-column:1 / -1}
+  .ddays::-webkit-scrollbar{display:none}
+  .howband{padding:20px}
+  .howband ol{grid-template-columns:1fr;gap:14px}
+  .areas{padding:20px}
+  .areacols{columns:2}
+  .mapbox{height:420px}
+  /* restaurant */
+  .vcrumbs{margin:14px 0 6px;font-size:13px}
+  .vhead{margin-bottom:14px}
+  .vhead h1{font-size:32px}
+  .gallery{height:230px;grid-template-columns:1fr;margin:0}
+  .ggrid{display:none}
+  .gallery .gmore{display:none}
+  .vcols{display:flex;flex-direction:column;gap:0}
+  .vbook{order:-1;margin:16px 0 0;padding:20px 16px 16px;border-radius:16px;box-shadow:0 8px 28px rgba(11,50,71,.12)}
+  .vbook .serif{font-size:26px}
+  .vleft{padding-top:24px}
+  .vleft>div{margin-top:28px}
+  body.desk .serif{font-size:30px}
+  .contact{grid-template-columns:1fr;gap:16px}
+  .ncards.scroll{grid-auto-columns:46%}
+  .nearby{margin-top:36px}
+  /* booking page */
+  .cotop{margin:14px 0 2px}
+  .cohead{font-size:30px;margin:4px 0 14px}
+  .cogrid{display:flex;flex-direction:column;gap:0}
+  .coright{order:-1;position:static;padding:16px;border-radius:16px;margin-bottom:4px}
+  .cowhen{font-size:26px}
+  .covenue .thumb{width:84px;height:84px}
+  .covenue b{font-size:18px}
+  /* footer */
+  body.desk .dfoot{margin-top:28px}
+  .df-in{padding:34px 16px 24px}
+  .df-cols{grid-template-columns:1fr;gap:26px}
+  .df-cols>div+div{border-left:0;border-top:1px solid rgba(255,255,255,.12);padding-top:24px}
+  .df-cols h3{font-size:24px}
+  .df-legal{margin-top:24px}
+  dialog.wide-dlg{max-width:none}
+}
+@media (max-width:1023px){ #co .paybar{margin-left:-16px;margin-right:-16px;padding-left:16px;padding-right:16px} }
+@media (max-width:1023px){
+  .lcols>*,.vcols>*,.cogrid>*{min-width:0;width:100%}
+  .hsearch{min-width:0;flex:1 1 0}
+  .ncards,.ncards.scroll{grid-auto-columns:168px}
+  .fbar label{padding:0 8px}
+  .fbar select{font-size:14px;text-overflow:ellipsis}
+}
+@media (max-width:1023px){
+  .hsearch{flex:1 1 calc(100% - 150px)}
+  .hcity{flex:0 0 auto}
+  .lside{display:flex;justify-content:flex-start}
+  .lside .btn.outline{width:auto;display:inline-flex;padding:8px 16px;font-size:15px;border-width:1px}
+}
+@media (max-width:1023px){
+  .hsearch{flex:1 1 0;min-width:0}
+  .dh-in>.hsearch{flex-basis:calc(100% - 190px)}
+  .hcity{max-width:178px}
+  .hnav{margin-left:auto}
+}
+.lines-m{display:none}
+.hb-s{display:none}
+@media (max-width:1023px){
+  .lines-m{display:block}
+  .coright .lines,.coright .assure{display:none}
+  .coright{padding:12px 14px}
+  .holdbar{padding:8px 12px;font-size:14px;margin-bottom:10px}
+  .hb-l{display:none}.hb-s{display:inline}
+  .cowhen{font-size:21px;margin:2px 0 8px}
+  .coright .deal-pill{font-size:13px;padding:4px 10px}
+  .covenue{margin:10px 0 0;gap:12px}
+  .covenue .thumb{width:60px;height:60px}
+  .covenue b{font-size:16px}
+  .covenue div div{font-size:13px}
+  .covenue div div:nth-of-type(n+3){display:none}
+  .vbook .assure{font-size:14px;gap:4px 14px}
+}
+@media (max-width:1023px){ .hnav:has(.hsign) a[href="#/"]{display:inline} }

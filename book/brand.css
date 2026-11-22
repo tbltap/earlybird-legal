@@ -1,0 +1,360 @@
+/* Early Bird brand layer for the booking site: "Paper & candlelight" (~/earlybird/brand/kit/tokens.css, 22 Nov 2026).
+   Loaded after book.css. It only restyles: no layout or behaviour changes, so removing this one <link> restores the old look. */
+@font-face{font-family:"Instrument Serif";font-style:normal;font-weight:400;font-display:swap;src:url(../fonts/InstrumentSerif-Regular.woff2) format("woff2")}
+@font-face{font-family:"Instrument Serif";font-style:italic;font-weight:400;font-display:swap;src:url(../fonts/InstrumentSerif-Italic.woff2) format("woff2")}
+@font-face{font-family:"Inter Tight";font-style:normal;font-weight:100 900;font-display:swap;src:url(../fonts/InterTight-var.woff2) format("woff2")}
+
+:root{
+  /* brand */
+  --paper:#F3EEE5; --card:#FBF8F2; --espresso:#1C1A17; --ember:#A8401C; --ember-soft:#E9A27B; --sage:#4F7350;
+  --line:#E2DACE; --well:#EEE8DE;
+  /* the old names, remapped */
+  --accent:#1C1A17; --on-accent:#F3EEE5;
+  --slot:#1C1A17; --slot-pale:#E6DFD3;
+  --page:#F3EEE5; --ink:#1C1A17; --muted:#6B645A;
+  --navy:#1C1A17; --navy-dark:#1C1A17;
+  --deal:#F1DCCB; --deal-text:#8A3416; --deal-head:#A8401C;
+  --green:#4F7350; --card-fill:#EEE8DE; --chip:#E6DFD3; --pale-blue:#EFE5DA; --hairline:rgba(60,45,30,.10);
+  --hero-top:#EFE5DA; --red:#A8401C;
+  --serif:"Instrument Serif",ui-serif,"New York",Georgia,serif;
+  --sans:"Inter Tight",-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",Helvetica,Arial,sans-serif;
+  --grain:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .35 0 0 0 0 .3 0 0 0 0 .25 0 0 0 .5 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+body{-webkit-font-smoothing:antialiased;letter-spacing:-.005em}
+/* paper grain, never blocks clicks */
+body::after{content:"";position:fixed;inset:0;z-index:60;pointer-events:none;background-image:var(--grain);mix-blend-mode:multiply;opacity:.45}
+a{color:var(--espresso)}
+button:focus-visible,a:focus-visible,summary:focus-visible{outline-color:var(--ember)}
+
+/* Instrument Serif has one weight: every heavy serif heading becomes the regular cut, a touch larger */
+.brand,.display,.thumb,.vtitle,.balance,body.desk .serif,.dlogo,.df-cols h3,.dhero h1,.teaser b,.nph,.dthumb,.howband h2,.howband li::before,
+.areas h2,.vhead h1,.gbig span,.cohead,.cowhen,.pickcity b,.eh,.ecol strong,.eresult .big b,.gtile b,.p-hero h1,.p-big b,.p-h2,.p-who b,.r-big,.p-final h2{
+  font-weight:400!important;letter-spacing:-.01em}
+.display{font-size:clamp(36px,9vw,48px)}
+.vtitle{font-size:clamp(36px,9vw,46px)}
+.vhead h1{font-size:54px}
+.dhero h1{font-size:62px}
+.pickcity b{font-size:30px}
+.display .gold{color:var(--ember);font-style:italic}
+.r-big,.eresult .big b{color:var(--ember)!important}
+
+/* surfaces: warm cards on paper, warm wells instead of blue-grey */
+.card,.res,.ncard,.vbook,.coright,#co .grp,details.disc,.howband,.teaser,.fbar,.opt,.brow,.quick button,.hs-list,.qchip,.qchips .pill,
+.textsearch input,.sortrow select,.fgroup input[type=search],.searchbar,.btn.outline,.btn.danger{background:var(--card)}
+@media (max-width:1023px){.drow{background:var(--card)}}
+body.desk .dhead{background:rgba(243,238,229,.86);-webkit-backdrop-filter:saturate(160%) blur(18px);backdrop-filter:saturate(160%) blur(18px);border-bottom:1px solid var(--line)}
+input[type=text],input[type=email],input[type=password],input[type=tel],input[type=search],select,textarea{background:var(--well)}
+input:focus,select:focus,textarea:focus{border-color:var(--espresso);background:var(--card)}
+.dcol.alt,.lines,.policy,.holdbar,.hs-list a:hover,.hs-list a:focus,.hpill:hover{background:var(--well)}
+.hsearch,.hs-list,.sortrow select,.qchip,.fgroup input[type=search],.vsel,.vsel label+label,.qchips .pill{border-color:var(--line)}
+.drow,.fgroup,.spc,.drev{border-top-color:var(--line)}
+.thumb,.nph,.dthumb,.gbig,.gtile,.gmore{background:#E6DFD3}
+.nph,.gbig span{color:#A89E90}
+.searchbar{border-color:var(--espresso)}
+.hs-list mark{background:#F1DCCB}
+.stars{color:var(--ember)}
+.code{background:#FBF1E6;border-color:var(--ember-soft)}
+
+/* buttons: espresso pills */
+.btn{border-radius:999px;font-weight:500;letter-spacing:0}
+.btn:hover{filter:none;background:#000}
+.btn.pale{background:#E6DFD3;color:var(--espresso)}
+.btn.pale:hover,.btn.grey:hover{background:#DCD3C6}
+.btn.outline,.btn.danger{border-radius:999px}
+.btn.outline:hover{background:var(--espresso);color:var(--paper)}
+.btn.danger:hover{background:var(--ember);color:#fff}
+
+/* time slots: espresso, with the discount tag in ember-soft */
+.slot{color:var(--paper);font-weight:500}
+.slot small{color:var(--ember-soft)}
+.slot:hover{background:#000}
+.slot.more{background:var(--slot-pale);color:var(--espresso)}
+.ddays .slot.off,.ddays .none{background:var(--well);color:#B3A999}
+.badge{font-weight:600;letter-spacing:.02em}
+
+/* the phone tab bar */
+.tabs{background:rgba(251,248,242,.94);box-shadow:0 6px 28px rgba(60,45,30,.18)}
+.tabs a.on{background:#E6DFD3;color:var(--espresso)}
+
+/* desktop hero band and footer */
+.dhero:not(.hasphoto){background:radial-gradient(520px 300px at 82% 20%,rgba(233,162,123,.22),transparent 70%),linear-gradient(180deg,#24201C,#1C1A17)}
+/* area and city photos: a warm scrim instead of the old blue one */
+.hasphoto{background-image:linear-gradient(180deg,rgba(28,26,23,.38),rgba(28,26,23,.74)),var(--areaimg)!important}
+.dhero p{color:#D9CFC1}
+body.desk .dfoot{background:var(--espresso);color:#BFB5A7}
+.df-cols>div+div,.df-legal{border-color:rgba(243,238,229,.14)}
+.df-legal a{color:#E6DCCD}
+.dfoot .dbtn{border-radius:999px}
+
+/* city picker cards keep their photos; warmer scrim */
+.pickcity{border-radius:14px}
+
+@media (prefers-reduced-motion:reduce){body::after{opacity:.35}}
+
+/* restaurant names in the serif, like the landing page */
+.dname{font-family:var(--serif)!important;font-weight:400!important;font-size:30px!important;letter-spacing:-.01em;line-height:1.1}
+.nm{font-family:var(--serif);font-weight:400;font-size:22px;letter-spacing:-.005em}
+
+/* ===================== Sleeker pass (22 Nov): closer to the landing page ===================== */
+
+/* header: menu-style caps, quiet pills, espresso sign-in */
+.hpill{font:500 11px var(--sans);letter-spacing:.2em;text-transform:uppercase;padding:9px 14px}
+.hpill svg{width:16px;height:16px;stroke-width:1.6}
+.hpill.on{background:transparent;box-shadow:inset 0 -1px 0 var(--espresso);border-radius:0}
+.hpill.ghost{color:var(--muted)!important}
+body.desk .dhead .hsearch{background:var(--card);border-color:var(--line);border-radius:999px}
+.hcity select,.pinsel select{font-weight:500}
+
+/* section headings in the serif; small labels as spaced caps */
+.sechead{align-items:center;margin:4px 0 16px}
+.sechead h2{font:400 30px/1.1 var(--serif);letter-spacing:-.01em}
+.sechead a{font:500 11px var(--sans);letter-spacing:.2em;text-transform:uppercase;color:var(--espresso);text-decoration:none;border-bottom:1px solid var(--espresso);padding-bottom:2px}
+.fgroup h3{font:500 11px var(--sans);letter-spacing:.24em;text-transform:uppercase;color:var(--muted);margin:0 0 12px}
+.fgroup,.fgroup+.fgroup{border-top-color:var(--line)}
+.ck input[type=checkbox],.check input{accent-color:var(--espresso)}
+.howband{background:transparent;border:0;border-top:1px solid var(--line);border-radius:0;padding:36px 0 0}
+.howband h2{font:400 36px/1.1 var(--serif)!important}
+.howband li::before{color:var(--espresso)}
+
+/* filter chips: thin outlines, filled when on */
+.pill{background:transparent;box-shadow:inset 0 0 0 1px var(--line);color:var(--espresso);font-weight:500;font-size:14px}
+.pill[aria-pressed=true]{background:var(--espresso);color:var(--paper);box-shadow:none}
+.pill.near{color:var(--espresso)}
+.chiprow .pill{background:transparent;box-shadow:none;padding:2px 0;margin-right:14px;font-size:12px;color:var(--muted);border-radius:0}
+.chiprow .pill svg{width:14px;height:14px}
+
+/* the search bar under the city header: flat, hairlines */
+.fbar{border-radius:14px;box-shadow:0 1px 2px rgba(60,45,30,.05),0 18px 44px rgba(60,45,30,.10)}
+
+/* results: no boxes, hairlines between, photo with a soft radius */
+.drow{border-top:1px solid var(--line)}
+.dthumb{border-radius:10px}
+.dthumb img{transition:transform 1.1s cubic-bezier(.2,.7,.2,1)}
+.drow:hover .dthumb img{transform:scale(1.03)}
+.dname:hover{color:var(--ember)}
+.dname span{font-family:var(--sans);font-size:.6em;vertical-align:middle;color:var(--muted)}
+
+/* day columns: caps day names, discount as small ember text, light outline time pills */
+.ddays{gap:10px}
+.ddays .dh{font:500 10.5px/1.5 var(--sans);letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.ddays .dh b{display:block;font:400 18px/1.1 var(--serif);letter-spacing:0;text-transform:none;color:var(--espresso)}
+.ddays .badge{background:transparent;color:var(--ember);font:600 10px var(--sans);letter-spacing:.14em;text-transform:uppercase;padding:0}
+.ddays .slot{background:transparent;color:var(--espresso);box-shadow:inset 0 0 0 1px var(--espresso);border-radius:999px;height:34px;line-height:34px;font-size:13px;font-weight:500;transition:background .2s ease,color .2s ease}
+.ddays .slot:hover{background:var(--espresso);color:var(--paper)}
+.ddays .slot.more{box-shadow:none;background:transparent;color:var(--muted);text-decoration:underline;text-underline-offset:3px;height:auto;line-height:1.4;font-size:12px}
+.ddays .slot.off,.ddays .none{background:transparent;box-shadow:inset 0 0 0 1px var(--line);color:#B3A999;border-radius:999px;height:34px;line-height:34px}
+.slot[aria-pressed=true]{background:var(--espresso);color:var(--paper);box-shadow:none}
+
+/* "New on Early Bird" cards */
+.ncard{border:0;background:transparent;border-radius:0}
+.ncard img,.ncard .nph{border-radius:10px}
+
+/* restaurant page: serif headings, quieter booking card */
+body.desk .serif{font-size:36px}
+.vbook{background:var(--card);border:1px solid var(--line);border-radius:18px;box-shadow:0 1px 2px rgba(60,45,30,.05),0 24px 60px rgba(60,45,30,.13)}
+.vsel{border-radius:999px;overflow:hidden}
+.coright,#co .grp,details.disc{border-color:var(--line)}
+
+/* footer columns: caps labels, serif titles */
+.dfoot .dbtn{font-weight:500}
+
+/* phone: app-style screens, same refinements */
+.res{border-left:0;border-right:0;border-radius:0;background:transparent}
+.thumb{border-radius:10px}
+.res .nm{font:400 24px/1.1 var(--serif)!important;letter-spacing:-.01em}
+.dcol .dh{font:500 11px var(--sans);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.dcol .dh b{display:block;font:400 17px var(--serif);letter-spacing:0;text-transform:none;color:var(--espresso)}
+.dcol .badge{background:transparent;color:var(--ember);font:600 10px var(--sans);letter-spacing:.12em;text-transform:uppercase;padding:0}
+.dcol .slot{background:transparent;color:var(--espresso);box-shadow:inset 0 0 0 1px var(--espresso);border-radius:999px;font-size:14px;padding:9px 0}
+.dcol .slot.more{box-shadow:none;color:var(--muted);text-decoration:underline;font-size:12px}
+.dcol.alt{background:transparent}
+.tabs a{font-weight:500;letter-spacing:.02em}
+.hnav .hpill,.hnav a.hpill{font:500 11px var(--sans);letter-spacing:.2em;text-transform:uppercase}
+.ddays .slot,.dcol .slot{display:flex!important;align-items:center;justify-content:center;padding:0!important;text-transform:lowercase}
+.ddays .slot{height:32px!important;line-height:1!important}
+.dcol .slot{height:38px!important;line-height:1!important}
+.ddays .slot.more,.dcol .slot.more{text-transform:none;height:auto!important}
+.drow .chiprow .pill,.res .chiprow .pill,.vbook .chiprow .pill,.chips.chiprow .pill{background:transparent!important;box-shadow:none!important;border:0!important;padding:2px 0!important;margin-right:14px;font:500 12px var(--sans);color:var(--muted)}
+.dfacts{gap:0 18px}
+.dfacts span{background:transparent;padding:0;border-radius:0;font:500 12px var(--sans);color:var(--muted)}
+.dfacts svg{width:14px;height:14px}
+.dwhere{color:var(--muted)}
+.more-t{color:var(--muted);font-size:12px}
+.vbook .ddays{-webkit-mask-image:linear-gradient(90deg,#000 86%,transparent);mask-image:linear-gradient(90deg,#000 86%,transparent);scrollbar-width:none}
+.vbook .ddays::-webkit-scrollbar{display:none}
+.vbook .serif{font-size:30px!important}
+.sec h2{font:400 32px/1.1 var(--serif)!important;letter-spacing:-.01em}
+.days{scrollbar-width:none;padding-left:18px;scroll-padding-left:18px;-webkit-mask-image:linear-gradient(90deg,#000 88%,transparent);mask-image:linear-gradient(90deg,#000 88%,transparent)}
+.days::-webkit-scrollbar{display:none}
+
+/* ===================== Floating top bar (owner, 22 Nov): blurred, rounded, a halo ring set apart from it, logo on the left ===================== */
+body.desk .dhead{position:sticky;top:14px;z-index:30;width:calc(100% - 40px);max-width:1240px;margin:14px auto 0;border-radius:999px;
+  background:rgba(251,248,242,.62);-webkit-backdrop-filter:saturate(170%) blur(22px);backdrop-filter:saturate(170%) blur(22px);
+  border:1px solid rgba(255,255,255,.55);border-bottom:1px solid rgba(255,255,255,.55);
+  box-shadow:0 1px 2px rgba(60,45,30,.06),0 14px 40px rgba(60,45,30,.12);
+  outline:1px solid rgba(28,26,23,.14);outline-offset:5px}
+body.desk .dhead .dh-in{height:64px;padding:0 10px 0 22px;max-width:none}
+.dlogo{font:400 24px/1 var(--serif)!important;letter-spacing:-.01em;gap:9px}
+.dlogo img{border-radius:0;height:24px;width:auto}
+body.desk .dhead .hsearch{height:42px;background:rgba(243,238,229,.7)}
+body.desk .dhead .hcity{border:0}
+/* the city photo band now sits under a floating bar: pull it up behind the bar */
+body.desk .dhero{margin-top:-92px;padding-top:120px}
+@media (max-width:1023px){body.desk .dhead{border-radius:28px}}
+body.desk .dhead{outline-color:rgba(150,136,118,.55)}
+
+/* ===================== Restaurant page: photos and menu easy to see (owner, 22 Nov) ===================== */
+/* gallery thumbnails share the .gtile name with the owner-stats tiles; undo that card styling inside the gallery */
+.gallery .gtile,.gallery .gbig{padding:0!important;border:0!important;border-radius:0!important;background:#E6DFD3!important;display:block}
+.gallery .gtile img,.gallery .gbig img{width:100%;height:100%;object-fit:cover;display:block}
+/* contained, rounded, a little taller, aligned with the page */
+.gallery{width:calc(100% - 48px);max-width:1192px;height:480px;border-radius:16px;overflow:hidden;margin:6px auto 0}
+.gallery .gmore{border-radius:999px;background:rgba(28,26,23,.78);font:500 12px var(--sans);letter-spacing:.14em;text-transform:uppercase;padding:10px 16px}
+/* the booking card no longer sits on top of the photos */
+.vbook{margin-top:28px!important}
+@media (max-width:1023px){.gallery{width:auto;height:260px;border-radius:0;margin:0}}
+/* menu: section titles in caps, items in two columns on wide screens, prices aligned */
+.menu summary{font:500 12px var(--sans)!important;letter-spacing:.2em;text-transform:uppercase;padding:18px 0}
+.menu details{border-top-color:var(--line)}
+.menu details[open]{padding-bottom:14px}
+.menu .item{padding:10px 0;border-top:1px solid var(--line-soft,#E6DFD3);align-items:baseline}
+.menu .item>div:first-child span{font-weight:500;font-size:15px;letter-spacing:.01em}
+.menu .item .d{font-size:13px;line-height:1.45;margin-top:2px}
+.menu .item .p{font-weight:500}
+/* the booking card stays in view while you read the page */
+body.desk .vbook{position:sticky;top:96px}
+/* phone restaurant page: serif section titles, photo strip that reads as swipeable */
+h2.title{font:400 28px/1.1 var(--serif)!important;letter-spacing:-.01em}
+.photos{scrollbar-width:none;-webkit-mask-image:linear-gradient(90deg,#000 85%,transparent);mask-image:linear-gradient(90deg,#000 85%,transparent)}
+.photos::-webkit-scrollbar{display:none}
+.photos img{height:160px;border-radius:12px}
+hr.rule{border:0;border-top:1px solid var(--line)}
+
+/* "Been here before?" on the booking form: optional, two pills (0200) */
+.fv{border:0;margin:16px 0 6px;padding:0;display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.fv legend{float:left;width:100%;padding:0;margin:0 0 8px;font:500 15px var(--sans);color:var(--espresso)}
+.fv legend em{font-style:normal;font-size:12px;color:var(--muted);margin-left:6px;letter-spacing:.04em}
+.fv label{position:relative;cursor:pointer}
+.fv input{position:absolute;opacity:0;pointer-events:none}
+.fv span{display:inline-block;padding:9px 16px;border-radius:999px;box-shadow:inset 0 0 0 1px var(--line);font:500 14px var(--sans);color:var(--espresso);transition:background .2s ease,color .2s ease}
+.fv input:checked+span{background:var(--espresso);color:var(--paper);box-shadow:none}
+.fv input:focus-visible+span{outline:2px solid var(--ember);outline-offset:2px}
+
+/* ===================== Search pill and offer note (owner, 22 Nov) ===================== */
+/* Meal / date / diners: one rounded, frosted pill with a halo ring like the top bar, caps labels over each value */
+body.desk .fbar{max-width:860px;margin:-38px auto 0;height:74px;border-radius:999px;top:96px;
+  background:rgba(251,248,242,.86);-webkit-backdrop-filter:saturate(170%) blur(20px);backdrop-filter:saturate(170%) blur(20px);
+  box-shadow:0 1px 2px rgba(60,45,30,.06),0 18px 44px rgba(60,45,30,.14);outline:1px solid rgba(150,136,118,.45);outline-offset:5px}
+body.desk .fbar label{position:relative;padding:0 30px;gap:12px;color:var(--espresso)}
+body.desk .fbar label+label{border-left:1px solid var(--line)}
+body.desk .fbar label svg{width:18px;height:18px;stroke-width:1.6;color:var(--muted)}
+body.desk .fbar label::before{position:absolute;left:60px;top:15px;font:500 10px var(--sans);letter-spacing:.22em;text-transform:uppercase;color:var(--muted)}
+body.desk .fbar label:nth-child(1)::before{content:"Meal"}
+body.desk .fbar label:nth-child(2)::before{content:"Date"}
+body.desk .fbar label:nth-child(3)::before{content:"Party"}
+body.desk .fbar select{padding:22px 0 4px;font:500 16px var(--sans);color:var(--espresso);width:100%}
+body.desk .fbar label:hover{background:rgba(230,223,211,.45)}
+body.desk .fbar label:first-child{border-radius:999px 0 0 999px}
+body.desk .fbar label:last-child{border-radius:0 999px 999px 0}
+/* phones: same pill, no labels */
+body:not(.desk) .fbar{border-radius:999px;box-shadow:0 1px 2px rgba(60,45,30,.06),0 12px 30px rgba(60,45,30,.12)}
+
+/* "Diners get… / Restaurants list for free": no box, two quiet lines with caps labels */
+.offerbox{width:330px;background:transparent!important;border:0!important;-webkit-backdrop-filter:none;backdrop-filter:none;padding:0;border-left:1px solid rgba(243,238,229,.35)!important;padding-left:24px}
+.offerbox .offer{gap:16px;font-size:15px;line-height:1.45;color:#F3EEE5}
+.offerbox .offer li svg{display:none}
+.offerbox .offer li span{display:block}
+.offerbox .offer b{display:block;font:500 10.5px var(--sans);letter-spacing:.24em;text-transform:uppercase;color:var(--ember-soft);margin-bottom:3px}
+.offerbox .offer a{color:#F3EEE5;text-decoration:none;border-bottom:1px solid rgba(243,238,229,.6);padding-bottom:1px;white-space:nowrap}
+.offerbox .offer a::after{content:" →"}
+.offerbox .offer a:hover{border-bottom-color:#F3EEE5}
+/* phone header: same treatment */
+.mhero .offer b{display:block;font:500 10.5px var(--sans);letter-spacing:.22em;text-transform:uppercase;margin-bottom:2px}
+.mhero.hasphoto .offer b{color:var(--ember-soft)}
+.mhero .offer li svg{display:none}
+.mhero .offer li span{display:block}
+.mhero.hasphoto .offer a{color:#F3EEE5;text-decoration:none;border-bottom:1px solid rgba(243,238,229,.6)}
+.mhero .offer a::after{content:" →"}
+/* phone meal/diners bar: rounded pill with the go button as a circle */
+.searchbar{border-radius:999px!important;border:1px solid var(--line)!important;background:rgba(251,248,242,.9)!important;box-shadow:0 1px 2px rgba(60,45,30,.06),0 12px 30px rgba(60,45,30,.10);outline:1px solid rgba(150,136,118,.4);outline-offset:4px;overflow:hidden}
+.searchbar button:last-child,.searchbar .go{border-radius:999px!important;margin:5px;width:52px;height:52px;flex:none}
+.searchbar button{align-self:center!important;border-radius:999px!important;margin:5px!important;width:48px!important;height:48px!important}
+.searchbar button svg{width:22px;height:22px}
+.textsearch input{border-radius:999px!important}
+/* wider search pill with four parts: meal, date, party, discount */
+body.desk .fbar{max-width:1080px;grid-template-columns:1fr 1.25fr .95fr 1.15fr}
+body.desk .fbar label:nth-child(4)::before{content:"Discount"}
+body.desk .fbar label:nth-child(3){border-radius:0}
+@media (max-width:1100px){body.desk .fbar{max-width:none;margin-left:24px;margin-right:24px}}
+
+/* ===================== "50% off" in gold (owner, 22 Nov) ===================== */
+:root{--gold-1:#F1D896;--gold-2:#D9B05A;--gold-3:#B8862C;--gold-ink:#3B2A08}
+/* small tags over each day's times, and anywhere else a discount badge shows */
+.badge,.ddays .badge,.dcol .badge{background:linear-gradient(180deg,var(--gold-1),var(--gold-2))!important;color:var(--gold-ink)!important;
+  font:700 9.5px var(--sans)!important;letter-spacing:.14em;text-transform:uppercase;padding:3px 8px!important;border-radius:999px!important;
+  box-shadow:inset 0 0 0 1px rgba(184,134,44,.35),0 1px 2px rgba(120,85,20,.15);align-self:center}
+.ddays .badge.ghost{background:transparent!important;box-shadow:none}
+.deal-pill{background:linear-gradient(180deg,var(--gold-1),var(--gold-2))!important;color:var(--gold-ink)!important;border-radius:999px}
+/* headline highlight ("Ready to get 50% off…") in gold lettering */
+.display .gold,.mhero .display .gold{background:linear-gradient(180deg,var(--gold-1),var(--gold-2) 55%,var(--gold-3));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:var(--gold-2)}
+/* only the top bar follows you; the meal/date/party/discount pill stays under the city photo (owner, 22 Nov: two bars got in the way) */
+body.desk .fbar{position:relative!important;top:auto!important}
+/* (owner, 22 Nov) while scanning times the meal/date/party/discount pill matters most: it sticks; the top header scrolls away */
+body.desk .dhead{position:relative!important;top:auto!important}
+body.desk .fbar{position:sticky!important;top:14px!important;z-index:25}
+body.desk .vbook{top:24px}
+
+/* ===================== Search pill pickers (picker.js): blur behind, smooth panels ===================== */
+body.desk .fbar label{cursor:pointer;transition:background .25s ease}
+body.desk .fbar select{pointer-events:none}
+body.desk .fbar label.pk-on{background:rgba(230,223,211,.75)}
+.pk-backdrop{position:fixed;inset:0;z-index:40;background:rgba(243,238,229,.18);-webkit-backdrop-filter:blur(0px);backdrop-filter:blur(0px);opacity:0;
+  transition:opacity .3s ease,backdrop-filter .35s ease,-webkit-backdrop-filter .35s ease}
+.pk-backdrop.in{opacity:1;-webkit-backdrop-filter:blur(6px) saturate(110%);backdrop-filter:blur(6px) saturate(110%)}
+html.pk-open body.desk .fbar{z-index:45}
+.pk-pop{position:fixed;z-index:50;min-width:300px;max-width:min(560px,calc(100vw - 32px));background:rgba(251,248,242,.96);border:1px solid rgba(255,255,255,.7);
+  border-radius:24px;padding:20px 20px 18px;box-shadow:0 2px 4px rgba(60,45,30,.06),0 30px 80px rgba(60,45,30,.22);outline:1px solid rgba(150,136,118,.35);outline-offset:5px;
+  -webkit-backdrop-filter:blur(24px) saturate(160%);backdrop-filter:blur(24px) saturate(160%);
+  opacity:0;transform:translateY(-8px) scale(.97);transform-origin:var(--ox,50%) top;transition:opacity .28s cubic-bezier(.2,.7,.2,1),transform .38s cubic-bezier(.2,.7,.2,1)}
+.pk-pop.in{opacity:1;transform:none}
+.pk-h{margin:0 0 14px;font:400 24px/1.1 var(--serif);letter-spacing:-.01em;color:var(--espresso)}
+.pk-opt{font:inherit;color:var(--espresso);background:transparent;border:0;cursor:pointer;transition:background .2s ease,color .2s ease,transform .2s ease,box-shadow .2s ease}
+.pk-opt:focus-visible{outline:2px solid var(--ember);outline-offset:2px}
+/* items arrive in a soft cascade */
+.pk-pop.in .pk-opt{animation:pkIn .45s cubic-bezier(.2,.7,.2,1) both}
+.pk-pop.in .pk-opt:nth-child(2){animation-delay:.03s}.pk-pop.in .pk-opt:nth-child(3){animation-delay:.06s}.pk-pop.in .pk-opt:nth-child(4){animation-delay:.09s}
+.pk-pop.in .pk-opt:nth-child(5){animation-delay:.12s}.pk-pop.in .pk-opt:nth-child(n+6){animation-delay:.15s}
+@keyframes pkIn{from{opacity:0;transform:translateY(6px)}}
+/* meal */
+.pk-meals{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;min-width:440px}
+.pk-meal{text-align:left;padding:16px;border-radius:18px;box-shadow:inset 0 0 0 1px var(--line)}
+.pk-meal b{display:block;font:400 24px/1.1 var(--serif)}
+.pk-meal span{display:block;margin-top:4px;font-size:12px;color:var(--muted)}
+.pk-meal:hover{background:rgba(230,223,211,.6)}
+.pk-meal.on{background:var(--espresso);color:var(--paper);box-shadow:none}.pk-meal.on span{color:#CFC6B8}
+/* party */
+.pk-party{display:grid;grid-template-columns:repeat(6,48px);gap:10px}
+.pk-num{width:48px;height:48px;border-radius:999px;box-shadow:inset 0 0 0 1px var(--line);font:500 16px var(--sans)}
+.pk-num:hover{box-shadow:inset 0 0 0 1px var(--espresso);transform:translateY(-1px)}
+.pk-num.on{background:var(--espresso);color:var(--paper);box-shadow:none}
+/* discount */
+.pk-list{display:grid;gap:6px;min-width:300px}
+.pk-row{text-align:left;padding:12px 16px;border-radius:14px;font:500 15px var(--sans);display:flex;justify-content:space-between;align-items:center}
+.pk-row:hover{background:rgba(230,223,211,.6)}
+.pk-row.on{background:var(--espresso);color:var(--paper)}
+.pk-gold{font-style:normal;font:700 9.5px var(--sans);letter-spacing:.14em;text-transform:uppercase;padding:3px 8px;border-radius:999px;color:#3B2A08;background:linear-gradient(180deg,#F1D896,#D9B05A)}
+/* date */
+.pk-kind-date{min-width:420px}
+.pk-all{display:flex;justify-content:space-between;align-items:center;width:100%;padding:12px 16px;border-radius:14px;margin-bottom:14px;box-shadow:inset 0 0 0 1px var(--line);font:500 15px var(--sans)}
+.pk-all span{font-size:12px;color:var(--muted)}
+.pk-all:hover{background:rgba(230,223,211,.6)}.pk-all.on{background:var(--espresso);color:var(--paper);box-shadow:none}.pk-all.on span{color:#CFC6B8}
+.pk-week,.pk-cal{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;text-align:center}
+.pk-week span{font:500 10px var(--sans);letter-spacing:.16em;text-transform:uppercase;color:var(--muted);padding-bottom:6px}
+.pk-day{display:flex;flex-direction:column;align-items:center;justify-content:center;height:62px;border-radius:16px}
+.pk-day small{font:500 9px var(--sans);letter-spacing:.14em;text-transform:uppercase;color:var(--muted);height:11px}
+.pk-day b{font:400 22px/1.1 var(--serif)}
+.pk-day em{font-style:normal;font:500 9px var(--sans);letter-spacing:.1em;text-transform:uppercase;color:var(--ember);height:11px}
+.pk-day:hover{background:rgba(230,223,211,.7)}
+.pk-day.on{background:var(--espresso);color:var(--paper)}.pk-day.on small,.pk-day.on em{color:var(--ember-soft)}
+@media (prefers-reduced-motion:reduce){.pk-pop,.pk-backdrop,.pk-opt{transition:none!important;animation:none!important}.pk-pop{transform:none}}
+.pk-backdrop.in{-webkit-backdrop-filter:blur(3px) saturate(105%);backdrop-filter:blur(3px) saturate(105%)}

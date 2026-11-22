@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>For restaurants | Early Bird</title>
-<meta name="description" content="Fill up to five tables in your slow hours with guests who book ahead. You set the rules, we bring the diners, and you pay nothing. See how 50% off food still pays.">
+<meta name="description" content="Fill up to five tables in your slow hours with guests who book ahead. You set the rules, we bring the diners, and listing your deals is free. See how 50% off food still pays.">
 <meta name="theme-color" content="#F3EEE5">
 <link rel="icon" type="image/png" sizes="64x64" href="../img/favicon.png?v=20261122e">
 <link rel="icon" type="image/png" sizes="32x32" href="../img/favicon-32.png?v=20261122e">
@@ -12,7 +12,7 @@
 <link rel="preload" href="../fonts/InstrumentSerif-Regular.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="../fonts/InterTight-var.woff2" as="font" type="font/woff2" crossorigin>
 <meta property="og:title" content="Early Bird for restaurants: your empty tables, paid for">
-<meta property="og:description" content="Fill your slow hours. You set the rules, we bring the diners, you pay nothing.">
+<meta property="og:description" content="Fill your slow hours. You set the rules, we bring the diners, and listing is free.">
 <style>
 /* Brand: "Paper & candlelight" (~/earlybird/brand/kit/tokens.css). Same system as the landing page. */
 @font-face{font-family:"Instrument Serif";font-style:normal;font-weight:400;font-display:swap;src:url(../fonts/InstrumentSerif-Regular.woff2) format("woff2")}
@@ -229,7 +229,7 @@ input[type=range]:focus-visible{outline:2px solid var(--ember);outline-offset:4p
 @media (max-width:760px){.month{grid-template-columns:1fr}}
 
 /* ---------- guests who come back ---------- */
-.grow{display:grid;grid-template-columns:repeat(2,1fr);gap:28px;max-width:860px}
+.grow{display:grid;grid-template-columns:repeat(3,1fr);gap:28px}
 .gcard{border-top:1px solid var(--espresso);padding-top:20px}
 .gcard h3{font-size:26px;line-height:1.1;margin:0 0 8px}
 .gcard p{margin:0;color:var(--muted);font-size:16px}
@@ -338,7 +338,7 @@ footer a:hover{color:var(--espresso)}
       <div>
         <p class="caps rise" style="--d:.05s">For restaurants</p>
         <h1 id="h1" class="rise" style="--d:.12s">Your empty tables,<br><em>paid for.</em></h1>
-        <p class="sub rise" style="--d:.24s">Early Bird fills up to five tables in your slow hours with guests who book ahead. You set the rules, we bring the diners, and you pay nothing.</p>
+        <p class="sub rise" style="--d:.24s">Early Bird fills up to five tables in your slow hours with guests who book ahead. You set the rules, we bring the diners, and listing your deals is free.</p>
         <div class="ctas rise" style="--d:.36s">
           <a class="btn fill" href="../book/#/biz">List your restaurant</a>
           <a class="btn line" href="#math">See the math</a>
@@ -380,7 +380,7 @@ footer a:hover{color:var(--espresso)}
           <div class="r-line tipline"><span>Plus a tip for your team<small data-k="tipNote">20% of the bill, theirs to keep</small></span><span class="v num" data-k="tip"></span></div>
         </div>
         <ul class="notes">
-          <li data-reveal><b>You pay nothing to list</b><p>No sign-up cost and no subscription. Guests pay Early Bird a small booking fee to hold the table, and that's how we're paid.</p></li>
+          <li data-reveal><b>Listing your deals is free</b><p>No sign-up cost to list your early tables. Guests pay Early Bird a small booking fee to hold the table, and that's how we're paid.</p></li>
           <li data-reveal style="--d:.08s"><b>The item you choose stays full price</b><p>Pick what each guest must order: a drink, a starter or a dessert. Choose your highest-margin item and that's where the extra money comes from.</p></li>
           <li data-reveal style="--d:.16s"><b>These are tables that would earn $0</b><p>We only fill your quiet windows. Anything a guest spends there is money you weren't going to make, on staff you're already paying.</p></li>
         </ul>
@@ -585,7 +585,12 @@ footer a:hover{color:var(--espresso)}
           <h3>Bring them back at full price</h3>
           <p>Send come-back, win-back and birthday offers to the guests on your list, timed for the nights you want to fill.</p>
         </div>
+        <div class="gcard" data-reveal style="--d:.16s">
+          <h3>Built for first visits</h3>
+          <p>When they book, guests tell you if they've been before, so you can see which early tables are new faces.</p>
+        </div>
       </div>
+      <p class="planfine" data-reveal>Listing your deals is free. Sending offers to your guest list is an optional paid upgrade.</p>
     </div>
   </section>
 

@@ -243,8 +243,8 @@ const heroAttrs = (c) => { const p = areaPhoto(c); return p ? ` hasphoto" style=
 const photoCredit = (c) => { const p = areaPhoto(c); return p ? `<a class="photocredit" href="../img/areas/CREDITS.md" target="_blank" rel="noopener">Photo: ${esc(p.by)}, ${esc(p.lic)}</a>` : ""; };
 // The offer, for both audiences, in a few words (no fee basis: the diner sees the actual fee when booking).
 const offerHtml = () => `<ul class="offer">
-  <li>${ic("fork")}<span><b>Diners</b> get 50% off the food bill and pay a small booking fee per diner.</span></li>
-  <li>${ic("store")}<span><b>Restaurants</b> list for free. <a href="#/biz">List your restaurant</a></span></li></ul>`;
+  <li>${ic("fork")}<span><b>Diners</b> 50% off the food bill, with a small booking fee per diner.</span></li>
+  <li>${ic("store")}<span><b>Restaurants</b> Listing is free. <a href="#/biz">List your restaurant</a></span></li></ul>`;
 async function refreshTestBar() {
   const bar = document.getElementById("testbar");
   try {
@@ -289,6 +289,7 @@ async function drawChrome(path) {
   const on = (k) => ((k === "home" && (path === "/" || path.startsWith("/r/"))) || (k === "bookings" && path.startsWith("/booking")) || (k === "account" && path === "/account") ? ' class="on"' : "");
   const pill = (k, href, icon, label, cls = "") => `<a href="${href}" class="hpill ${cls}"${on(k)}>${ic(icon)}<span>${label}</span></a>`;
   head.innerHTML = `<div class="dh-in">
+    <a class="dlogo" href="../?about" aria-label="Early Bird home"><img src="../img/bird-mark-gradient.png?v=20261122" alt="" width="29" height="24"><span>Early Bird</span></a>
     ${`<div class="hsearch" id="hsearch">${ic("search")}<input id="hs" type="search" placeholder="Search restaurants" autocomplete="off" aria-label="Search restaurants"><div id="hs-list" class="hs-list" role="listbox" hidden></div></div>
       <label class="hcity">${ic("pin")}<select id="hcity" aria-label="City"><option>City</option></select></label>`}
     <nav class="hnav" aria-label="Main">${pill("home", "#/", "home", "Home")}${pill("bookings", signedIn ? "#/bookings" : "#/signin", "cal", "Bookings")}${signedIn ? pill("account", "#/account", "person", "Profile") : pill("account", "#/signin", "person", "Sign in")}
@@ -451,13 +452,17 @@ function checkoutHref(v, deal, date, time, meal, diners) {
 }
 
 /* ───────────────────────────── Home: search, quick search, results ───────────────────────────── */
-const H = { q: "", near: null, cuisines: [], areas: [], prices: [], sort: "featured", date: "", map: false, meal: "dinner", diners: 2, rows: [], offset: 0, more: false, loading: false };
+const H = { q: "", near: null, cuisines: [], areas: [], prices: [], sort: "featured", date: "", map: false, meal: "dinner", diners: 2, disc: 0, rows: [], offset: 0, more: false, loading: false };
+// Discount filter (owner, 22 Nov): "at least X% off". Every deal is 50% today; the other steps are ready for when restaurants offer them.
+const DISCOUNTS = [[50, "50% off"], [40, "40% off or more"], [30, "30% off or more"], [20, "20% off or more"]];
+const dealOff = (v) => Number(v.deal?.max_discount ?? v.deal?.discount ?? 0);
+const discOk = (v) => !H.disc || dealOff(v) >= H.disc;
 const SORTS = [["featured", "Featured first"], ["distance", "Nearest first"], ["highest_rated", "Highest rated"], ["new", "Newest"], ["alphabetical", "A to Z"]];
 const list = (v) => String(v || "").split("|").filter(Boolean);
 function homeParams(extra = {}) {
   const p = { city: S.city.slug, meal: H.meal, diners: H.diners, ...(H.q ? { q: H.q } : {}), ...(H.cuisines.length ? { c: H.cuisines.join("|") } : {}),
     ...(H.areas.length ? { a: H.areas.join("|") } : {}), ...(H.prices.length ? { p: H.prices.join("|") } : {}), ...(H.sort !== "featured" ? { sort: H.sort } : {}),
-    ...(H.date ? { date: H.date } : {}), ...(H.map ? { map: 1 } : {}), ...(H.near ? { near: `${H.near.lat},${H.near.lng}` } : {}), ...extra };
+    ...(H.date ? { date: H.date } : {}), ...(H.disc ? { off: H.disc } : {}), ...(H.map ? { map: 1 } : {}), ...(H.near ? { near: `${H.near.lat},${H.near.lng}` } : {}), ...extra };
   Object.keys(p).forEach((k) => (p[k] === "" || p[k] == null) && delete p[k]);
   return p;
 }
@@ -502,6 +507,7 @@ async function viewHome(q) {
   if (!S.city) return viewPickArea();
   H.q = q.q || ""; H.cuisines = list(q.c); H.areas = list(q.a); H.prices = list(q.p).map(Number).filter((n) => n >= 1 && n <= 4);
   H.sort = SORTS.some(([k]) => k === q.sort) ? q.sort : "featured"; H.date = /^\d{4}-\d{2}-\d{2}$/.test(q.date || "") ? q.date : ""; H.map = q.map === "1";
+  H.disc = DISCOUNTS.some(([n]) => n === Number(q.off)) ? Number(q.off) : 0;
   H.meal = ["breakfast", "lunch", "dinner"].includes(q.meal) ? q.meal : H.meal;
   H.diners = Math.min(Math.max(Number(q.diners) || H.diners, 1), S.config.max_party || 12);
   if (isDesk()) return viewHomeDesk();
@@ -568,11 +574,12 @@ async function loadResults(append) {
     H.offset += rows.length;
     H.more = rows.length === 24;
     const desk = isDesk();
-    grid.innerHTML = H.rows.length ? H.rows.map(desk ? resultHtmlDesk : resultHtml).join("")
+    const shown = H.rows.filter(discOk);
+    grid.innerHTML = shown.length ? shown.map(desk ? resultHtmlDesk : resultHtml).join("")
       : H.near ? `<div class="card center"><b>No Early Bird restaurants near you yet.</b><p class="muted" style="margin:6px 0 12px">We're in ${esc(S.cities.map((c) => c.name).join(" and "))} for now.</p><a class="btn pale" href="#/?${new URLSearchParams(homeParams({ near: "" }))}">Show all of ${esc(S.city.name)}</a></div>`
       : `<div class="card center muted">No restaurants found${H.q ? ` for “${esc(H.q)}”` : ""}. Try fewer filters, another search or another city.</div>`;
     const more = document.getElementById("more"); if (more) more.hidden = !H.more;
-    const cnt = document.getElementById("count"); if (cnt) cnt.textContent = H.rows.length ? `${H.rows.length}${H.more ? "+" : ""} restaurant${H.rows.length === 1 && !H.more ? "" : "s"}` : "";
+    const cnt = document.getElementById("count"); if (cnt) cnt.textContent = shown.length ? `${shown.length}${H.more ? "+" : ""} restaurant${shown.length === 1 && !H.more ? "" : "s"}` : "";
     if (H.map) drawMap();
   } finally { H.loading = false; }
 }
@@ -626,6 +633,7 @@ async function viewHomeDesk() {
         <label>${ic("fork")}<select id="f-meal" aria-label="Meal">${MEALS.map((m) => `<option value="${m}" ${m === H.meal ? "selected" : ""}>${cap(m)}</option>`).join("")}</select></label>
         <label>${ic("cal")}<select id="f-date" aria-label="Date"><option value="">All dates</option>${dates.map((d) => `<option value="${d}" ${d === H.date ? "selected" : ""}>${d === today ? "Today, " : ""}${esc(fmtDate(d, { weekday: "short", day: "numeric", month: "short" }))}</option>`).join("")}</select></label>
         <label>${ic("person")}<select id="f-diners" aria-label="Diners">${Array.from({ length: maxD }, (_, i) => i + 1).map((n) => `<option value="${n}" ${n === H.diners ? "selected" : ""}>${n} ${n === 1 ? "diner" : "diners"}</option>`).join("")}</select></label>
+        <label>${ic("tag")}<select id="f-off" aria-label="Discount"><option value="">Any discount</option>${DISCOUNTS.map(([n, t]) => `<option value="${n}" ${n === H.disc ? "selected" : ""}>${t}</option>`).join("")}</select></label>
       </div>
       <div class="lcols">
         <div class="lmain">
@@ -652,6 +660,7 @@ async function viewHomeDesk() {
   document.getElementById("f-meal").onchange = (e) => nav({ meal: e.target.value });
   document.getElementById("f-date").onchange = (e) => nav({ date: e.target.value });
   document.getElementById("f-diners").onchange = (e) => nav({ diners: e.target.value });
+  document.getElementById("f-off").onchange = (e) => nav({ off: e.target.value });
   document.getElementById("f-sort").onchange = (e) => nav({ sort: e.target.value });
   document.getElementById("mapbtn").onclick = () => nav({ map: H.map ? "" : 1 });
   document.getElementById("nearme").onclick = useNearMe;
@@ -1088,7 +1097,7 @@ async function viewCheckout(q) {
   const payNeeded = () => hd().payment_mode === "stripe" && hd().amount_due_cents > 0;
   const prepPayment = async () => { C.intent = payNeeded() ? await pay("intent", { claim_id: hd().booking_id }) : null; };
   try { await makeHold(); await prepPayment(); } catch (e) { if (e.code === "not_signed_in") throw e; return out(friendly(e)); }
-  C.details = { name: [profile.first_name, profile.last_name].filter(Boolean).join(" ").replace(/^Early Bird diner$/, ""), phone: profile.phone || "", request: "", share: true, marketing: false, accepted: false, venueRef: "", bookedWithVenue: false };
+  C.details = { name: [profile.first_name, profile.last_name].filter(Boolean).join(" ").replace(/^Early Bird diner$/, ""), phone: profile.phone || "", request: "", share: true, marketing: false, accepted: false, venueRef: "", bookedWithVenue: false, firstVisit: null };
   const unmount = () => { try { C.paymentEl?.destroy(); C.expressEl?.destroy(); } catch { /* ignore */ } C.paymentEl = C.expressEl = null; };
   view.cleanup = () => { clearInterval(C.timer); unmount(); if (C.hold && !C.intent && !C.done) rpc("release_hold", { p_device: deviceId, p_claim: C.hold.booking_id }).catch(() => {}); };
 
@@ -1168,6 +1177,9 @@ async function viewCheckout(q) {
         <table><tr><td>Within ${cfg.cancel_full_credit_minutes} minutes of booking</td><td>The whole fee</td></tr><tr><td>Later, before the day</td><td>${cfg.cancel_before_day_percent}% of the fee</td></tr><tr><td>On the day, or no-show</td><td>Nothing</td></tr></table></div></details>
       <div class="lines-m">${linesHtml()}</div>
       <div class="grow-f agree" id="w-c-ok"><label class="check"><input type="checkbox" id="c-ok" ${d.accepted ? "checked" : ""}><span>I agree to the Early Bird conditions, the cancellation policy and the <a href="../terms.html" target="_blank" rel="noopener">booking terms</a></span></label><div class="ferr" id="e-c-ok" role="alert" hidden></div></div>
+      <fieldset class="fv"><legend>Been to ${esc(v.name)} before? <em>Optional</em></legend>
+        <label><input type="radio" name="c-fv" value="true" ${d.firstVisit === true ? "checked" : ""}><span>First time here</span></label>
+        <label><input type="radio" name="c-fv" value="false" ${d.firstVisit === false ? "checked" : ""}><span>Been before</span></label></fieldset>
       <label class="check small"><input type="checkbox" id="c-sh" ${d.share ? "checked" : ""}><span>Share my name, mobile number and email with ${esc(v.name)}, so they can contact me about my bookings</span></label>
       <label class="check small"><input type="checkbox" id="c-mk" ${d.marketing ? "checked" : ""}><span>Let ${esc(v.name)} send me offers through Early Bird</span></label>
       <div class="paybar"><div class="paysum"><b>${money(due())}</b><span>${payNeeded() ? "to pay now" : due() === 0 && h.credit_cents > 0 ? (h.promo_cents >= h.credit_cents ? "free booking fee" : "covered by credit") : "nothing to pay"}</span></div><button class="btn" id="c-go" type="button">${goLabel()}</button></div>
@@ -1187,6 +1199,7 @@ async function viewCheckout(q) {
     const d = C.details;
     d.name = val("c-name"); d.phone = val("c-phone"); d.request = val("c-req");
     d.share = !!document.getElementById("c-sh")?.checked; d.marketing = !!document.getElementById("c-mk")?.checked; d.accepted = !!document.getElementById("c-ok")?.checked;
+    const fv = document.querySelector('input[name="c-fv"]:checked'); d.firstVisit = fv ? fv.value === "true" : null; // optional; tells the restaurant (0200)
     if (document.getElementById("c-ref")) { d.venueRef = val("c-ref"); d.bookedWithVenue = document.getElementById("c-bv").checked; }
   };
   // Change party size or discount option: take a fresh hold with the new choice (a started card payment can't be re-priced).
@@ -1271,7 +1284,7 @@ async function viewCheckout(q) {
     pe.mount("#pay-element");
     pe.on("change", (e) => { C.cardComplete = !!e.complete; if (e.complete) clearErr("card"); });
   }
-  const confirmParams = (id) => ({ p_device: deviceId, p_claim: id, p_name: C.details.name.trim(), p_phone: C.details.phone, p_request: C.details.request || null, p_external_ref: C.details.venueRef || null, p_share_contact: C.details.share ? true : null, p_marketing: C.details.marketing ? true : null });
+  const confirmParams = (id) => ({ p_device: deviceId, p_claim: id, p_name: C.details.name.trim(), p_phone: C.details.phone, p_request: C.details.request || null, p_external_ref: C.details.venueRef || null, p_share_contact: C.details.share ? true : null, p_marketing: C.details.marketing ? true : null, p_first_visit: C.details.firstVisit ?? null });
   function after(b) {
     const n = C.details.name.trim().split(/\s+/);
     rpc("save_profile", { p_first: n[0], p_last: n.slice(1).join(" ") || null, p_phone: C.details.phone }).catch(() => {});
@@ -1305,7 +1318,7 @@ async function settleBooking(id, d) {
     showPage(`<div class="gate"><h1 class="display">That table was taken</h1></div><div class="msg info">Your payment arrived after your hold ran out and the table had gone, so we've kept your fee as ${esc(CREDIT)}. You can use it on your next booking.</div><a class="btn" href="#/">Find another table</a>`, { wash: false });
     return null;
   }
-  return rpc("confirm", { p_device: deviceId, p_claim: id, p_name: d.name.trim(), p_phone: d.phone, p_request: d.request || null, p_external_ref: d.venueRef || null, p_share_contact: d.share ? true : null, p_marketing: d.marketing ? true : null });
+  return rpc("confirm", { p_device: deviceId, p_claim: id, p_name: d.name.trim(), p_phone: d.phone, p_request: d.request || null, p_external_ref: d.venueRef || null, p_share_contact: d.share ? true : null, p_marketing: d.marketing ? true : null, p_first_visit: d.firstVisit ?? null });
 }
 // Stripe sends the diner back here after a redirect-based payment method (?pay=<booking id>).
 async function viewReturn(q) {

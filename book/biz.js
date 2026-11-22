@@ -767,7 +767,7 @@ async function viewBookingsTab(vid, q) {
       <div class="codef"><input id="ci-code" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="12" placeholder="Booking code" aria-label="Booking code"><button class="btn" type="submit">Check in</button></div><div id="ci-msg"></div></form>
     ${list.length ? `<div class="bklist">${list.map((b) => `<div class="bkrow" data-id="${esc(b.id)}">
         <div class="bktime">${esc(time12(b.time))}</div>
-        <div class="bkmain"><b>${esc(b.guest)} · ${b.diners} ${b.diners === 1 ? "diner" : "diners"}</b><span>${esc(reqText(b))}</span>${b.special_request ? `<span class="bkreq">“${esc(b.special_request)}”</span>` : ""}<span class="mono">${esc(b.code)}</span></div>
+        <div class="bkmain"><b>${esc(b.guest)} · ${b.diners} ${b.diners === 1 ? "diner" : "diners"}</b>${b.visit_label ? `<span class="bizpill ${b.first_visit ? "ok" : ""}" style="align-self:flex-start">${esc(b.visit_label)}</span>` : ""}<span>${esc(reqText(b))}</span>${b.special_request ? `<span class="bkreq">“${esc(b.special_request)}”</span>` : ""}<span class="mono">${esc(b.code)}</span></div>
         <div class="bkact"><span class="bizpill ${st[b.status]?.[0] || ""}">${esc(st[b.status]?.[1] || b.status)}</span>
           ${b.status === "confirmed" ? `<button class="btn bk-in" type="button" data-code="${esc(b.code)}">Check in</button><button class="linkbtn bk-ns" type="button" id="ns-${esc(b.id)}" data-id="${esc(b.id)}">No-show</button>` : ""}</div></div>`).join("")}</div>`
       : `<p class="muted center" style="margin:22px 0">No Early Bird bookings on this day.</p>`}

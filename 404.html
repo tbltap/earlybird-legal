@@ -26,6 +26,44 @@ a.btn{display:inline-block;background:#265682;color:#fff;border-radius:3px;paddi
   if (r) location.replace("/book/#/invite/" + r[1]);
 })();
 </script>
+<script src="/book/config.js"></script>
+<script>
+// Tagged links for posts and ads (https://eatearlybird.com/go/<code>, made in the app's admin, migration 0204). On an
+// iPhone with the app, the link opens the app instead and this page never loads. Here: count the tap with the
+// browser's random device id (the same one the web booking uses, so a later sign-up or booking on this browser counts
+// for the link), the kind of device and the referring site's host only, then go where the link points. No cookies,
+// no third-party trackers. If counting fails or is slow, the visitor still goes on after 1.5 s.
+(function () {
+  var g = location.pathname.match(/^\/go\/([A-Za-z0-9-]{3,40})\/?$/);
+  if (!g) return;
+  document.documentElement.className = "going";
+  var CFG = window.EB_CONFIG || {}, done = false;
+  var go = function (to) { if (!done) { done = true; location.replace(to); } };
+  var dest = function (r) {
+    if (r && r.destination === "venue" && r.venue_slug) return "/book/#/r/" + encodeURIComponent(r.venue_slug);
+    if (r && r.destination === "restaurants") return "/restaurants/";
+    if (r && r.destination === "app") return CFG.url + "/functions/v1/beta-join";
+    return "/book/";
+  };
+  var dev = null;
+  try {
+    dev = localStorage.getItem("eb.web.device");
+    if (!dev && window.crypto && crypto.randomUUID) { dev = crypto.randomUUID().toLowerCase(); localStorage.setItem("eb.web.device", dev); }
+  } catch (e) { /* private mode: count without a device id */ }
+  var ua = navigator.userAgent || "";
+  var platform = /iPhone|iPad|iPod/.test(ua) ? "ios" : /Android/.test(ua) ? "android" : /Mobi/.test(ua) ? "other" : "desktop";
+  var ref = ""; try { ref = document.referrer ? new URL(document.referrer).host : ""; } catch (e) { ref = ""; }
+  setTimeout(function () { go("/book/"); }, 1500);
+  if (!CFG.url || !window.fetch) return go("/book/");
+  fetch(CFG.url + "/rest/v1/rpc/link_click", {
+    method: "POST", keepalive: true,
+    headers: { "Content-Type": "application/json", "Content-Profile": "api", "Accept-Profile": "api", apikey: CFG.key, Authorization: "Bearer " + CFG.key },
+    body: JSON.stringify({ p_code: g[1], p_device: dev, p_surface: "web", p_platform: platform, p_referrer: ref || null })
+  }).then(function (res) { return res.ok ? res.json() : null; })
+    .then(function (r) { go(dest(r)); }, function () { go("/book/"); });
+})();
+</script>
+<style>html.going main{display:none}html.going body:after{content:"Opening Early Bird…";display:block;margin:30vh auto;text-align:center;color:#0f2a43}</style>
 </head>
 <body>
 <main>

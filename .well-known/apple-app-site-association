@@ -1,4 +1,14 @@
 {
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["593W8AEV33.com.tbltap.earlybird"],
+        "components": [
+          { "/": "/go/*", "comment": "Tagged post and ad links (backend 0204): open the app when it is installed" }
+        ]
+      }
+    ]
+  },
   "webcredentials": {
     "apps": ["593W8AEV33.com.tbltap.earlybird"]
   }

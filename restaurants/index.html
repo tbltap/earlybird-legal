@@ -203,6 +203,40 @@ input[type=range]:focus-visible{outline:2px solid var(--ember);outline-offset:4p
 }
 @media (prefers-reduced-motion:reduce){.seg2,.net,.dl{transition:none}}
 
+
+/* ---------- every month: today vs with Early Bird ---------- */
+.month{margin-top:28px;display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.mcard{border-radius:18px;padding:26px 26px 22px}
+.mcard.now{background:#EFE5DA;border:1px solid var(--line-soft)}
+.mcard.eb{background:var(--espresso);color:var(--paper)}
+.mcard .caps{margin-bottom:10px}
+.mcard.eb .caps{color:var(--ember-soft)}
+.mcard .big{font-family:var(--serif);font-size:clamp(48px,5.6vw,68px);line-height:1}
+.mcard.now .big{color:var(--ember)}
+.mcard p{margin:10px 0 0;font-size:15px}
+.mcard.now p{color:var(--muted)}
+.mcard.eb p{color:#CFC6B8}
+.mcard ul{list-style:none;margin:14px 0 0;padding:14px 0 0;border-top:1px solid rgba(207,198,184,.25);font-size:14px;display:grid;gap:6px}
+.mcard li{display:flex;justify-content:space-between;gap:12px}
+.mcard li b{font-weight:500;font-variant-numeric:tabular-nums}
+.mdelta{grid-column:1/-1;display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:8px 24px;border-top:1px solid var(--line);padding-top:18px;margin-top:6px}
+.mdelta .caps{margin:0}
+.mdelta b{font-family:var(--serif);font-weight:400;font-size:clamp(40px,4.6vw,56px);line-height:1}
+.comeback{grid-column:1/-1;background:var(--card);border:1px solid var(--line-soft);border-radius:18px;padding:20px 22px}
+.comeback .ctl{margin:0}
+.comeback p.res{margin:10px 0 0;font-size:15px}
+.comeback p.res b{font-family:var(--serif);font-weight:400;font-size:28px}
+@media (max-width:760px){.month{grid-template-columns:1fr}}
+
+/* ---------- guests who come back ---------- */
+.grow{display:grid;grid-template-columns:repeat(2,1fr);gap:28px;max-width:860px}
+.gcard{border-top:1px solid var(--espresso);padding-top:20px}
+.gcard h3{font-size:26px;line-height:1.1;margin:0 0 8px}
+.gcard p{margin:0;color:var(--muted);font-size:16px}
+.soon{display:inline-block;margin-left:8px;vertical-align:middle;font:500 10px var(--sans);letter-spacing:.2em;text-transform:uppercase;color:var(--ember);border:1px solid var(--ember);border-radius:999px;padding:3px 8px}
+.planfine{margin:24px 0 0;font-size:13px;color:var(--muted)}
+@media (max-width:900px){.grow{grid-template-columns:1fr}}
+
 /* the day: we never touch your rush */
 .day{position:relative;margin-top:8px}
 .day-track{position:relative;height:74px;border-radius:12px;background:var(--line-soft);overflow:hidden}
@@ -483,6 +517,31 @@ footer a:hover{color:var(--espresso)}
           </table>
         </details>
       </div>
+
+      <div class="month" data-reveal aria-live="polite">
+        <div class="mcard now">
+          <p class="caps">Every month today</p>
+          <div class="big num" id="m-now">$0</div>
+          <p>Staff on shift through your slow windows, with those tables earning nothing.</p>
+        </div>
+        <div class="mcard eb">
+          <p class="caps">Every month with Early Bird</p>
+          <div class="big num" id="m-eb">$0</div>
+          <p>After ingredients and the same staff cost, from the same slow windows.</p>
+          <ul>
+            <li><span>Guests through your door</span><b id="m-guests">0</b></li>
+            <li><span>Tips for your team</span><b id="m-tips">$0</b></li>
+          </ul>
+        </div>
+        <div class="mdelta"><p class="caps">Better off every month</p><b class="num" id="m-delta">$0</b></div>
+        <div class="comeback">
+          <div class="ctl">
+            <label for="cb"><span>New guests who come back once at full price <small style="color:var(--muted)">(your estimate)</small></span> <output id="o-cb" class="num"></output></label>
+            <input type="range" id="cb" min="0" max="40" step="1" value="10">
+          </div>
+          <p class="res">Each one is worth about <span id="cb-each">$0</span> to you on a full-price visit: <b class="num" id="cb-month">$0</b> more a month, on top of the above.</p>
+        </div>
+      </div>
     </div>
   </section>
 
@@ -504,6 +563,28 @@ footer a:hover{color:var(--espresso)}
         </div>
         <div class="hours"><span style="left:0">11am</span><span style="left:18.2%">1pm</span><span style="left:36.4%">3pm</span><span style="left:54.5%">5pm</span><span style="left:72.7%">7pm</span><span style="left:90.9%">9pm</span></div>
         <div class="legend"><span class="l1">Early Bird tables, up to 5</span><span class="l2">Your normal service</span></div>
+      </div>
+    </div>
+  </section>
+
+
+  <!-- ===== guests who come back ===== -->
+  <section class="band" aria-labelledby="g-h">
+    <div class="wrap">
+      <div class="head" data-reveal>
+        <p class="caps">More than one night</p>
+        <h2 id="g-h">New guests today,<br><em>full-price regulars tomorrow.</em></h2>
+        <p>Early Bird brings people who haven't eaten with you yet. Win them over once, then invite them back when they'll pay full price.</p>
+      </div>
+      <div class="grow">
+        <div class="gcard" data-reveal>
+          <h3>Your guest list grows</h3>
+          <p>Every guest who opts in shares their details with you. Your list builds with each early table, and it's yours.</p>
+        </div>
+        <div class="gcard" data-reveal style="--d:.08s">
+          <h3>Bring them back at full price</h3>
+          <p>Send come-back, win-back and birthday offers to the guests on your list, timed for the nights you want to fill.</p>
+        </div>
       </div>
     </div>
   </section>
@@ -622,7 +703,7 @@ footer a:hover{color:var(--espresso)}
   // Extras guests add on top (industry averages; food, so half price under Early Bird).
   var EXTRAS = { dessert: { name: "Dessert", price: 11, cost: 25 }, starter: { name: "Starter", price: 14, cost: 30 } };
   var addon = "drink";
-  var ids = ["food", "fc", "ap", "ac", "ud", "us", "tp", "gpt", "tbl", "win", "lab"];
+  var ids = ["food", "fc", "ap", "ac", "ud", "us", "tp", "gpt", "tbl", "win", "lab", "cb"];
   var el = {}; ids.forEach(function (k) { el[k] = $(k); });
 
   function paintTrack(r) { var p = (r.value - r.min) / (r.max - r.min) * 100; r.style.setProperty("--p", p + "%"); }
@@ -672,6 +753,19 @@ footer a:hover{color:var(--espresso)}
       ? "<b>Covers your staff for that window</b>, with " + money(Math.round(perWin - v.lab)) + " to spare. Without Early Bird those tables earn $0."
       : "<b>Covers " + pct + "% of your staff cost</b> for that window, from tables that would otherwise earn $0. Add a table or a pricier required item to cover it all.";
     var tipsWin = tipPer * v.gpt * v.tbl;
+    // every month (52 weeks / 12)
+    var M = v.win * 52 / 12, netWin = perWin - v.lab;
+    tween($("m-now"), -v.lab * M, function (x) { return (x < -0.5 ? "−" : "") + money(Math.abs(Math.round(x))); });
+    tween($("m-eb"), netWin * M, function (x) { return (x < -0.5 ? "−" : "+") + money(Math.abs(Math.round(x))); });
+    tween($("m-delta"), perWin * M, function (x) { return "+" + money(Math.round(x)); });
+    tween($("m-guests"), v.gpt * v.tbl * M, function (x) { return Math.round(x).toLocaleString("en-US"); });
+    tween($("m-tips"), tipsWin * M, function (x) { return money(Math.round(x)); });
+    // a full-price return visit: same order, no discount, minus ingredients
+    var fullKeep = v.food * (1 - v.fc / 100) + v.ap * (1 - v.ac / 100)
+      + ud * EXTRAS.dessert.price * (1 - EXTRAS.dessert.cost / 100) + us * EXTRAS.starter.price * (1 - EXTRAS.starter.cost / 100);
+    $("o-cb").textContent = v.cb + "%";
+    $("cb-each").textContent = money(Math.round(fullKeep));
+    tween($("cb-month"), v.gpt * v.tbl * M * v.cb / 100 * fullKeep, function (x) { return "+" + money(Math.round(x)); });
     if (tipsWin >= 1) $("verdict").innerHTML += " Your team also takes home about <b>" + money(Math.round(tipsWin)) + " in tips</b> from a shift that would have been quiet.";
     tween($("s-guests"), guestsWeek, function (x) { return Math.round(x).toLocaleString("en-US"); });
     tween($("s-week"), week, function (x) { return money(Math.round(x)); });

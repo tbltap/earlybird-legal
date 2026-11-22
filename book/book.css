@@ -958,3 +958,11 @@ body.desk .col.bizwide{max-width:980px}
 .p-final .btn{max-width:360px;margin:0 auto 14px}
 .p-sec .bizsteps{max-width:620px;width:100%;margin:0 auto}
 .biz>.p-sec{margin-top:8px}.p-final{margin-top:48px!important}
+
+/* Smooth fade between pages of the site (browsers that support cross-document view transitions; others just load normally). */
+@view-transition { navigation: auto; }
+::view-transition-old(root) { animation: vt-out .35s cubic-bezier(.4,0,.2,1) both; }
+::view-transition-new(root) { animation: vt-in .55s cubic-bezier(.2,.7,.2,1) both; }
+@keyframes vt-out { to { opacity: 0; transform: scale(.985); } }
+@keyframes vt-in { from { opacity: 0; transform: translateY(10px); } }
+@media (prefers-reduced-motion: reduce) { @view-transition { navigation: none; } }

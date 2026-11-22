@@ -38,3 +38,11 @@ mark { background: var(--mark); color: var(--mark-ink); border-radius: 3px; padd
 .version { color: var(--muted); font-size: 14px; margin-top: 36px; }
 footer { border-top: 1px solid var(--line); padding-top: 14px; padding-bottom: 28px; color: var(--muted); font-size: 14px; }
 footer a { color: var(--muted); }
+
+/* Smooth fade between pages of the site (browsers that support cross-document view transitions; others just load normally). */
+@view-transition { navigation: auto; }
+::view-transition-old(root) { animation: vt-out .35s cubic-bezier(.4,0,.2,1) both; }
+::view-transition-new(root) { animation: vt-in .55s cubic-bezier(.2,.7,.2,1) both; }
+@keyframes vt-out { to { opacity: 0; transform: scale(.985); } }
+@keyframes vt-in { from { opacity: 0; transform: translateY(10px); } }
+@media (prefers-reduced-motion: reduce) { @view-transition { navigation: none; } }

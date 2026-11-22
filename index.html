@@ -141,8 +141,8 @@ footer a:hover{text-decoration:underline}
       <div class="getcard">
         <div class="txt"><b>Book a table now</b><span>Right here in your browser, or in the iPhone app.</span></div>
         <a class="btn coral" href="book/">Find a table</a>
-        <!-- Public TestFlight beta. When the app is on the App Store, point this at the App Store URL and change the label. -->
-        <a class="btn" href="https://testflight.apple.com/join/YBDjS7rX" rel="noopener"><small>Join the beta on</small>TestFlight</a>
+        <!-- Public TestFlight beta, via the beta-join redirect (logs the click + notifies the owner, migration 0192), then forwards to TestFlight. When the app is on the App Store, point this at the App Store URL and change the label. -->
+        <a class="btn" href="https://xopcdblqmmrvyocqomqz.supabase.co/functions/v1/beta-join" rel="noopener"><small>Join the beta on</small>TestFlight</a>
       </div>
     </div>
   </div>

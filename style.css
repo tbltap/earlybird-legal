@@ -15,6 +15,7 @@ header, main, footer { max-width: 760px; margin: 0 auto; padding: 0 16px; }
 header { display: flex; flex-wrap: wrap; gap: 8px 20px; align-items: center; justify-content: space-between;
          padding-top: 18px; padding-bottom: 14px; border-bottom: 1px solid var(--line); }
 .brand { font-weight: 700; font-size: 18px; color: var(--navy); text-decoration: none; display: flex; align-items: center; gap: 8px; }
+.logo { width: auto; height: 26px; display: block; }
 .sun { width: 18px; height: 9px; border-radius: 18px 18px 0 0; background: var(--gold); display: inline-block; }
 nav { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 15px; }
 nav a { color: var(--muted); text-decoration: none; }

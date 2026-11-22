@@ -103,6 +103,8 @@ export default async function bizRoute(path, q) {
   if (path === "/biz/new") return viewNew();
   if (path.startsWith("/biz/claim/")) return viewClaim(path.slice(11));
   if (path.startsWith("/biz/v/")) return viewVenue(path.slice(7), q);
+  // The guided "set your deal" (0210, dealsetup.js): one question per screen.
+  if (path.startsWith("/biz/deal/")) return (await import("./dealsetup.js" + new URL(import.meta.url).search)).default(path.slice(10), q, { upload, note, errText, back });
   return viewBizHome();
 }
 const page = (inner) => showPage(`<div class="biz">${inner}</div>`, { wash: false, size: "bizwide" });
@@ -502,8 +504,11 @@ function reqRow(r, i) {
     <label class="field">Doesn't count (optional)<input class="r-ex" placeholder="Tap water" value="${esc(r.excludes.join(", "))}"></label>
     <button class="linkbtn r-rm" type="button">Remove</button></div>`;
 }
-function dealHtml(s) {
-  return `<p class="small">Choose when you'd like early diners and how many tables you'll hold for them. <b>Every open day needs at least one table.</b> Diners pick a time every 30 minutes; once they're booked, the rest show as sold out.</p>
+function dealHtml(s, ls) {
+  const guided = `<a class="btn" href="#/biz/deal/${esc(ls?.venue_id || "")}">${s.meals.length ? "Change your deal, step by step" : "Set your deal in 3 minutes"}</a>
+    <p class="small muted">We ask a few quick questions (your quiet times, your menu, your food cost), suggest a deal and estimate what you'd keep.</p>
+    <details class="dealmanual"><summary class="small"><b>Or set the details yourself</b></summary>`;
+  return `${guided}<p class="small">Choose when you'd like early diners and how many tables you'll hold for them. <b>Every open day needs at least one table.</b> Diners pick a time every 30 minutes; once they're booked, the rest show as sold out.</p>
     <div id="d-meals">${s.meals.map(mealRow).join("")}</div>
     <button class="btn pale" type="button" id="d-add">Add a time window</button>
     <div class="field" style="margin-top:14px">Closed on<div class="daychips" id="d-closed" role="group" aria-label="Closed days">${DAY1.map((d, k) => `<button type="button" class="daychip closed ${s.closed_days.includes(k) ? "on" : ""}" data-k="${k}" aria-pressed="${s.closed_days.includes(k)}" aria-label="Closed on ${DAYS[k]}">${d}</button>`).join("")}</div></div>
@@ -512,7 +517,7 @@ function dealHtml(s) {
     <div id="d-reqs">${s.requirements.map(reqRow).join("")}</div><button class="btn pale" type="button" id="d-addreq">Add an order rule</button>
     <h3 class="bizh3">Conditions</h3><p class="small muted">Optional, one per line, up to 8. For example: Not on public holidays.</p>
     <textarea id="d-cond" rows="3" maxlength="1400">${esc(s.conditions.join("\n"))}</textarea>
-    <div id="d-msg"></div><button class="btn" type="button" id="d-save">Save your tables</button>`;
+    <div id="d-msg"></div><button class="btn" type="button" id="d-save">Save your tables</button></details>`;
 }
 function readDeal(S) {
   const s = S.setup;

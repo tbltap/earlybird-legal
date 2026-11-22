@@ -352,7 +352,7 @@ function go(path, q) {
   location.hash = "#" + path + qs;
 }
 const navigate = (hash) => { if (location.hash === hash) route(); else location.hash = hash; };
-const setTitle = (t) => { document.title = t ? `${t} | Early Bird` : "Book an early table | Early Bird"; };
+const setTitle = (t) => { document.title = t ? `${t} | Early Bird` : "Early Bird: 50% off food at restaurants in Los Angeles and New York"; };
 /* ───────────────────────────── invites and codes (0131_codes_and_referrals) ───────────────────────────── */
 // A friend's invite link (https://eatearlybird.com/r/<code>, mapped by 404.html to #/invite/<code>) keeps the code in this
 // browser through sign-up or sign-in, then redeems it once the diner is signed in; the stored code is then removed.
@@ -398,13 +398,14 @@ async function route() {
   drawChrome(path);
   APP.innerHTML = '<div class="col"><p class="loading">Loading…</p></div>';
   try {
-    // Visitors can browse and open restaurant pages without an account. Booking, "My bookings" and Profile need one:
-    // those addresses show the sign-in screen and open again after sign-in.
+    // Visitors can browse, open restaurant pages and fill in the booking form without an account (owner, 22 Nov 2026:
+    // sign-in at the highest intent). The booking form asks for sign-in on its last button; "My bookings" and Profile
+    // still show the sign-in screen and open again after sign-in.
     if (path.startsWith("/invite/")) return await viewInvite(decodeURIComponent(path.slice(8)));
     // Restaurants listing themselves (eatearlybird.com/restaurants): its own module, loaded only when opened.
     if (path === "/biz" || path.startsWith("/biz/")) return await (await import("./biz.js" + new URL(import.meta.url).search)).default(path, q);
     if (Auth.session() && store.get(IKEY)) claimInvite();
-    const needsAccount = path === "/book" || path === "/bookings" || path.startsWith("/booking/") || path === "/account" || new URLSearchParams(location.search).get("pay");
+    const needsAccount = path === "/bookings" || path.startsWith("/booking/") || path === "/account" || new URLSearchParams(location.search).get("pay");
     if (!Auth.session() && (needsAccount || path === "/signin")) {
       const sq = new URLSearchParams(location.search);
       const next = sq.get("pay") ? "" : path === "/signin" ? q.next || "#/" : location.hash || "#/";
@@ -988,8 +989,9 @@ async function viewSignIn(q) {
   const st = { method: q.mode === "up" ? "email" : "phone", mode: q.mode === "up" ? "up" : "in", step: 0, dial: "+1", phone: "", e164: "", email: "", first: "", last: "", resendAt: 0, busy: false };
   let tick = null;
   view.cleanup = () => clearInterval(tick);
-  const head = () => `<div class="gate"><h1 class="display">${next.startsWith("#/biz") ? "Sign in to list your restaurant" : toLinked ? "Sign in to book your table" : "Sign in to book"}</h1>
-    <p class="muted" style="font-size:18px">${st.method === "phone" ? "We'll text you a code. New here? An account is made for you." : st.mode === "in" ? "Use the email and password you use in the Early Bird app." : "Create a free account. It works in the Early Bird app too."}</p></div>`;
+  const booking = next.startsWith("#/book?");   // the last step of a booking: the table is already held
+  const head = () => `<div class="gate">${booking ? '<p style="margin:0 0 6px;font-size:12px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--ember)">Last step</p>' : ""}<h1 class="display">${next.startsWith("#/biz") ? "Sign in to list your restaurant" : booking ? "Sign in to book" : toLinked ? "Sign in to book your table" : "Sign in to book"}</h1>
+    <p class="muted" style="font-size:18px">${booking ? "Your table is held. " : ""}${st.method === "phone" ? "We'll text you a code. New here? An account is made for you." : st.mode === "in" ? "Use the email and password you use in the Early Bird app." : "Create a free account. It works in the Early Bird app too."}</p>${booking ? `<p class="small" style="margin:8px 0 0"><a href="${esc(next)}">‹ Back to your booking</a></p>` : ""}</div>`;
   const legal = `<p class="tiny muted center" style="margin:12px 0 0">By continuing you accept the <a href="../terms.html" target="_blank" rel="noopener">Terms</a> and <a href="../privacy.html" target="_blank" rel="noopener">Privacy Policy</a>.</p>`;
   const msgHtml = (m, k) => (m ? `<div class="msg ${k || "err"}" role="alert">${esc(m)}</div>` : "");
 
@@ -1087,7 +1089,8 @@ async function viewCheckout(q) {
   const C = { hold: null, venue: null, profile: null, intent: null, timer: null, done: false, paying: false, details: null, cardComplete: false, busy: false };
   const slug = q.v, wanted = { deal: q.deal, date: q.date, time: q.time, meal: q.meal || "dinner", diners: Number(q.diners) || 2, option: q.opt === "nodrink" ? "nodrink" : "standard" };
   if (!slug || !wanted.deal || !wanted.date || !wanted.time) return go("/");
-  const [page, profile] = await Promise.all([rpc("venue_page", { p_slug: slug }), rpc("profile"), loadConfig()]);
+  const guest = !Auth.session();   // a visitor: the table is held for this browser; sign-in comes on the last button
+  const [page, profile] = await Promise.all([rpc("venue_page", { p_slug: slug }), guest ? Promise.resolve({}) : rpc("profile"), loadConfig()]);
   if (!page?.venue) return go("/");
   C.venue = page.venue; C.profile = profile;
   const v = C.venue;
@@ -1095,9 +1098,14 @@ async function viewCheckout(q) {
   const makeHold = async () => { C.hold = await rpc("hold", { p_device: deviceId, p_deal: wanted.deal, p_date: wanted.date, p_time: wanted.time, p_diners: wanted.diners, p_meal: wanted.meal, p_option: wanted.option }); };
   const hd = () => C.hold;
   const payNeeded = () => hd().payment_mode === "stripe" && hd().amount_due_cents > 0;
-  const prepPayment = async () => { C.intent = payNeeded() ? await pay("intent", { claim_id: hd().booking_id }) : null; };
+  const prepPayment = async () => { C.intent = payNeeded() && !guest ? await pay("intent", { claim_id: hd().booking_id }) : null; };
   try { await makeHold(); await prepPayment(); } catch (e) { if (e.code === "not_signed_in") throw e; return out(friendly(e)); }
   C.details = { name: [profile.first_name, profile.last_name].filter(Boolean).join(" ").replace(/^Early Bird diner$/, ""), phone: profile.phone || "", request: "", share: true, marketing: false, accepted: false, venueRef: "", bookedWithVenue: false, firstVisit: null };
+  // Back from signing in: put back what the visitor had typed (same table only), then they pay.
+  const DRAFT = "eb.web.draft", draftKey = [slug, wanted.deal, wanted.date, wanted.time].join("|");
+  let resumed = false;
+  try { const dr = JSON.parse(sstore.get(DRAFT) || "null"); if (dr && dr.key === draftKey && !guest) { Object.assign(C.details, dr.details, { name: dr.details.name || C.details.name, phone: dr.details.phone || C.details.phone }); resumed = true; } } catch { /* ignore */ }
+  if (!guest) sstore.set(DRAFT, null);
   const unmount = () => { try { C.paymentEl?.destroy(); C.expressEl?.destroy(); } catch { /* ignore */ } C.paymentEl = C.expressEl = null; };
   view.cleanup = () => { clearInterval(C.timer); unmount(); if (C.hold && !C.intent && !C.done) rpc("release_hold", { p_device: deviceId, p_claim: C.hold.booking_id }).catch(() => {}); };
 
@@ -1118,7 +1126,7 @@ async function viewCheckout(q) {
   const cfg = S.config;
   const testBadge = (mode) => (mode === "test" ? '<span class="testbadge">TEST MODE · card 4242 4242 4242 4242</span>' : "");
   const due = () => (C.intent ? C.intent.amount_cents : hd().amount_due_cents);
-  const goLabel = () => (payNeeded() ? `Pay ${money(due())} and book` : "Book now");
+  const goLabel = () => (guest ? "Continue" : payNeeded() ? `Pay ${money(due())} and book` : "Book now");
 
   const summaryMobile = () => {
     const h = hd();
@@ -1153,7 +1161,7 @@ async function viewCheckout(q) {
 
   function formHtml(msg) {
     const d = C.details, h = hd();
-    return `${msg ? `<div class="msg err" role="alert">${esc(msg)}</div>` : ""}
+    return `${msg ? `<div class="msg err" role="alert">${esc(msg)}</div>` : resumed ? `<div class="msg ok" role="status">You're signed in. Check your details${payNeeded() ? " and pay" : ""} to book.</div>` : ""}
       <section class="grp"><h2 class="grp-h">Your table</h2>
         <div class="grow"><span>Diners</span><div class="stepper"><button type="button" id="d-minus" aria-label="Fewer diners" ${h.diners <= 1 ? "disabled" : ""}>−</button><span id="d-n" aria-live="polite">${h.diners}</span><button type="button" id="d-plus" aria-label="More diners" ${h.diners >= h.max_diners ? "disabled" : ""}>+</button></div></div>
         ${h.nodrink_discount ? `<div class="grow col"><span>Discount</span><div class="seg" role="radiogroup" aria-label="Discount option">
@@ -1170,7 +1178,8 @@ async function viewCheckout(q) {
         ${field("c-phone", "Mobile", `<input id="c-phone" type="tel" autocomplete="tel" inputmode="tel" maxlength="32" placeholder="(310) 555-0101" value="${esc(d.phone)}">`, "Only for this booking, if the restaurant needs to reach you.")}
         ${field("c-req", "Request <span class=\"optl\">optional</span>", `<input id="c-req" type="text" maxlength="500" value="${esc(d.request)}" placeholder="Allergies, a high chair, a window seat…">`)}
       </section>
-      ${payNeeded() ? `<section class="grp"><h2 class="grp-h">Payment</h2><div id="express-element"></div><div id="pay-element"></div><div class="ferr" id="e-card" role="alert" hidden></div></section>` : ""}
+      ${payNeeded() && guest ? `<section class="grp"><h2 class="grp-h">Payment</h2><p class="small muted" style="margin:0">Next, sign in or create a free account, then pay ${money(due())} with Apple Pay, Google Pay or a card. Your table stays held.</p></section>`
+        : payNeeded() ? `<section class="grp"><h2 class="grp-h">Payment</h2><div id="express-element"></div><div id="pay-element"></div><div class="ferr" id="e-card" role="alert" hidden></div></section>` : ""}
       <details class="disc"><summary><b>Early Bird conditions</b><span>${esc(rules().slice(0, 2).join(" · "))}</span></summary><ul class="rules">${rules().map((c) => `<li>${ic("check")}<span>${esc(c)}</span></li>`).join("")}</ul></details>
       <details class="disc"><summary><b>Cancellation policy</b><span>All of the fee back as ${esc(CREDIT)} within ${cfg.cancel_full_credit_minutes} minutes</span></summary>
         <div class="policy">Cancellations come back as ${esc(CREDIT)} for booking fees on other Early Bird bookings, used first on your next one, for ${cfg.credit_valid_days} days.
@@ -1182,7 +1191,7 @@ async function viewCheckout(q) {
         <label><input type="radio" name="c-fv" value="false" ${d.firstVisit === false ? "checked" : ""}><span>Been before</span></label></fieldset>
       <label class="check small"><input type="checkbox" id="c-sh" ${d.share ? "checked" : ""}><span>Share my name, mobile number and email with ${esc(v.name)}, so they can contact me about my bookings</span></label>
       <label class="check small"><input type="checkbox" id="c-mk" ${d.marketing ? "checked" : ""}><span>Let ${esc(v.name)} send me offers through Early Bird</span></label>
-      <div class="paybar"><div class="paysum"><b>${money(due())}</b><span>${payNeeded() ? "to pay now" : due() === 0 && h.credit_cents > 0 ? (h.promo_cents >= h.credit_cents ? "free booking fee" : "covered by credit") : "nothing to pay"}</span></div><button class="btn" id="c-go" type="button">${goLabel()}</button></div>
+      <div class="paybar"><div class="paysum"><b>${money(due())}</b><span>${guest && payNeeded() ? "to pay after sign-in" : payNeeded() ? "to pay now" : due() === 0 && h.credit_cents > 0 ? (h.promo_cents >= h.credit_cents ? "free booking fee" : "covered by credit") : "nothing to pay"}</span></div><button class="btn" id="c-go" type="button">${goLabel()}</button></div>
       ${testBadge(C.intent?.mode || h.stripe_mode)}`;
   }
 
@@ -1239,6 +1248,14 @@ async function viewCheckout(q) {
   }
   async function submit() {
     if (C.busy || C.paying) return;
+    if (guest) {
+      const g = firstProblem({ skipCard: true });
+      if (g) return showErr(g[0], g[1]);
+      C.details.phone = normalisePhone(C.details.phone);
+      sstore.set(DRAFT, JSON.stringify({ key: draftKey, details: C.details }));
+      C.done = true;   // keep the hold while signing in; the next hold (as the account) replaces it
+      return go("/signin", { next: location.hash, mode: "book" });
+    }
     const p = firstProblem();
     if (p) return showErr(p[0], p[1]);
     C.details.phone = normalisePhone(C.details.phone);

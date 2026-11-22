@@ -2,14 +2,15 @@
 // Owner, 22 Nov 2026: one question per screen, no thought needed. The same steps and backend as the app
 // (EarlyBird/Features/Admin/DealSetupFlow.swift; backend/API.md "Restaurant: deal setup, guided (0210)"):
 //   0 what Early Bird is · 1 days open · 2 quiet times (same / per day / POS report) · 3 menu · 4 food cost ·
-//   5 our recommendation (3 options, an estimate) · 6 review → quick_deal (as the old editor does).
+//   5 staff on shift → the tables that cover them (0211) · 6 our recommendation (3 options, an estimate) ·
+//   7 review → quick_deal (as the old editor does).
 // Answers are saved as they go (save_deal_setup). The booking fee is never shown or set here.
 const EB = window.EB;
 const { CFG, Auth, rpc, esc, toast, navigate, setTitle, time12 } = EB;
 
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const SHORT = DAYS.map((d) => d.slice(0, 3));
-const STEPS = 7;
+const STEPS = 8;
 const CONDITIONS = ["The discount is on food only. Drinks are full price.", "Arrive within your booked time and show your code.", "Can't be combined with other offers."];
 // The quiet times to tap, as quick_deal windows (first and last booking). One per meal per day.
 const CHIPS = [
@@ -102,15 +103,25 @@ export default async function dealSetup(venueId, q, h) {
   const option = () => S.rec?.options.find((o) => o.key === (S.plan.option || "balanced"));
   const items = () => S.plan.deal_items ?? option()?.deal_items ?? [];
   const tables = () => S.plan.tables ?? option()?.tables ?? 4;
+  // staff (0211): what the quiet windows cost and how many tables cover it
+  const staffN = () => S.plan.staff_count ?? S.rec?.staff?.count ?? 3;
+  const wage = () => S.plan.staff_wage ?? S.rec?.staff?.wage ?? 20;
+  const winDays = () => windows().reduce((a, w) => a + w.weekdays.length, 0);
+  const hoursPer = () => { const n = winDays(); return n ? windows().reduce((a, w) => a + ((mins(w.end) - mins(w.start)) / 60 + 1) * w.weekdays.length, 0) / n : (S.rec?.staff?.hours_per_window ?? 2.5); };
+  const staffWin = () => Math.round(staffN() * wage() * hoursPer());
+  const quietMonth = () => Math.round(staffWin() * Math.max(1, winDays()) * 52 / 12);
+  const perTable = () => option()?.kept_per_table ?? S.rec?.staff?.kept_per_table ?? (option() ? option().guest.keep * 2 : 33);
+  const breakEven = () => Math.max(1, Math.ceil(staffWin() / Math.max(1, perTable())));
+  const signed = (v) => (v < 0 ? "−" : "+") + usd(Math.abs(v));
   const fits = (c, d) => { const [o, cl] = hoursOf(d); return mins(c.start) >= o && mins(c.end) <= cl - 30; };
 
   const save = async () => { S.plan.step = S.step; try { data = await rpc("save_deal_setup", { p_venue: venueId, p_plan: clean(S.plan) }); } catch (e) { S.msg = errText(e); } };
   const clean = (p) => ({ ...p, windows: p.windows?.map(({ share, ...w }) => w) });
   const loadRec = async () => {
-    try { S.rec = await rpc("deal_recommendation", { p_venue: venueId, p_overrides: clean({ windows: windows().length ? windows() : undefined, open_days: open(), food_cost_pct: S.plan.food_cost_pct, required_item: S.plan.required_item }) }); }
+    try { S.rec = await rpc("deal_recommendation", { p_venue: venueId, p_overrides: clean({ windows: windows().length ? windows() : undefined, open_days: open(), food_cost_pct: S.plan.food_cost_pct, required_item: S.plan.required_item, staff_count: S.plan.staff_count, staff_wage: S.plan.staff_wage }) }); }
     catch (e) { S.msg = errText(e); }
   };
-  const next = async () => { S.msg = ""; await save(); S.step = Math.min(STEPS - 1, S.step + 1); S.sub = null; if (S.step === 5) await loadRec(); draw(); };
+  const next = async () => { S.msg = ""; await save(); S.step = Math.min(STEPS - 1, S.step + 1); S.sub = null; if (S.step >= 5) await loadRec(); draw(); };
   const fn = async (body) => {
     const token = await Auth.token();
     const res = await fetch(`${CFG.functionsUrl || CFG.url + "/functions/v1"}/deal-setup`, { method: "POST", headers: { apikey: CFG.key, Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -132,7 +143,7 @@ export default async function dealSetup(venueId, q, h) {
     if (S.step === 0) return "";
     const bits = [dayList(open())], ws = windows();
     if (ws.length) bits.push(ws.slice(0, 2).map(winLabel).join(" & ") + (ws.length > 2 ? ` +${ws.length - 2}` : ""));
-    if (S.step >= 5) { const n = items().length || dealDishes().length; if (n) bits.push(`${n} dishes`); bits.push(`${tables()} tables`); }
+    if (S.step >= 6) { const n = items().length || dealDishes().length; if (n) bits.push(`${n} dishes`); bits.push(`${tables()} tables`); }
     return `<p class="prev"><b>50% off food</b>${esc(bits.join(" · "))}</p>`;
   }
   const big = (id, icon, title, detail, on) => `<button type="button" class="big" data-a="${id}" ${on !== undefined ? `aria-pressed="${!!on}"` : ""}><span class="ic" aria-hidden="true">${icon}</span><span><b>${esc(title)}</b>${detail ? `<small>${esc(detail)}</small>` : ""}</span></button>`;
@@ -154,7 +165,8 @@ export default async function dealSetup(venueId, q, h) {
       case 2: return quietBody();
       case 3: return menuBody();
       case 4: return costBody();
-      case 5: return recBody();
+      case 5: return staffBody();
+      case 6: return recBody();
       default: return reviewBody();
     }
   }
@@ -255,6 +267,18 @@ export default async function dealSetup(venueId, q, h) {
       <div class="pills">${pill("overall", "One number")}${pill("per_dish", "Per dish", !dealDishes().length)}${pill("upload", "Upload")}</div>${inner}${foot("Next", "Skip: use 30%")}`;
   }
 
+  function staffBody() {
+    const n = staffN(), be = breakEven();
+    return `<h1 class="q">Who works your quiet hours?</h1><p class="sub">The people on shift while the deal runs. It shows how many tables pay for them.</p>
+      <div class="crd"><div class="kv"><span><b>People on shift</b><br><small>A cook, a server and a dishwasher is typical</small></span><span><input type="number" id="ds-staff" min="1" max="30" value="${n}" style="width:64px" aria-label="People on shift"></span></div>
+        <div class="kv"><span><b>Pay an hour, each</b><br><small>Average pay, with payroll taxes if you like</small></span><span>$<input type="number" id="ds-wage" min="10" max="80" step="1" value="${wage()}" style="width:64px" aria-label="Pay an hour"></span></div></div>
+      <div class="crd"><b>What your quiet times cost now</b><div class="kv"><span class="n" style="font-family:var(--serif,Georgia,serif);font-size:32px;color:inherit" id="ds-sw">${usd(staffWin())}</span><span>in staff each time</span></div>
+        <p class="sub small" id="ds-sm">About ${usd(quietMonth())} a month for your ${Math.max(1, winDays())} quiet window${winDays() === 1 ? "" : "s"} a week, while those tables sit empty.</p></div>
+      <div class="crd"><b>What covers it</b><div class="kv"><span style="font-family:var(--serif,Georgia,serif);font-size:32px;color:inherit" id="ds-be">${be}</span><span id="ds-bel">${be === 1 ? "table pays" : "tables pay"} for your staff</span></div>
+        <p class="sub small" id="ds-bet">Each Early Bird table keeps about ${usd(perTable())} after food cost (2 guests). Every table after ${be} is money you weren't making.</p>
+        <p class="sub small">An estimate from your answers, not a promise of bookings.</p></div>
+      ${foot("Next", "Skip: use 3 people at $20")}`;
+  }
   function recBody() {
     const r = S.rec;
     if (!r) return `<h1 class="q">Here's what we'd do</h1>${foot("Try again")}`;
@@ -270,7 +294,9 @@ export default async function dealSetup(venueId, q, h) {
         <div class="kv"><span>You keep per guest, after food cost</span><span>${usd(o.guest.keep, true)}</span></div>
         <div class="kv"><span>Kept per deal time</span><span>${usd(o.kept_per_window)}</span></div>
         <div class="kv"><span>Guests who come back at full price</span><span>+${usd(o.come_back_per_month)}/mo</span></div>
+        ${o.break_even_tables != null ? `<div class="kv"><span>Staff on each deal time</span><span>${usd(staffWin())}</span></div><div class="kv"><span>Tables that cover your staff</span><span>${o.break_even_tables}</span></div>` : ""}
         <div class="kv"><b>Kept a month, after ingredients</b><b>${range(o)}</b></div>
+        ${o.net_per_month != null ? `<div class="kv"><span>Quiet hours now (staff, empty tables)</span><span>${signed(-o.staff_cost_per_month)}/mo</span></div><div class="kv"><b>With Early Bird, after staff</b><b>${signed(o.net_per_month_half_full)} to ${signed(o.net_per_month)}/mo</b></div>` : ""}
         <p class="sub small">Estimate: half the tables booked to every table booked. Not a promise of bookings.</p></div>` : ""}
       <div class="crd"><b>Each guest also orders, at full price</b><div class="pills">${[["drink", "A drink"], ["starter", "A starter"], ["dessert", "A dessert"], ["none", "Nothing"]].map(([k, l]) => `<button type="button" class="pill ri" data-k="${k}" aria-pressed="${(S.plan.required_item || "drink") === k}">${l}</button>`).join("")}</div>
         <p class="sub small">That's where most of your margin is. A drink is the usual choice.</p></div>
@@ -285,12 +311,14 @@ export default async function dealSetup(venueId, q, h) {
   const req = () => REQ[S.plan.required_item || "drink"] || null;
   const uncovered = () => open().filter((d) => !(S.leave || []).includes(d) && !windows().some((w) => w.weekdays.includes(d)));
   const wordingChanged = () => approved && JSON.stringify((ls.setup?.requirements || []).map((r) => r.label)) !== JSON.stringify(req() ? [req().label] : []);
+  const beLine = () => { const be = breakEven(), t = tables(); return t >= be ? `${be} ${be === 1 ? "table covers" : "tables cover"} your staff (${usd(staffWin())} each time). Every table after that is extra.` : `You need ${be} tables to cover your staff (${usd(staffWin())} each time). Add ${be - t} more.`; };
   function reviewBody() {
     const pl = ls.pledge || {};
     return `<h1 class="q">Your deal</h1><p class="sub">This is what diners will see.</p>
       <div class="crd"><div class="kv"><span>Days</span><span>${dayList(open().filter((d) => !(S.leave || []).includes(d)))}</span></div>
         <div class="kv"><span>When</span><span>${windows().map((w) => `${winLabel(w)} ${dayList(w.weekdays)}`).join("<br>") || "—"}</span></div>
         <div class="kv"><span>Tables each time</span><span><input type="number" id="ds-tables" min="1" max="20" value="${tables()}" style="width:64px" aria-label="Tables each time"></span></div>
+        <p class="small ${tables() >= breakEven() ? "okt" : "warn"}" id="ds-ber">${beLine()}</p>
         <div class="kv"><span>Deal</span><span>${items().length ? `50% off ${items().length} dishes` : "50% off your food menu"}</span></div>
         <div class="kv"><span>Each guest also orders</span><span>${req() ? `1 ${req().label.toLowerCase()}, full price` : "Nothing"}</span></div></div>
       ${uncovered().map((d) => `<div class="msg info"><b>${DAYS[d]} has no deal time.</b> Early Bird needs at least one table each day you list.<div class="pills"><button type="button" class="pill fix" data-day="${d}">Add 1 table, 5:00–6:30PM</button><button type="button" class="pill leave" data-day="${d}">Leave ${SHORT[d]} out</button></div></div>`).join("")}
@@ -402,12 +430,21 @@ export default async function dealSetup(venueId, q, h) {
         busy("Saving…", async () => {
           if (mode === "overall") data = await rpc("save_dish_costs", { p_venue: venueId, p_costs: [], p_overall: S.plan.food_cost_pct ?? 30 });
           if (mode === "per_dish" && costs.length) data = await rpc("save_dish_costs", { p_venue: venueId, p_costs: costs });
-          await save(); S.step = 5; await loadRec();
+          await save(); S.step = 5; await loadRec();   // → staff
         });
       };
       later.onclick = () => { S.plan.food_cost_pct = S.plan.food_cost_pct ?? 30; next(); };
     }
     if (S.step === 5) {
+      const upd = () => { $("ds-sw").textContent = usd(staffWin()); $("ds-sm").textContent = `About ${usd(quietMonth())} a month for your ${Math.max(1, winDays())} quiet window${winDays() === 1 ? "" : "s"} a week, while those tables sit empty.`;
+        const be = breakEven(); $("ds-be").textContent = be; $("ds-bel").textContent = `${be === 1 ? "table pays" : "tables pay"} for your staff`;
+        $("ds-bet").textContent = `Each Early Bird table keeps about ${usd(perTable())} after food cost (2 guests). Every table after ${be} is money you weren't making.`; };
+      $("ds-staff").oninput = (e) => { S.plan.staff_count = Math.min(30, Math.max(1, Math.round(+e.target.value || 1))); upd(); };
+      $("ds-wage").oninput = (e) => { S.plan.staff_wage = Math.min(80, Math.max(10, +e.target.value || 20)); upd(); };
+      go.onclick = () => { S.plan.staff_count = staffN(); S.plan.staff_wage = wage(); next(); };
+      later.onclick = () => { S.plan.staff_count = 3; S.plan.staff_wage = 20; next(); };
+    }
+    if (S.step === 6) {
       if (!S.rec) { go.onclick = () => busy("Working it out…", loadRec); return; }
       all(".opt").forEach((b) => (b.onclick = () => { const o = S.rec.options.find((x) => x.key === b.dataset.o); S.plan.option = o.key; S.plan.deal_items = null; S.plan.tables = null; S.check = null; if (o.key === "margin" || !windows().length) S.plan.windows = o.windows; draw(); }));
       all(".ri").forEach((b) => (b.onclick = () => { S.plan.required_item = b.dataset.k; busy("Working it out…", loadRec); }));
@@ -419,10 +456,10 @@ export default async function dealSetup(venueId, q, h) {
       }));
       go.onclick = () => { const o = option(); if (o) { S.plan.option = o.key; S.plan.deal_items ??= o.deal_items; S.plan.tables ??= o.tables; if (!windows().length) S.plan.windows = o.windows; } next(); };
     }
-    if (S.step === 6) {
+    if (S.step === 7) {
       // came back straight to the review without times: use the recommendation's
       if (!windows().length && (option()?.windows?.length || S.rec?.windows?.length)) { S.plan.windows = option()?.windows?.length ? option().windows : S.rec.windows; return draw(); }
-      const t = $("ds-tables"); if (t) t.onchange = () => { S.plan.tables = Math.min(20, Math.max(1, +t.value || 1)); };
+      const t = $("ds-tables"); if (t) t.oninput = () => { S.plan.tables = Math.min(20, Math.max(1, +t.value || 1)); const b = $("ds-ber"); b.textContent = beLine(); b.className = "small " + (tables() >= breakEven() ? "okt" : "warn"); };
       all(".fix").forEach((b) => (b.onclick = () => { S.plan.windows = [...(S.plan.windows || []), { meal: "dinner", start: "17:00", end: "18:30", weekdays: [+b.dataset.day] }]; draw(); }));
       all(".leave").forEach((b) => (b.onclick = () => { S.leave = [...(S.leave || []), +b.dataset.day]; draw(); }));
       go.onclick = () => {

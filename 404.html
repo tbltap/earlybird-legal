@@ -60,9 +60,37 @@ a.btn{display:inline-block;background:#265682;color:#fff;border-radius:3px;paddi
     headers: { "Content-Type": "application/json", "Content-Profile": "api", "Accept-Profile": "api", apikey: CFG.key, Authorization: "Bearer " + CFG.key },
     body: JSON.stringify({ p_code: g[1], p_device: dev, p_surface: "web", p_platform: platform, p_referrer: ref || null })
   }).then(function (res) { return res.ok ? res.json() : null; })
-    .then(function (r) { go(dest(r)); }, function () { go("/book/"); });
+    .then(function (r) {
+      if (r && r.destination === "post" && r.post && r.post.venues && r.post.venues.length) {
+        done = true;   // stay here and show the post (once the page body exists)
+        if (document.body) showPost(r.post); else document.addEventListener("DOMContentLoaded", function () { showPost(r.post); });
+        return;
+      }
+      go(dest(r));
+    },
+          function () { go("/book/"); });
+  // A post link (0215): the post's photos, caption and restaurants, each opening its booking page.
+  function showPost(p) {
+    var esc = function (t) { return String(t == null ? "" : t).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); };
+    var safe = function (u) { return /^https:\/\//.test(u || "") ? u : ""; };
+    var h = '<main class="post">' + (p.media || []).filter(safe).map(function (m) { return '<img class="ph" src="' + esc(m) + '" alt="">'; }).join("");
+    if (p.title) h += "<h1>" + esc(p.title) + "</h1>";
+    if (p.caption) h += '<p class="cap">' + esc(p.caption) + "</p>";
+    h += "<h2>" + (p.venues.length === 1 ? "The restaurant" : "The restaurants") + "</h2>";
+    h += p.venues.map(function (v) {
+      var sub = [v.area || v.city || "", (v.cuisines || []).join(", ")].filter(Boolean).join(" · ");
+      return '<a class="v" href="/book/#/r/' + encodeURIComponent(v.slug) + '">' +
+        (safe(v.photo) ? '<img src="' + esc(v.photo) + '" alt="">' : '<span class="i">' + esc(v.name.charAt(0)) + "</span>") +
+        "<span><b>" + esc(v.name) + "</b>" + (sub ? "<small>" + esc(sub) + "</small>" : "") +
+        (v.discount ? '<em>' + esc(v.discount) + "% off food</em>" : "") + "</span></a>";
+    }).join("") + '<a class="btn" href="/book/">Find more early tables</a></main>';
+    document.title = (p.title || "From our post") + " | Early Bird";
+    document.documentElement.className = "";
+    document.body.innerHTML = h;
+  }
 })();
 </script>
+<style>main.post{max-width:520px;margin:0 auto;padding:16px 16px 48px;text-align:left}main.post .ph{width:100%;border-radius:14px;margin-bottom:10px;display:block}main.post h1{font-size:30px;margin:12px 0 8px}main.post .cap{white-space:pre-line}main.post h2{font:700 17px/1.3 "Open Sans",system-ui,sans-serif;margin:22px 0 10px}main.post a.v{display:flex;gap:12px;align-items:center;padding:10px;border:1px solid #e3e5ea;border-radius:14px;margin-bottom:10px;color:inherit;text-decoration:none}main.post a.v img,main.post a.v .i{width:64px;height:64px;border-radius:10px;object-fit:cover;flex:none;background:#eceef3;display:flex;align-items:center;justify-content:center;font-weight:700;color:#5f6673}main.post a.v span{display:flex;flex-direction:column;min-width:0}main.post small{color:#5f6673}main.post em{font-style:normal;font-size:12px;font-weight:700;color:#3d2e0a;background:#edc457;border-radius:99px;padding:1px 8px;align-self:flex-start;margin-top:3px}main.post .btn{display:block;text-align:center;margin:18px 0 0}</style>
 <style>html.going main{display:none}html.going body:after{content:"Opening Early Bird…";display:block;margin:30vh auto;text-align:center;color:#0f2a43}</style>
 </head>
 <body>

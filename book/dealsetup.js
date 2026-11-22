@@ -20,6 +20,20 @@ const CHIPS = [
   { id: "early-dinner", title: "Early dinner", meal: "dinner", start: "17:00", end: "18:30" },
   { id: "late", title: "Late", meal: "dinner", start: "21:00", end: "22:00" },
 ];
+const SVG = (d) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+const IC = {
+  same: SVG('<rect x="3.5" y="5" width="17" height="15" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/>'),
+  per_day: SVG('<path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/>'),
+  pos: SVG('<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>'),
+  upload: SVG('<path d="M12 15V4M7.5 8.5 12 4l4.5 4.5"/><path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/>'),
+  clock: SVG('<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>'),
+  link: SVG('<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>'),
+  photo: SVG('<rect x="3.5" y="5" width="17" height="14" rx="3"/><circle cx="9" cy="10" r="1.6"/><path d="m20.5 15-4.5-4.5L7 19.5"/>'),
+  type: SVG('<path d="M5 6h14M12 6v13M9 19h6"/>'),
+  back: SVG('<path d="M15 5 8 12l7 7"/>'),
+  close: SVG('<path d="M6 6l12 12M18 6 6 18"/>'),
+  tick: SVG('<path d="m5 12.5 4.5 4.5L19 7.5" stroke-width="2.4"/>'),
+};
 const POS_HELP = [["Toast", "Reports › Sales › Sales by time of day, or Orders › Export"], ["Square", "Reports › Sales trends › by hour, or Transactions › Export"],
   ["Clover", "Reports › Sales › Hourly sales"], ["Lightspeed", "Reports › Sales by hour"]];
 const REQ = { drink: { label: "Drink", per_person: 1, counts_as: ["Soft drinks", "Juice", "Beer", "Wine", "Cocktails", "Coffee & tea"], excludes: ["Tap water"] },
@@ -38,50 +52,107 @@ function dayList(days) {
 }
 
 const CSS = `
-.dsw{max-width:560px;margin:0 auto}
-.dsw .dsbar{height:5px;border-radius:9px;background:var(--line,#E6DFD3);overflow:hidden;margin:6px 0 4px}
-.dsw .dsbar i{display:block;height:100%;background:var(--espresso,#1C1A17);border-radius:9px;transition:width .4s}
-.dsw .dsstep{font-size:13px;color:var(--muted,#6B645A);text-align:center}
-.dsw h1.q{font-family:var(--serif,"Instrument Serif",Georgia,serif);font-weight:400;font-size:36px;line-height:1.05;margin:14px 0 6px;text-wrap:balance}
-.dsw .sub{color:var(--muted,#6B645A);margin:0 0 14px}
-.dsw .big{display:flex;gap:14px;align-items:center;width:100%;text-align:left;background:#fff;border:1px solid var(--hairline,#DCD3C6);border-radius:16px;padding:14px;margin:10px 0;cursor:pointer;font:inherit;color:inherit}
-.dsw .big:hover{border-color:var(--espresso,#1C1A17)}
-.dsw .big[aria-pressed=true]{border:2px solid var(--espresso,#1C1A17);padding:13px}
-.dsw .big b{display:block;font-size:17px}.dsw .big small{display:block;color:var(--muted,#6B645A);font-size:13px}
-.dsw .big .ic{width:42px;height:42px;border-radius:12px;background:#F1ECE3;display:grid;place-items:center;flex:none;font-size:18px}
-.dsw .crd{background:#fff;border:1px solid var(--hairline,#DCD3C6);border-radius:16px;padding:14px;margin:12px 0}
-.dsw .kv{display:flex;justify-content:space-between;gap:10px;padding:5px 0;font-size:15px;font-variant-numeric:tabular-nums}
-.dsw .kv span:last-child{color:var(--muted,#6B645A);text-align:right}
-.dsw .days{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin:8px 0 12px}
-.dsw .dchip{border:0;border-radius:12px;padding:12px 0;font:700 16px var(--sans,inherit);background:#ECE5DA;color:var(--muted,#6B645A);cursor:pointer}
-.dsw .dchip[aria-pressed=true]{background:var(--espresso,#1C1A17);color:#fff}
+/* Paper & candlelight (brand.css tokens), restyled 22 Nov 2026 to match the booking site */
+.dsw{max-width:560px;margin:0 auto;padding-bottom:8px}
+.dsw .dshead{display:flex;align-items:center;gap:12px;margin:4px 0 6px}
+.dsw .dsx,.dsw .dsb{flex:none;width:38px;height:38px;border-radius:50%;display:grid;place-items:center;background:var(--card,#FBF8F2);box-shadow:inset 0 0 0 1px var(--line,#E2DACE);color:var(--espresso,#1C1A17);border:0;cursor:pointer;text-decoration:none;transition:background .2s,box-shadow .2s}
+.dsw .dsx:hover,.dsw .dsb:hover{background:#fff;box-shadow:inset 0 0 0 1px var(--espresso,#1C1A17)}
+.dsw .dsx svg,.dsw .dsb svg{width:16px;height:16px}
+.dsw .dsb[hidden]{visibility:hidden;display:grid}
+.dsw .dsmid{flex:1;min-width:0;text-align:center}
+.dsw .dsbrand{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted,#6B645A)}
+.dsw .dsbrand img{width:22px;height:auto}
+.dsw .dsbar{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:4px;margin:8px 0 0}
+.dsw .dsbar i{height:3px;border-radius:9px;background:var(--line,#E2DACE);transition:background .4s}
+.dsw .dsbar i.on{background:var(--espresso,#1C1A17)}
+.dsw .dsstep{font-size:12px;color:var(--muted,#6B645A);text-align:center;margin-top:7px;font-variant-numeric:tabular-nums}
+.dsw h1.q{font-family:var(--serif);font-weight:400;font-size:40px;line-height:1.02;letter-spacing:-.015em;margin:22px 0 8px;text-wrap:balance}
+.dsw .sub{color:var(--muted,#6B645A);margin:0 0 18px;font-size:16px;line-height:1.45}
+.dsw .sub.small,.dsw p.small{font-size:13px;line-height:1.45}
+.dsw .crd,.dsw .big,.dsw .opt{background:var(--card,#FBF8F2);border:0;box-shadow:inset 0 0 0 1px var(--line,#E2DACE),0 1px 2px rgba(60,45,30,.04),0 10px 30px rgba(60,45,30,.06);border-radius:20px}
+.dsw .crd{padding:16px 18px;margin:12px 0}
+.dsw .crd>b:first-child,.dsw .crd .ch{display:block;font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted,#6B645A);margin:0 0 8px}
+.dsw .big{display:flex;gap:14px;align-items:center;width:100%;text-align:left;padding:16px;margin:10px 0;cursor:pointer;font:inherit;color:inherit;transition:box-shadow .2s,transform .2s}
+.dsw .big:hover{box-shadow:inset 0 0 0 1px var(--espresso,#1C1A17),0 10px 30px rgba(60,45,30,.08)}
+.dsw .big:active{transform:scale(.99)}
+.dsw .big[aria-pressed=true]{box-shadow:inset 0 0 0 1.5px var(--espresso,#1C1A17),0 10px 30px rgba(60,45,30,.08)}
+.dsw .big b{display:block;font-size:16px;font-weight:600;line-height:1.3}.dsw .big small{display:block;color:var(--muted,#6B645A);font-size:13px;margin-top:2px}
+.dsw .big>span:nth-child(2){flex:1;min-width:0}
+.dsw .big .ic{width:40px;height:40px;border-radius:50%;background:var(--well,#EEE8DE);color:var(--espresso,#1C1A17);display:grid;place-items:center;flex:none}
+.dsw .big .ic svg{width:18px;height:18px}
+.dsw .big[aria-pressed=true] .ic{background:var(--espresso,#1C1A17);color:var(--paper,#F3EEE5)}
+.dsw .big .dtk{flex:none;width:22px;height:22px;border-radius:50%;box-shadow:inset 0 0 0 1.5px var(--line,#E2DACE);display:grid;place-items:center;color:transparent}
+.dsw .big[aria-pressed=true] .dtk{background:var(--espresso,#1C1A17);box-shadow:none;color:var(--paper,#F3EEE5)}
+.dsw .big .dtk svg{width:12px;height:12px}
+.dsw .three{list-style:none;margin:0;padding:0;counter-reset:n}
+.dsw .three li{display:grid;grid-template-columns:34px 1fr;gap:2px 12px;padding:12px 0;border-top:1px solid var(--line,#E2DACE);counter-increment:n}
+.dsw .three li:first-child{border-top:0;padding-top:2px}
+.dsw .three li::before{content:counter(n);grid-row:span 2;font-family:var(--serif);font-size:30px;line-height:1;color:var(--ember,#A8401C)}
+.dsw .three b{font-size:16px;font-weight:600}.dsw .three small{color:var(--muted,#6B645A);font-size:13px}
+.dsw .kv{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:8px 0;font-size:15px;font-variant-numeric:tabular-nums;border-top:1px solid var(--line,#E2DACE)}
+.dsw .crd>.kv:first-child,.dsw .crd>b:first-child+.kv,.dsw .crd>.ch+.kv{border-top:0}
+.dsw .kv>span:last-child{color:var(--muted,#6B645A);text-align:right}
+.dsw .kv small{color:var(--muted,#6B645A);font-size:13px;font-weight:400}
+.dsw .nw{white-space:nowrap}.dsw .kv b{font-weight:600}.dsw .kv>b:last-child{white-space:nowrap}
+.dsw .kv.tot{border-top:1px solid var(--espresso,#1C1A17);margin-top:4px;padding-top:10px}
+.dsw .days{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin:4px 0 14px}
+.dsw .dchip{aspect-ratio:1;max-height:46px;border:0;border-radius:999px;padding:0;font:500 14px var(--sans);background:transparent;box-shadow:inset 0 0 0 1px var(--line,#E2DACE);color:var(--muted,#6B645A);cursor:pointer;transition:background .2s,color .2s,box-shadow .2s}
+.dsw .dchip:hover{box-shadow:inset 0 0 0 1px var(--espresso,#1C1A17);color:var(--espresso,#1C1A17)}
+.dsw .dchip[aria-pressed=true]{background:var(--espresso,#1C1A17);color:var(--paper,#F3EEE5);box-shadow:none}
+.dsw .hrs .kv{min-height:44px}
+.dsw .hrs .kv>span:first-child{font-weight:500}
+.dsw .hrs .kv>span:last-child{display:flex;align-items:center;gap:6px;white-space:nowrap}
+.dsw .hrs .closed{color:#B3A999;font-size:14px}
+.dsw select.hr{-webkit-appearance:none;appearance:none;border:0;box-shadow:inset 0 0 0 1px var(--line,#E2DACE);background:var(--paper,#F3EEE5);border-radius:999px;padding:8px 12px;font:500 14px var(--sans);color:var(--espresso,#1C1A17);text-transform:lowercase;cursor:pointer;width:auto;min-width:0}
+.dsw select.hr:focus{box-shadow:inset 0 0 0 1px var(--espresso,#1C1A17);outline:0}
 .dsw .pills{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}
-.dsw .pill{border:0;border-radius:99px;padding:9px 14px;font:600 14px var(--sans,inherit);background:#ECE5DA;color:inherit;cursor:pointer}
-.dsw .pill[aria-pressed=true]{background:var(--espresso,#1C1A17);color:#fff}
+.dsw .pill{border:0;border-radius:99px;padding:9px 16px;font:500 14px var(--sans);cursor:pointer}
 .dsw .heat{display:grid;gap:2px;font-size:10px;font-variant-numeric:tabular-nums;overflow-x:auto}
 .dsw .heat span{height:22px;border-radius:4px}.dsw .heat .h{height:auto;color:var(--muted,#6B645A);text-align:center}
-.dsw .heat .d{height:auto;align-self:center;font-weight:700;color:var(--muted,#6B645A)}
-.dsw .heat .w{box-shadow:inset 0 0 0 2px var(--sage,#5E7A5A)}
+.dsw .heat .d{height:auto;align-self:center;font-weight:600;color:var(--muted,#6B645A)}
+.dsw .heat .w{box-shadow:inset 0 0 0 2px var(--espresso,#1C1A17)}
 .dsw .heat .x{background:repeating-linear-gradient(135deg,transparent 0 3px,#E6DFD3 3px 4px)}
-.dsw .opt{display:block;width:100%;text-align:left;background:#fff;border:1px solid var(--hairline,#DCD3C6);border-radius:16px;padding:14px;margin:10px 0;cursor:pointer;font:inherit;color:inherit}
-.dsw .opt[aria-pressed=true]{border:2px solid var(--espresso,#1C1A17);padding:13px}
-.dsw .opt .t{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
-.dsw .opt .n{font-family:var(--serif,Georgia,serif);font-size:22px;font-variant-numeric:tabular-nums}
+.dsw .opt{display:block;width:100%;text-align:left;padding:16px 18px;margin:10px 0;cursor:pointer;font:inherit;color:inherit;transition:box-shadow .2s}
+.dsw .opt[aria-pressed=true]{box-shadow:inset 0 0 0 1.5px var(--espresso,#1C1A17),0 10px 30px rgba(60,45,30,.08)}
+.dsw .opt .t{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap}
+.dsw .opt .t b{font-size:17px;font-weight:600}
+.dsw .opt .n{font-family:var(--serif);font-size:24px;font-variant-numeric:tabular-nums;white-space:nowrap}
 .dsw .opt p{margin:4px 0 0;font-size:13px;color:var(--muted,#6B645A)}
-.dsw .est{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#9C7412}
-.dsw .tag{display:inline-block;background:#EDC457;color:#3D2E0A;font-weight:700;font-size:11px;border-radius:99px;padding:2px 7px;margin-left:6px;vertical-align:2px}
-.dsw .dish{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #EEE8DE;font-size:15px}
-.dsw .dish:last-child{border:0}.dsw .dish input{width:20px;height:20px;accent-color:var(--espresso,#1C1A17)}
-.dsw .dish .nm{flex:1;min-width:0}.dsw .dish small{display:block;color:var(--muted,#6B645A);font-size:12px}.dsw .dish small.thin{color:#A8401C}
-.dsw .foot{position:sticky;bottom:0;background:var(--page,#F3EEE5);padding:10px 0 14px;margin-top:10px;border-top:1px solid var(--hairline,#DCD3C6)}
-.dsw .prev{font-size:13px;color:var(--muted,#6B645A);margin:0 0 8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.dsw .prev b{background:#EDC457;color:#3D2E0A;border-radius:99px;padding:2px 8px;font-size:11px;margin-right:6px}
-.dsw .later{display:block;width:100%;background:none;border:0;font:600 15px var(--sans,inherit);padding:10px;cursor:pointer;color:inherit}
-.dsw details{font-size:14px;color:var(--muted,#6B645A)}.dsw details summary{cursor:pointer;color:var(--ink,#1C1A17);font-weight:600}
-.dsw textarea,.dsw input[type=url],.dsw input[type=text]{width:100%;box-sizing:border-box;font:inherit;font-size:16px;padding:12px;border-radius:12px;border:1px solid var(--hairline,#DCD3C6);background:#fff}
-.dsw input[type=range]{width:100%;accent-color:var(--espresso,#1C1A17)}
-.dsw .busy{text-align:center;color:var(--muted,#6B645A);padding:30px 0}
-@media (max-width:420px){.dsw h1.q{font-size:30px}}`;
+.dsw .est{display:inline-block;font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted,#6B645A);margin:0 0 4px}
+.dsw .tag,.dsw .prev b{display:inline-block;background:linear-gradient(135deg,#F1D896,#D9B05A);color:#3B2A08;font-weight:600;font-size:11px;border-radius:99px;padding:3px 9px;letter-spacing:.01em}
+.dsw .tag{margin-left:8px;vertical-align:2px}
+.dsw .dish{display:flex;align-items:center;gap:12px;padding:11px 0;border-top:1px solid var(--line,#E2DACE);font:400 15px var(--sans);cursor:pointer}
+.dsw .crd>b:first-child+.dish,.dsw .crd>p+.dish,.dsw .dish:first-child{border-top:0}
+.dsw .dish input{flex:none;width:20px;height:20px;margin:0;accent-color:var(--espresso,#1C1A17)}
+.dsw .dish .nm{flex:1;min-width:0;font:500 15px/1.3 var(--sans);letter-spacing:0}
+.dsw .dish small{display:block;color:var(--muted,#6B645A);font:400 12px/1.4 var(--sans);margin-top:2px}
+.dsw .dish small.thin{color:var(--ember,#A8401C)}
+.dsw .dish>span:last-child{font-variant-numeric:tabular-nums;color:var(--muted,#6B645A)}
+.dsw .big-n{font-family:var(--serif);font-size:44px;line-height:1;color:var(--espresso,#1C1A17);font-variant-numeric:tabular-nums}
+.dsw .stat{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin:2px 0 6px}
+.dsw .stat>span:last-child{color:var(--muted,#6B645A);font-size:14px;text-align:right}
+.dsw .field{display:inline-flex;align-items:center;gap:2px;background:var(--paper,#F3EEE5);border-radius:12px;box-shadow:inset 0 0 0 1px var(--line,#E2DACE);padding:0 10px;transition:box-shadow .2s}
+.dsw .field:focus-within{box-shadow:inset 0 0 0 1px var(--espresso,#1C1A17);background:#fff}
+.dsw .field i{font-style:normal;color:var(--muted,#6B645A);font-size:15px}
+.dsw .field input{-moz-appearance:textfield;appearance:textfield;border:0!important;background:transparent!important;box-shadow:none!important;outline:0;width:44px!important;padding:9px 0;font:500 17px var(--sans);text-align:center;color:var(--espresso,#1C1A17);font-variant-numeric:tabular-nums}
+.dsw .field input::-webkit-outer-spin-button,.dsw .field input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.dsw .foot{position:sticky;bottom:0;z-index:5;margin:18px -16px 0;padding:12px 16px calc(12px + env(safe-area-inset-bottom));background:rgba(243,238,229,.86);-webkit-backdrop-filter:saturate(160%) blur(16px);backdrop-filter:saturate(160%) blur(16px);border-top:1px solid var(--line,#E2DACE)}
+.dsw .prev{font-size:12px;color:var(--muted,#6B645A);margin:0 0 10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dsw .prev b{margin-right:8px}
+.dsw .foot .btn{transition:transform .15s,background .2s}.dsw .foot .btn:active{transform:scale(.99)}
+.dsw .foot .btn[disabled]{opacity:.35;cursor:default}
+.dsw .later{display:block;width:100%;background:none;border:0;font:500 14px var(--sans);padding:12px 10px 2px;cursor:pointer;color:var(--muted,#6B645A);text-decoration:underline;text-decoration-color:var(--line,#E2DACE);text-underline-offset:4px}
+.dsw .later:hover{color:var(--espresso,#1C1A17);text-decoration-color:currentColor}
+.dsw details{font-size:14px;color:var(--muted,#6B645A);margin:14px 2px}.dsw details summary{cursor:pointer;color:var(--ink,#1C1A17);font-weight:500}
+.dsw textarea,.dsw input[type=url],.dsw input[type=text]{width:100%;box-sizing:border-box;font:inherit;font-size:16px;padding:14px;border-radius:14px;border:0;box-shadow:inset 0 0 0 1px var(--line,#E2DACE);background:var(--card,#FBF8F2)}
+.dsw input[type=range]{width:100%;accent-color:var(--espresso,#1C1A17);margin:10px 0 4px}
+.dsw .okt{color:var(--sage,#4F7350)}.dsw .warn{color:var(--ember,#A8401C)}
+.dsw .busy{text-align:center;color:var(--muted,#6B645A);padding:60px 0;font-family:var(--serif);font-size:22px}
+.dsw .q,.dsw .sub,.dsw .crd,.dsw .big,.dsw .opt,.dsw .days{animation:dsin .45s cubic-bezier(.2,.7,.2,1) both}
+.dsw .sub{animation-delay:.04s}.dsw .crd,.dsw .big,.dsw .opt,.dsw .days{animation-delay:.08s}
+@keyframes dsin{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.dsw *{animation:none!important;transition:none!important}}
+@media (max-width:420px){.dsw h1.q{font-size:34px}.dsw .big-n{font-size:40px}}`;
 
 export default async function dealSetup(venueId, q, h) {
   const { upload, note, errText, back } = h;
@@ -112,7 +183,7 @@ export default async function dealSetup(venueId, q, h) {
   const quietMonth = () => Math.round(staffWin() * Math.max(1, winDays()) * 52 / 12);
   const perTable = () => option()?.kept_per_table ?? S.rec?.staff?.kept_per_table ?? (option() ? option().guest.keep * 2 : 33);
   const breakEven = () => Math.max(1, Math.ceil(staffWin() / Math.max(1, perTable())));
-  const signed = (v) => (v < 0 ? "−" : "+") + usd(Math.abs(v));
+  const signed = (v) => `<span class="nw">${v < 0 ? "−" : "+"}${usd(Math.abs(v))}</span>`;
   const fits = (c, d) => { const [o, cl] = hoursOf(d); return mins(c.start) >= o && mins(c.end) <= cl - 30; };
 
   const save = async () => { S.plan.step = S.step; try { data = await rpc("save_deal_setup", { p_venue: venueId, p_plan: clean(S.plan) }); } catch (e) { S.msg = errText(e); } };
@@ -146,7 +217,7 @@ export default async function dealSetup(venueId, q, h) {
     if (S.step >= 6) { const n = items().length || dealDishes().length; if (n) bits.push(`${n} dishes`); bits.push(`${tables()} tables`); }
     return `<p class="prev"><b>50% off food</b>${esc(bits.join(" · "))}</p>`;
   }
-  const big = (id, icon, title, detail, on) => `<button type="button" class="big" data-a="${id}" ${on !== undefined ? `aria-pressed="${!!on}"` : ""}><span class="ic" aria-hidden="true">${icon}</span><span><b>${esc(title)}</b>${detail ? `<small>${esc(detail)}</small>` : ""}</span></button>`;
+  const big = (id, icon, title, detail, on) => `<button type="button" class="big" data-a="${id}" ${on !== undefined ? `aria-pressed="${!!on}"` : ""}><span class="ic">${IC[icon] || icon}</span><span><b>${esc(title)}</b>${detail ? `<small>${esc(detail)}</small>` : ""}</span>${on !== undefined ? `<span class="dtk">${IC.tick}</span>` : ""}</button>`;
   const foot = (primary, later, enabled = true) => `<div class="foot">${preview()}${S.msg ? note(S.msg) : ""}
     ${primary ? `<button class="btn" type="button" id="ds-go" ${enabled ? "" : "disabled"}>${esc(primary)}</button>` : ""}${later ? `<button class="later" type="button" id="ds-later">${esc(later)}</button>` : ""}</div>`;
 
@@ -154,13 +225,13 @@ export default async function dealSetup(venueId, q, h) {
     if (S.busy) return `<p class="busy">${esc(S.busy)}</p>`;
     switch (S.step) {
       case 0: return `<h1 class="q">Fill your quiet hours</h1><p class="sub">Here's the whole idea, in three lines.</p>
-        <div class="crd"><div class="kv"><span><b>1. Guests get 50% off food</b><br><small>Only in the quiet times you pick. Drinks stay full price.</small></span></div>
-        <div class="kv"><span><b>2. They pay us a small booking fee</b><br><small>So they turn up. You pay nothing per booking.</small></span></div>
-        <div class="kv"><span><b>3. Listing is free</b><br><small>Pause or change your deal any time.</small></span></div></div>
+        <div class="crd"><ol class="three"><li><b>Guests get 50% off food</b><small>Only in the quiet times you pick. Drinks stay full price.</small></li>
+        <li><b>They pay us a small booking fee</b><small>So they turn up. You pay nothing per booking.</small></li>
+        <li><b>Listing is free</b><small>Pause or change your deal any time.</small></li></ol></div>
         <p class="sub">We'll ask a few quick questions and suggest a deal. About 3 minutes. You can skip anything and come back.</p>${foot("Let's set it up")}`;
       case 1: return `<h1 class="q">Which days are you open?</h1><p class="sub">Click a day to switch it. Hours are from your listing.</p>
         <div class="days" role="group" aria-label="Open days">${SHORT.map((d, k) => `<button type="button" class="dchip" data-day="${k}" aria-pressed="${open().includes(k)}" aria-label="${DAYS[k]}">${d[0]}</button>`).join("")}</div>
-        <div class="crd">${DAYS.map((d, k) => { const on = open().includes(k), [o, c] = hoursOf(k); return `<div class="kv"><span>${d}</span><span>${on ? `<select class="hr" data-day="${k}" data-w="0" aria-label="${d} opens">${opts(o, 300, 840)}</select> – <select class="hr" data-day="${k}" data-w="1" aria-label="${d} closes">${opts(c, o + 60, 1410)}</select>` : "Closed"}</span></div>`; }).join("")}</div>
+        <div class="crd hrs">${DAYS.map((d, k) => { const on = open().includes(k), [o, c] = hoursOf(k); return `<div class="kv"><span>${d}</span><span>${on ? `<select class="hr" data-day="${k}" data-w="0" aria-label="${d} opens">${opts(o, 300, 840)}</select>–<select class="hr" data-day="${k}" data-w="1" aria-label="${d} closes">${opts(c, o + 60, 1410)}</select>` : `<span class="closed">Closed</span>`}</span></div>`; }).join("")}</div>
         ${foot("Next", null, open().length > 0)}`;
       case 2: return quietBody();
       case 3: return menuBody();
@@ -175,13 +246,13 @@ export default async function dealSetup(venueId, q, h) {
   function quietBody() {
     const mode = S.plan.busy_mode;
     if (!mode) return `<h1 class="q">Are your quiet times the same every day?</h1><p class="sub">The deal only runs when you'd have empty tables anyway.</p>
-      ${big("same", "=", "Yes, about the same", "Pick them once")}${big("per_day", "≠", "No, it changes by day", "Pick them for each day")}
-      ${big("pos", "⇪", "Work it out from my sales", "Upload a report from Toast, Square, Clover, Lightspeed…")}${foot(null, "I'm not sure: suggest something")}`;
+      ${big("same", "same", "Yes, about the same", "Pick them once")}${big("per_day", "per_day", "No, it changes by day", "Pick them for each day")}
+      ${big("pos", "pos", "Work it out from my sales", "Upload a report from Toast, Square, Clover, Lightspeed…")}${foot(null, "I'm not sure: suggest something")}`;
     if (mode === "pos") {
       const sp = data.sales_profile;
       if (!sp) return `<h1 class="q">Upload a sales report</h1><p class="sub">Any export with sales by hour or by order time: CSV, Excel or PDF. Four weeks or more is best.</p>
         <div class="crd"><b>Where to find it</b>${POS_HELP.map(([k, v]) => `<div class="kv"><span>${k}</span><span>${v}</span></div>`).join("")}</div>
-        <label class="big"><span class="ic" aria-hidden="true">⇪</span><span><b>Choose a file</b><small>CSV, Excel (.xlsx) or PDF</small></span><input type="file" id="ds-pos" accept=".csv,.xlsx,.xls,.pdf,image/*" hidden></label>
+        <label class="big"><span class="ic">${IC.upload}</span><span><b>Choose a file</b><small>CSV, Excel (.xlsx) or PDF</small></span><input type="file" id="ds-pos" accept=".csv,.xlsx,.xls,.pdf,image/*" hidden></label>
         <p class="sub small">We only use it to find your quiet hours. It stays private to your restaurant.</p>${foot(null, "Pick times myself instead")}`;
       const sug = S.rec?.windows_source === "sales" ? S.rec.windows : [];
       return `<h1 class="q">Here's when you're quiet</h1><p class="sub">From ${sp.weeks ? `${sp.weeks} week${sp.weeks === 1 ? "" : "s"} of ` : ""}your sales. Outlined: quiet enough for the deal.</p>
@@ -194,7 +265,7 @@ export default async function dealSetup(venueId, q, h) {
     const days = perDay ? [day] : open();
     return `<h1 class="q">When is it quiet?</h1><p class="sub">${perDay ? "Pick a day, then click its quiet times." : "Click all that apply, for every day you're open."}</p>
       ${perDay ? `<div class="days">${open().map((d) => `<button type="button" class="dchip pd" data-day="${d}" aria-pressed="${d === day}">${SHORT[d]}</button>`).join("")}</div>` : ""}
-      ${CHIPS.filter((c) => days.some((d) => fits(c, d))).map((c) => big("chip:" + c.id, "◷", `${c.title}, ${time12(c.start)}–${time12(c.end)}`, `First booking ${time12(c.start)}, last ${time12(c.end)}`, chipOn(c, days))).join("")}
+      ${CHIPS.filter((c) => days.some((d) => fits(c, d))).map((c) => big("chip:" + c.id, "clock", `${c.title}, ${time12(c.start)}–${time12(c.end)}`, `First booking ${time12(c.start)}, last ${time12(c.end)}`, chipOn(c, days))).join("")}
       ${perDay ? `<div class="crd">${open().map((d) => { const ws = windows().filter((w) => w.weekdays.includes(d)).map(winLabel); return `<div class="kv"><span>${DAYS[d]}</span><span>${ws.length ? ws.join(", ") : "None yet"}</span></div>`; }).join("")}</div>` : ""}
       ${foot("Next", "Work it out from my sales instead", windows().length > 0)}`;
   }
@@ -238,9 +309,9 @@ export default async function dealSetup(venueId, q, h) {
     if ((data.dishes || []).length && S.sub !== "replace") return `<h1 class="q">We have your menu</h1><p class="sub">${data.dishes.length} dishes are on your Early Bird page. We'll use them to suggest your deal.</p>
       <div class="crd">${data.dishes.slice(0, 6).map((d) => `<div class="kv"><span>${esc(d.name)}</span><span>${usd(d.price)}</span></div>`).join("")}${data.dishes.length > 6 ? `<p class="sub small">and ${data.dishes.length - 6} more</p>` : ""}</div>${foot("Use this menu", "Replace it with my latest menu")}`;
     return `<h1 class="q">Add your menu</h1><p class="sub">So we can suggest which dishes go on the deal. You can skip this.</p>
-      ${big("link", "↗", "Import it from your website", "Your website's menu page, Toast, Square…")}
-      <label class="big"><span class="ic" aria-hidden="true">▣</span><span><b>Upload a photo, screenshot or PDF</b><small>A paper menu, your DoorDash page as a screenshot, or a PDF</small></span><input type="file" id="ds-menu" accept="image/*,.pdf" hidden></label>
-      ${big("type", "⌨", "Type it", "One dish per line, with its price")}${foot(null, "Do this later")}`;
+      ${big("link", "link", "Import it from your website", "Your website's menu page, Toast, Square…")}
+      <label class="big"><span class="ic">${IC.photo}</span><span><b>Upload a photo, screenshot or PDF</b><small>A paper menu, your DoorDash page as a screenshot, or a PDF</small></span><input type="file" id="ds-menu" accept="image/*,.pdf" hidden></label>
+      ${big("type", "type", "Type it", "One dish per line, with its price")}${foot(null, "Do this later")}`;
   }
   function typedMenu(text) {
     const out = []; let cur = { name: "Menu", items: [] };
@@ -258,10 +329,10 @@ export default async function dealSetup(venueId, q, h) {
     const mode = S.plan.cost_mode || "overall", pct = S.plan.food_cost_pct ?? 30;
     const pill = (k, l, dis) => `<button type="button" class="pill cm" data-k="${k}" aria-pressed="${mode === k}" ${dis ? "disabled" : ""}>${l}</button>`;
     let inner;
-    if (mode === "per_dish") inner = `<div class="crd">${dealDishes().map((d) => `<div class="kv"><span>${esc(d.name)}<br><small>${usd(d.price)}${d.cost_source === "invoice_estimate" ? " · from your invoices" : ""}</small></span><span><input type="number" class="dc" data-id="${esc(d.id)}" min="5" max="80" value="${Math.round(d.cost_pct)}" style="width:70px" aria-label="${esc(d.name)} food cost %">%</span></div>`).join("")}</div>`;
-    else if (mode === "upload") inner = `<label class="big"><span class="ic" aria-hidden="true">⇪</span><span><b>Choose a file</b><small>A cost sheet (dish and cost) or supplier invoices (Sysco, US Foods…). We work out each dish's cost.</small></span><input type="file" id="ds-cost" accept=".csv,.xlsx,.xls,.pdf,image/*" hidden></label>
+    if (mode === "per_dish") inner = `<div class="crd">${dealDishes().map((d) => `<div class="kv"><span>${esc(d.name)}<br><small>${usd(d.price)}${d.cost_source === "invoice_estimate" ? " · from your invoices" : ""}</small></span><span><label class="field"><input type="number" class="dc" data-id="${esc(d.id)}" min="5" max="80" value="${Math.round(d.cost_pct)}" aria-label="${esc(d.name)} food cost %"><i>%</i></label></span></div>`).join("")}</div>`;
+    else if (mode === "upload") inner = `<label class="big"><span class="ic">${IC.upload}</span><span><b>Choose a file</b><small>A cost sheet (dish and cost) or supplier invoices (Sysco, US Foods…). We work out each dish's cost.</small></span><input type="file" id="ds-cost" accept=".csv,.xlsx,.xls,.pdf,image/*" hidden></label>
       <p class="sub small">Invoices give an estimate per dish, marked as one. You can change any of them in Per dish.</p>`;
-    else inner = `<div class="crd"><div class="kv"><b>Food cost</b><b style="font-family:var(--serif,Georgia,serif);font-size:32px;font-weight:400" id="ds-pct">${pct}%</b></div>
+    else inner = `<div class="crd"><b>Food cost</b><div class="stat"><span class="big-n" id="ds-pct">${pct}%</span><span>of the menu price</span></div>
       <input type="range" id="ds-fc" min="15" max="45" step="1" value="${pct}" aria-label="Food cost percent"><p class="sub small">Not sure? Leave it at 30%.</p></div>`;
     return `<h1 class="q">What does your food cost you?</h1><p class="sub">Ingredients as a share of the menu price. Most restaurants are 28–32%.</p>
       <div class="pills">${pill("overall", "One number")}${pill("per_dish", "Per dish", !dealDishes().length)}${pill("upload", "Upload")}</div>${inner}${foot("Next", "Skip: use 30%")}`;
@@ -270,11 +341,11 @@ export default async function dealSetup(venueId, q, h) {
   function staffBody() {
     const n = staffN(), be = breakEven();
     return `<h1 class="q">Who works your quiet hours?</h1><p class="sub">The people on shift while the deal runs. It shows how many tables pay for them.</p>
-      <div class="crd"><div class="kv"><span><b>People on shift</b><br><small>A cook, a server and a dishwasher is typical</small></span><span><input type="number" id="ds-staff" min="1" max="30" value="${n}" style="width:64px" aria-label="People on shift"></span></div>
-        <div class="kv"><span><b>Pay an hour, each</b><br><small>Average pay, with payroll taxes if you like</small></span><span>$<input type="number" id="ds-wage" min="10" max="80" step="1" value="${wage()}" style="width:64px" aria-label="Pay an hour"></span></div></div>
-      <div class="crd"><b>What your quiet times cost now</b><div class="kv"><span class="n" style="font-family:var(--serif,Georgia,serif);font-size:32px;color:inherit" id="ds-sw">${usd(staffWin())}</span><span>in staff each time</span></div>
+      <div class="crd"><div class="kv"><span><b>People on shift</b><br><small>A cook, a server and a dishwasher is typical</small></span><span><label class="field"><input type="number" id="ds-staff" min="1" max="30" value="${n}" inputmode="numeric" aria-label="People on shift"></label></span></div>
+        <div class="kv"><span><b>Pay an hour, each</b><br><small>Average pay, with payroll taxes if you like</small></span><span><label class="field"><i>$</i><input type="number" id="ds-wage" min="10" max="80" step="1" value="${wage()}" inputmode="numeric" aria-label="Pay an hour"></label></span></div></div>
+      <div class="crd"><b>What your quiet times cost now</b><div class="stat"><span class="big-n" id="ds-sw">${usd(staffWin())}</span><span>in staff each time</span></div>
         <p class="sub small" id="ds-sm">About ${usd(quietMonth())} a month for your ${Math.max(1, winDays())} quiet window${winDays() === 1 ? "" : "s"} a week, while those tables sit empty.</p></div>
-      <div class="crd"><b>What covers it</b><div class="kv"><span style="font-family:var(--serif,Georgia,serif);font-size:32px;color:inherit" id="ds-be">${be}</span><span id="ds-bel">${be === 1 ? "table pays" : "tables pay"} for your staff</span></div>
+      <div class="crd"><b>What covers it</b><div class="stat"><span class="big-n" id="ds-be">${be}</span><span id="ds-bel">${be === 1 ? "table pays" : "tables pay"} for your staff</span></div>
         <p class="sub small" id="ds-bet">Each Early Bird table keeps about ${usd(perTable())} after food cost (2 guests). Every table after ${be} is money you weren't making.</p>
         <p class="sub small">An estimate from your answers, not a promise of bookings.</p></div>
       ${foot("Next", "Skip: use 3 people at $20")}`;
@@ -295,8 +366,8 @@ export default async function dealSetup(venueId, q, h) {
         <div class="kv"><span>Kept per deal time</span><span>${usd(o.kept_per_window)}</span></div>
         <div class="kv"><span>Guests who come back at full price</span><span>+${usd(o.come_back_per_month)}/mo</span></div>
         ${o.break_even_tables != null ? `<div class="kv"><span>Staff on each deal time</span><span>${usd(staffWin())}</span></div><div class="kv"><span>Tables that cover your staff</span><span>${o.break_even_tables}</span></div>` : ""}
-        <div class="kv"><b>Kept a month, after ingredients</b><b>${range(o)}</b></div>
-        ${o.net_per_month != null ? `<div class="kv"><span>Quiet hours now (staff, empty tables)</span><span>${signed(-o.staff_cost_per_month)}/mo</span></div><div class="kv"><b>With Early Bird, after staff</b><b>${signed(o.net_per_month_half_full)} to ${signed(o.net_per_month)}/mo</b></div>` : ""}
+        <div class="kv tot"><b>Kept a month, after ingredients</b><b>${range(o)}</b></div>
+        ${o.net_per_month != null ? `<div class="kv"><span>Quiet hours now (staff, empty tables)</span><span>${signed(-o.staff_cost_per_month)}/mo</span></div><div class="kv tot"><b>With Early Bird, after staff</b><b>${signed(o.net_per_month_half_full)} to ${signed(o.net_per_month)}/mo</b></div>` : ""}
         <p class="sub small">Estimate: half the tables booked to every table booked. Not a promise of bookings.</p></div>` : ""}
       <div class="crd"><b>Each guest also orders, at full price</b><div class="pills">${[["drink", "A drink"], ["starter", "A starter"], ["dessert", "A dessert"], ["none", "Nothing"]].map(([k, l]) => `<button type="button" class="pill ri" data-k="${k}" aria-pressed="${(S.plan.required_item || "drink") === k}">${l}</button>`).join("")}</div>
         <p class="sub small">That's where most of your margin is. A drink is the usual choice.</p></div>
@@ -317,7 +388,7 @@ export default async function dealSetup(venueId, q, h) {
     return `<h1 class="q">Your deal</h1><p class="sub">This is what diners will see.</p>
       <div class="crd"><div class="kv"><span>Days</span><span>${dayList(open().filter((d) => !(S.leave || []).includes(d)))}</span></div>
         <div class="kv"><span>When</span><span>${windows().map((w) => `${winLabel(w)} ${dayList(w.weekdays)}`).join("<br>") || "—"}</span></div>
-        <div class="kv"><span>Tables each time</span><span><input type="number" id="ds-tables" min="1" max="20" value="${tables()}" style="width:64px" aria-label="Tables each time"></span></div>
+        <div class="kv"><span>Tables each time</span><span><label class="field"><input type="number" id="ds-tables" min="1" max="20" value="${tables()}" inputmode="numeric" aria-label="Tables each time"></label></span></div>
         <p class="small ${tables() >= breakEven() ? "okt" : "warn"}" id="ds-ber">${beLine()}</p>
         <div class="kv"><span>Deal</span><span>${items().length ? `50% off ${items().length} dishes` : "50% off your food menu"}</span></div>
         <div class="kv"><span>Each guest also orders</span><span>${req() ? `1 ${req().label.toLowerCase()}, full price` : "Nothing"}</span></div></div>
@@ -338,9 +409,11 @@ export default async function dealSetup(venueId, q, h) {
   }
 
   function draw() {
-    show(`${back(`#/biz/v/${venueId}`, "Your listing")}
-      <div class="dsstep">Step ${S.step + 1} of ${STEPS}</div><div class="dsbar" role="progressbar" aria-valuemin="1" aria-valuemax="${STEPS}" aria-valuenow="${S.step + 1}"><i style="width:${((S.step + 1) / STEPS) * 100}%"></i></div>
-      ${S.step > 0 ? `<p style="margin:6px 0 0"><button type="button" class="linkbtn" id="ds-back">‹ Back</button></p>` : ""}
+    show(`<div class="dshead"><button type="button" class="dsb" id="ds-back" aria-label="Back" ${S.step > 0 || S.sub || S.plan.busy_mode && S.step === 2 ? "" : "hidden"}>${IC.back}</button>
+        <div class="dsmid"><span class="dsbrand"><img src="../img/bird-mark-gradient.png" alt="">Set your deal</span></div>
+        <a class="dsx" href="#/biz/v/${esc(venueId)}" aria-label="Close and go back to your listing">${IC.close}</a></div>
+      <div class="dsbar" role="progressbar" aria-valuemin="1" aria-valuemax="${STEPS}" aria-valuenow="${S.step + 1}">${Array.from({ length: STEPS }, (_, k) => `<i class="${k <= S.step ? "on" : ""}"></i>`).join("")}</div>
+      <div class="dsstep">Step ${S.step + 1} of ${STEPS}</div>
       ${body()}`);
     if (!S.busy) wire();            // while busy only the "Working…" line is on screen: nothing to wire
   }

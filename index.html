@@ -7,7 +7,10 @@
 <script>
 // Visitors land on the places (owner, 21 Nov: "the first land in the site i want it to be on the thing to see the places").
 // This page stays reachable for its sections (/#how, /#restaurants, /#get) and at /?about.
-if (!location.hash && !/[?&]about\b/.test(location.search)) location.replace("/book/");
+if (!location.hash && !/[?&]about\b/.test(location.search)) {
+  try { sessionStorage.setItem("eb.web.ref", document.referrer || ""); } catch (e) {}   // the visit counter (visit.js) keeps where they came from
+  location.replace("/book/");
+}
 </script>
 <meta name="description" content="Dine early and save 50% off your food bill. Book an early table at restaurants online or with the Early Bird iPhone app.">
 <meta name="theme-color" content="#F3EEE5">
@@ -366,6 +369,6 @@ footer a:hover{color:var(--espresso)}
   els.forEach(function (e) { io.observe(e); });
 })();
 </script>
-<script src="/visit.js?v=20261122" defer></script>
+<script src="/visit.js?v=20261122b" defer></script>
 </body>
 </html>

@@ -2,14 +2,19 @@
 // What is sent: the browser's random Early Bird id (the same `eb.web.device` the web booking uses), "web", a coarse
 // platform (ios / android / desktop), the referring site's address (the server keeps the host only, e.g.
 // l.instagram.com) and which part of the site (/, /book, /restaurants, /v). No cookies, no IP kept, no third parties.
-// One count per browser per 30 minutes; a page reached from our own pages (or a /go/ link redirect) isn't counted again.
+// One count per browser per 30 minutes; a page reached through a /go/ link isn't counted again (the link tap was).
 (function () {
   try {
     if (!/(^|\.)eatearlybird\.com$/.test(location.hostname)) return;            // live site only, not local tests
-    var ref = document.referrer || "";
-    var own = /^https?:\/\/([^\/]*\.)?eatearlybird\.com(\/|$)/i.test(ref);
+    // The home page forwards to /book/ at once and leaves the original referrer here (index.html).
+    var kept = sessionStorage.getItem("eb.web.ref");
+    if (kept !== null) sessionStorage.removeItem("eb.web.ref");
+    var ref = kept !== null ? kept : (document.referrer || "");
+    var own = /^https?:\/\/([^\/]*\.)?eatearlybird\.com(\/|$)/i;
+    if (own.test(ref) && /^https?:\/\/[^\/]+\/go\//i.test(ref)) return;    // came through one of our /go/ links: counted there
+    if (own.test(ref)) ref = "";                                                   // our own pages: no outside referrer
     var last = Number(sessionStorage.getItem("eb.web.visit") || 0);
-    if (own || Date.now() - last < 30 * 60 * 1000) return;
+    if (Date.now() - last < 30 * 60 * 1000) return;
     var id = localStorage.getItem("eb.web.device");
     if (!id) {
       id = (crypto.randomUUID ? crypto.randomUUID() : "xxxxxxxx-xxxx-4xxx-8xxx-xxxxxxxxxxxx".replace(/x/g, function () {

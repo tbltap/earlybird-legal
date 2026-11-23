@@ -222,6 +222,7 @@ input[type=range]:focus-visible{outline:2px solid var(--ember);outline-offset:4p
 .mcard ul{list-style:none;margin:14px 0 0;padding:14px 0 0;border-top:1px solid rgba(207,198,184,.25);font-size:14px;display:grid;gap:6px}
 .mcard li{display:flex;justify-content:space-between;gap:12px}
 .mcard li b{font-weight:500;font-variant-numeric:tabular-nums}
+.mnote{grid-column:1/-1;margin:2px 0 0;font-size:14px;color:var(--muted)}
 .mdelta{grid-column:1/-1;display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:8px 24px;border-top:1px solid var(--line);padding-top:18px;margin-top:6px}
 .mdelta .caps{margin:0}
 .mdelta b{font-family:var(--serif);font-weight:400;font-size:clamp(40px,4.6vw,56px);line-height:1}
@@ -408,7 +409,7 @@ footer a:hover{color:var(--espresso)}
           <div class="ctl">
             <label for="fc">Your food cost <output id="o-fc" class="num"></output></label>
             <input type="range" id="fc" min="20" max="45" step="1" value="32">
-            <p class="hint">Ingredients as a share of the menu price. Full-service average: about 32%.</p>
+            <p class="hint">Ingredients as a share of the menu price. Typical for full service: about 32%.</p>
           </div>
           <div class="ctl">
             <label>Every guest also orders</label>
@@ -421,6 +422,7 @@ footer a:hover{color:var(--espresso)}
           <div class="ctl">
             <label for="ap"><span><span data-k="addonName">Drink</span> price</span> <output id="o-ap" class="num"></output></label>
             <input type="range" id="ap" min="4" max="30" step="1" value="13">
+            <p class="hint">Typical: $13 for a drink, $14 for a starter, $11 for a dessert. Your own menu prices set yours.</p>
           </div>
           <div class="ctl">
             <label for="ac"><span><span data-k="addonName">Drink</span> cost, as a share of its price</span> <output id="o-ac" class="num"></output></label>
@@ -446,9 +448,14 @@ footer a:hover{color:var(--espresso)}
             <input type="range" id="gpt" min="1" max="6" step="1" value="2">
           </div>
           <div class="ctl">
-            <label for="tbl">Early tables per slow window <output id="o-tbl" class="num"></output></label>
+            <label for="tbl">Early tables you hold per slow window <output id="o-tbl" class="num"></output></label>
             <input type="range" id="tbl" min="1" max="5" step="1" value="4">
             <p class="hint">Up to five, before lunch, before dinner or after the rush.</p>
+          </div>
+          <div class="ctl">
+            <label for="bk">Tables that book <output id="o-bk" class="num"></output></label>
+            <input type="range" id="bk" min="10" max="100" step="5" value="35">
+            <p class="hint">Typical: about 35% of held tables. Busy areas book more, quiet ones less, and lunch about 15% less than dinner.</p>
           </div>
           <div class="ctl">
             <label for="win">Slow windows a week <output id="o-win" class="num"></output></label>
@@ -495,7 +502,7 @@ footer a:hover{color:var(--espresso)}
         <div class="ba-top">
           <div>
             <h3 id="ba-h">One slow window, <em>before and after.</em></h3>
-            <p>Empty tables still cost you the staff on shift. Early tables bring in food at half price plus the full-price item you choose, which covers the ingredients and the staff.</p>
+            <p>Empty tables still cost you the staff on shift. Early tables bring in food at half price plus the full-price item you choose. That pays for the ingredients and goes towards the staff; with enough tables booked, it covers them too.</p>
           </div>
           <div class="swing"><p class="caps">Better off per window</p><b class="num" id="swing">$0</b></div>
         </div>
@@ -537,6 +544,7 @@ footer a:hover{color:var(--espresso)}
           </ul>
         </div>
         <div class="mdelta"><p class="caps">Better off every month</p><b class="num" id="m-delta">$0</b></div>
+        <p class="mnote">These use typical numbers. Your own estimate depends on demand near you, your menu prices and how many tables book; you'll see it, as a range, when you set your deal.</p>
         <div class="comeback">
           <div class="ctl">
             <label for="cb"><span>New guests who come back once at full price <small style="color:var(--muted)">(your estimate)</small></span> <output id="o-cb" class="num"></output></label>
@@ -711,7 +719,7 @@ footer a:hover{color:var(--espresso)}
   // Extras guests add on top (industry averages; food, so half price under Early Bird).
   var EXTRAS = { dessert: { name: "Dessert", price: 11, cost: 25 }, starter: { name: "Starter", price: 14, cost: 30 } };
   var addon = "drink";
-  var ids = ["food", "fc", "ap", "ac", "ud", "us", "tp", "gpt", "tbl", "win", "lab", "cb"];
+  var ids = ["food", "fc", "ap", "ac", "ud", "us", "tp", "gpt", "tbl", "bk", "win", "lab", "cb"];
   var el = {}; ids.forEach(function (k) { el[k] = $(k); });
 
   function paintTrack(r) { var p = (r.value - r.min) / (r.max - r.min) * 100; r.style.setProperty("--p", p + "%"); }
@@ -735,12 +743,14 @@ footer a:hover{color:var(--espresso)}
     document.querySelector('[data-k="usNote"]').textContent = v.us + "% of guests, half price";
     document.querySelector('[data-k="tipNote"]').textContent = v.tp + "% of the bill, theirs to keep";
     // per table / window / week
-    var perWin = keep * v.gpt * v.tbl, guestsWeek = v.gpt * v.tbl * v.win;
+    // tables that actually book (owner: "make it realistic"): an average across windows, not every table every time
+    var bt = v.tbl * v.bk / 100;
+    var perWin = keep * v.gpt * bt, guestsWeek = v.gpt * bt * v.win;
     var week = perWin * v.win, month = week * 52 / 12;
 
     $("o-food").textContent = money(v.food); $("o-fc").textContent = v.fc + "%";
     $("o-ap").textContent = money(v.ap); $("o-ac").textContent = v.ac + "%";
-    $("o-gpt").textContent = v.gpt; $("o-tbl").textContent = v.tbl; $("o-win").textContent = v.win; $("o-lab").textContent = money(v.lab);
+    $("o-gpt").textContent = v.gpt; $("o-tbl").textContent = v.tbl; $("o-bk").textContent = v.bk + "%"; $("o-win").textContent = v.win; $("o-lab").textContent = money(v.lab);
     document.querySelectorAll('[data-k="addonName"]').forEach(function (n) { n.textContent = A.name; });
     document.querySelectorAll('[data-k="addonLower"]').forEach(function (n) { n.textContent = A.name.toLowerCase(); });
 
@@ -760,27 +770,27 @@ footer a:hover{color:var(--espresso)}
     $("verdict").innerHTML = perWin >= v.lab
       ? "<b>Covers your staff for that window</b>, with " + money(Math.round(perWin - v.lab)) + " to spare. Without Early Bird those tables earn $0."
       : "<b>Covers " + pct + "% of your staff cost</b> for that window, from tables that would otherwise earn $0. Add a table or a pricier required item to cover it all.";
-    var tipsWin = tipPer * v.gpt * v.tbl;
+    var tipsWin = tipPer * v.gpt * bt;
     // every month (52 weeks / 12)
     var M = v.win * 52 / 12, netWin = perWin - v.lab;
     tween($("m-now"), -v.lab * M, function (x) { return (x < -0.5 ? "−" : "") + money(Math.abs(Math.round(x))); });
     tween($("m-eb"), netWin * M, function (x) { return (x < -0.5 ? "−" : "+") + money(Math.abs(Math.round(x))); });
     tween($("m-delta"), perWin * M, function (x) { return "+" + money(Math.round(x)); });
-    tween($("m-guests"), v.gpt * v.tbl * M, function (x) { return Math.round(x).toLocaleString("en-US"); });
+    tween($("m-guests"), v.gpt * bt * M, function (x) { return Math.round(x).toLocaleString("en-US"); });
     tween($("m-tips"), tipsWin * M, function (x) { return money(Math.round(x)); });
     // a full-price return visit: same order, no discount, minus ingredients
     var fullKeep = v.food * (1 - v.fc / 100) + v.ap * (1 - v.ac / 100)
       + ud * EXTRAS.dessert.price * (1 - EXTRAS.dessert.cost / 100) + us * EXTRAS.starter.price * (1 - EXTRAS.starter.cost / 100);
     $("o-cb").textContent = v.cb + "%";
     $("cb-each").textContent = money(Math.round(fullKeep));
-    tween($("cb-month"), v.gpt * v.tbl * M * v.cb / 100 * fullKeep, function (x) { return "+" + money(Math.round(x)); });
+    tween($("cb-month"), v.gpt * bt * M * v.cb / 100 * fullKeep, function (x) { return "+" + money(Math.round(x)); });
     if (tipsWin >= 1) $("verdict").innerHTML += " Your team also takes home about <b>" + money(Math.round(tipsWin)) + " in tips</b> from a shift that would have been quiet.";
     tween($("s-guests"), guestsWeek, function (x) { return Math.round(x).toLocaleString("en-US"); });
     tween($("s-week"), week, function (x) { return money(Math.round(x)); });
     tween($("s-month"), month, function (x) { return money(Math.round(x)); });
 
-    hero.perWin = perWin; hero.n = v.tbl;
-    var g = v.gpt * v.tbl;
+    hero.perWin = perWin; hero.n = Math.max(1, Math.round(bt));   // the hero fills the tables that typically book
+    var g = v.gpt * bt;
     lastChart = { food: (foodPaid + dRev + sRev) * g, item: v.ap * g, ing: cogs * g, staff: v.lab, tips: tipPer * g };
     drawChart(lastChart);
   }

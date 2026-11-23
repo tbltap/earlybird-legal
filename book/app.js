@@ -1037,7 +1037,7 @@ async function viewVenue(slug, q) {
       <hr class="rule">
       <h2 class="title">The deal, if they join</h2>
       <p style="margin:6px 0"><b>${deal.max_discount || deal.discount}% off your food bill</b>${deal.nodrink_discount ? `, or ${deal.nodrink_discount}% off with nothing extra to order` : ""}.</p>
-      ${deal.requirements?.length ? `<p class="small muted">Order rules: ${deal.requirements.map((r) => `${r.per_person} ${esc(r.label.toLowerCase())} per person`).join(", ")}.</p>` : ""}`
+      ${deal.requirements?.length ? `<p class="small muted">At full price: ${deal.requirements.map((r) => `${r.per_person} ${esc(r.label.toLowerCase())} per person`).join(", ")}.</p>` : ""}`
     : deal ? `<h2 class="title" style="font-size:26px">Availability</h2>
       <div class="assure"><span>${ic("cal")}Guaranteed booking</span><span>${ic("cancel")}Flexible cancellation</span></div>
       <div class="filters">
@@ -1050,7 +1050,7 @@ async function viewVenue(slug, q) {
       <hr class="rule">
       <h2 class="title">The deal</h2>${npNote(v)}
       <p style="margin:6px 0"><b>${deal.max_discount || deal.discount}% off your food bill</b>${deal.nodrink_discount ? `, or ${deal.nodrink_discount}% off with nothing extra to order` : ""}.</p>
-      ${deal.requirements?.length ? `<p class="small muted">Order rules: ${deal.requirements.map((r) => `${r.per_person} ${esc(r.label.toLowerCase())} per person`).join(", ")}.</p>` : ""}
+      ${deal.requirements?.length ? `<p class="small muted">At full price: ${deal.requirements.map((r) => `${r.per_person} ${esc(r.label.toLowerCase())} per person`).join(", ")}.</p>` : ""}
       <ul class="rules">${(deal.conditions || []).map((c) => `<li>${ic("check")}<span>${esc(c)}</span></li>`).join("")}</ul>` : `<p class="muted">This restaurant doesn't have early tables listed right now.</p>`}
     ${(v.dish_photos || []).length > 1 ? `<hr class="rule"><h2 class="title" style="margin-bottom:10px">Photos</h2><div class="photos">${v.dish_photos.map((p) => `<img src="${esc(p)}" alt="" loading="lazy" onerror="this.remove()">`).join("")}</div>` : ""}
     ${menu.length ? `<hr class="rule"><div class="menu" id="menu"><h2 class="title" style="margin-bottom:6px">Menu</h2>${v.deal_menu ? '<p class="muted small">Items marked “On the deal” are covered by the discount.</p>' : ""}
@@ -1688,7 +1688,7 @@ async function viewBooking(id, q) {
       <dl class="kv"><dt>Diners</dt><dd>${b.diners}${b.option === "nodrink" ? " (no drinks needed)" : ""}</dd>
         <dt>Booking fee</dt><dd>${money(b.fee_cents)}${b.promo_cents > 0 ? ` (${money(b.promo_cents)} free booking fee)` : ""}${b.credit_used_cents - (b.promo_cents || 0) > 0 ? ` (${money(b.credit_used_cents - (b.promo_cents || 0))} from your ${esc(CREDIT)})` : ""}${b.amount_paid_cents ? ` · ${money(b.amount_paid_cents)} paid by card` : ""}</dd>
         ${b.saving_cents ? `<dt>Est. savings</dt><dd class="green">${m0(b.saving_cents)} on food</dd>` : ""}
-        ${b.requirements?.length ? `<dt>Order rules</dt><dd>${b.requirements.map((r) => `${r.per_person} ${esc(r.label.toLowerCase())} per person`).join(", ")}</dd>` : ""}
+        ${b.requirements?.length ? `<dt>At full price</dt><dd>${b.requirements.map((r) => `${r.per_person} ${esc(r.label.toLowerCase())} per person`).join(", ")}</dd>` : ""}
         ${b.guest_name ? `<dt>Name</dt><dd>${esc(b.guest_name)}</dd>` : ""}${b.special_request ? `<dt>Request</dt><dd>${esc(b.special_request)}</dd>` : ""}
         ${v.address ? `<dt>Where</dt><dd><a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent((v.name || "") + " " + v.address)}" target="_blank" rel="noopener">${esc(v.address)}</a></dd>` : ""}
         ${v.phone ? `<dt>Phone</dt><dd><a href="tel:${esc(v.phone)}">${esc(v.phone)}</a></dd>` : ""}</dl>

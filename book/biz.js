@@ -6,7 +6,7 @@
 const EB = window.EB;
 const { CFG, Auth, rpc, esc, ic, showPage, toast, go, navigate, setTitle, friendly, viewSignIn, time12 } = EB;
 
-const TERMS_VERSION = "2026-11-22.earlybird-restaurant-v5"; // setting restaurant.terms_version (API.md, Shape: Venue claim)
+const TERMS_VERSION = "2026-11-22.earlybird-restaurant-v5"; // fallback only: the server records its own current version (restaurant.terms_version)
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const DAY1 = ["S", "M", "T", "W", "T", "F", "S"];
 const MEALS = { breakfast: "Breakfast", lunch: "Lunch", dinner: "Dinner" };
@@ -461,12 +461,20 @@ function verifiedHtml(c, ls) {
   return `<p class="small">${how}Before it goes live we need one document: a photo of ${DOC_KINDS}.</p>${docsHtml({ ...c, status: "pending" })}`;
 }
 
+// The terms come from the server (owner, 22 Nov 2026: "shouldnt the terms be independant from the build??"): the claim
+// carries terms_summary, terms_url and terms_whats_new; accept_restaurant_terms records the server's current version.
+// The constants here are only fallbacks for a server that doesn't send them yet.
+const TERMS_SUMMARY = "By listing, you let Early Bird use your restaurant's name, logo, photos, menu and public social posts to promote your tables and offers in the app, on our website and social accounts, in ads and with partners, without asking each time. Only share what you have the rights to. Ask us any time to take something down.";
+const termsUrl = (c) => (/^https:\/\/eatearlybird\.com\//.test(c?.terms_url || "") ? c.terms_url : "../restaurant-terms.html");
 function termsHtml(c) {
-  if (c.terms_accepted && c.terms_current) return `<p class="small">Accepted. <a href="../restaurant-terms.html" target="_blank" rel="noopener">Read the Restaurant Terms</a></p>`;
-  if (c.role === "manager") return `<p class="small">The restaurant's owner needs to accept the <a href="../restaurant-terms.html" target="_blank" rel="noopener">Restaurant Terms</a>. Ask them to sign in to Early Bird and accept them.</p>`;
-  return `<p class="small">${c.terms_accepted ? "The Restaurant Terms have changed. Read the new version and accept it." : "Listing on Early Bird is free. Read how it works for your restaurant: the deal, cancellations and how you honour bookings."}</p>
-    <p class="small"><b>We market you.</b> By listing, you let Early Bird use your restaurant's name, logo, photos, menu and public social posts to promote your tables and offers in the app, on our website and social accounts, in ads and with partners, without asking each time. Only share what you have the rights to. Ask us any time to take something down.</p>
-    <p class="small"><a href="../restaurant-terms.html" target="_blank" rel="noopener">Read the Restaurant Terms</a></p>
+  const link = (t) => `<a href="${esc(termsUrl(c))}" target="_blank" rel="noopener">${t}</a>`;
+  if (c.terms_accepted && c.terms_current) return `<p class="small">Accepted. ${link("Read the Restaurant Terms")}</p>`;
+  if (c.role === "manager") return `<p class="small">The restaurant's owner needs to accept the ${link("Restaurant Terms")}. Ask them to sign in to Early Bird and accept them.</p>`;
+  const changed = c.terms_accepted;
+  return `<p class="small">${changed ? "The Restaurant Terms have changed. Read the new version and accept it." : "Listing on Early Bird is free. Read how it works for your restaurant: the deal, cancellations and how you honour bookings."}</p>
+    ${changed && c.terms_whats_new ? `<p class="small"><b>What's new.</b> ${esc(c.terms_whats_new)}</p>` : ""}
+    <p class="small"><b>We market you.</b> ${esc(c.terms_summary || TERMS_SUMMARY)}</p>
+    <p class="small">${link("Read the Restaurant Terms")}</p>
     <label class="check"><input type="checkbox" id="t-ok"><span>I've read the Restaurant Terms, including the marketing licence in section 2, and accept them for this restaurant</span></label>
     <div id="t-msg"></div><button class="btn" type="button" id="t-go">Accept the terms</button>`;
 }
@@ -476,7 +484,7 @@ function wireTerms(venueId, c, after) {
     const msg = document.getElementById("t-msg");
     if (!document.getElementById("t-ok").checked) { msg.innerHTML = note("Tick the box to accept the terms."); return; }
     b.disabled = true;
-    try { await rpc("accept_restaurant_terms", { p_venue: venueId, p_version: TERMS_VERSION }); toast("Terms accepted."); after(); }
+    try { await rpc("accept_restaurant_terms", { p_venue: venueId, p_version: c.terms_current_version || TERMS_VERSION }); toast("Terms accepted."); after(); }
     catch (e) { msg.innerHTML = note(errText(e)); b.disabled = false; }
   };
 }

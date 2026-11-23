@@ -28,6 +28,10 @@ a.btn{display:inline-block;background:#265682;color:#fff;border-radius:3px;paddi
   // the app opens them at the booking step; without the app, the web booking step for that table.
   var b = location.pathname.match(/^\/b\/([a-z0-9-]+)\/?$/);
   if (b) location.replace("/book/#/book?v=" + b[1] + (location.search ? "&" + location.search.slice(1) : ""));
+  // Area links for stories (https://eatearlybird.com/a/<area>[/follow]?l=<tracked link code>, 0230_area_follows): the app
+  // opens them on the area's deals with a Follow button; without the app, the same page in the web booking site.
+  var a = location.pathname.match(/^\/a\/([a-z0-9-]+(?:\/[a-z0-9-]+)?(?:\/follow)?)\/?$/i);
+  if (a) location.replace("/book/#/a/" + a[1].toLowerCase() + location.search);
 })();
 </script>
 <script src="/book/config.js"></script>
@@ -49,6 +53,8 @@ a.btn{display:inline-block;background:#265682;color:#fff;border-radius:3px;paddi
     if (r && r.destination === "post") return "/book/#/post/" + encodeURIComponent(g[1].toLowerCase());
     // A link-in-bio link (0221): the grid of recent posts (viewPosts in book/app.js); each tile goes to its own /go/ link.
     if (r && r.destination === "bio") return "/book/#/posts/" + encodeURIComponent(g[1].toLowerCase());
+    // An area link (0231): the area page (0230) with this link's code, so a Follow there counts for it.
+    if (r && r.destination === "area" && r.area_path) return "/a/" + r.area_path + "?l=" + encodeURIComponent(g[1].toLowerCase());
     if (r && r.destination === "restaurants") return "/restaurants/";
     if (r && r.destination === "app") return CFG.url + "/functions/v1/beta-join";
     return "/book/";

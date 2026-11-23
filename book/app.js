@@ -420,6 +420,7 @@ async function route() {
     if (path.startsWith("/r/")) return await viewVenue(decodeURIComponent(path.slice(3)), q);
     if (path.startsWith("/post/")) return await viewPost(decodeURIComponent(path.slice(6)), q);
     if (path.startsWith("/posts/")) return await viewBio();
+    if (path.startsWith("/a/")) return await viewArea(decodeURIComponent(path.slice(3)), q);
     if (path === "/book") return await viewCheckout(q);
     if (path === "/signin") return await viewSignIn(q);
     if (path === "/bookings") return await viewBookings();
@@ -611,7 +612,7 @@ function resultHtml(v) {
         ${rest > 0 ? `<a class="slot more" href="${href}&date=${day.date}">${rest} more</a>` : ""}</div>`;
     }).join("");
   }
-  return `<article class="res"><a class="head" href="${href}">${thumbHtml(v)}<div><div class="nm">${esc(v.name)}</div><div class="meta">${esc(sub)}</div></div></a>
+  return `<article class="res"><a class="head" href="${href}">${thumbHtml(v)}<div><div class="nm">${esc(v.name)}</div><div class="meta">${esc(sub)}</div>${v._note ? `<div class="pnote">${esc(v._note)}</div>` : ""}</div></a>
     ${d ? `<div class="chips chiprow"><span class="pill">${ic("card")}${m0(d.fee_per_diner_cents)} booking fee</span><span class="pill">${ic("bird")}+${m0(S.config.reward_per_booking_cents || 0)} credit</span></div>` : ""}
     ${cols ? `<div class="days">${cols}</div>` : d ? `<p class="muted small" style="padding:12px 18px 0">No ${H.meal} tables listed.</p>` : ""}</article>`;
 }
@@ -637,6 +638,21 @@ async function viewBio() {
     <div class="biogrid">${posts.map((p) => `<a class="biotile" href="${esc(p.url)}">${p.photo ? `<img src="${esc(p.photo)}" alt="" loading="lazy" onerror="this.remove()">` : ""}<span class="bt-txt"><b>${esc(p.title || "Early tables")}</b>${n(p) ? `<small>${n(p)} restaurant${n(p) === 1 ? "" : "s"}</small>` : ""}</span></a>`).join("")}</div>
     ${appPlug()}</div>`, { size: "wide" });
 }
+// helpers for the post view's order: the first bookable time, the distance (only with location already allowed)
+const nextSlot = (a) => { for (const d of a?.days || []) { if (!d.open) continue; const s = (d.slots || []).find((x) => x.left > 0); if (s) return { date: d.date, time: s.time }; } return null; };
+const whenTxt = (n, tz) => { const today = todayAt(tz), t = dateObj(today); t.setUTCDate(t.getUTCDate() + 1);
+  const day = n.date === today ? "" : n.date === t.toISOString().slice(0, 10) ? "tomorrow " : fmtDate(n.date, { weekday: "short" }) + " ";
+  return day + time12(n.time); };
+const haversineKm = (a, v) => { const r = (x) => x * Math.PI / 180, dLa = r(v.lat - a.lat), dLo = r(v.lng - a.lng);
+  const h = Math.sin(dLa / 2) ** 2 + Math.cos(r(a.lat)) * Math.cos(r(v.lat)) * Math.sin(dLo / 2) ** 2; return 12742 * Math.asin(Math.sqrt(h)); };
+async function knownPosition() {
+  try {
+    if (!navigator.permissions || !navigator.geolocation) return null;
+    const st = await navigator.permissions.query({ name: "geolocation" });
+    if (st.state !== "granted") return null;   // never ask from here
+    return await new Promise((res) => navigator.geolocation.getCurrentPosition((p) => res({ lat: p.coords.latitude, lng: p.coords.longitude }), () => res(null), { timeout: 4000, maximumAge: 600000 }));
+  } catch { return null; }
+}
 async function viewPost(code, q) {
   const r = await rpc("link_post", { p_code: code }).catch(() => null);
   if (!r || !r.ok || !r.post) return go("/");
@@ -659,9 +675,95 @@ async function viewPost(code, q) {
   const rows = pages.filter((v) => v && v.deal);
   const avail = rows.length ? await loadAvail(rows.map((v) => v.id), H.meal, H.diners).catch(() => ({})) : {};
   rows.forEach((v) => (v._avail = avail[v.id]));
+  // Like the app's Book now (owner: "show the places that are nearest with availability soonest"): soonest open time first,
+  // ties by distance; no open time last, in the post's order. Distance only if the browser already allows location (no prompt).
+  const here = await knownPosition();
+  const order = new Map((p.venues || []).map((x, i) => [x.slug, i]));
+  rows.forEach((v) => {
+    v._next = nextSlot(v._avail);
+    const km = here && v.lat != null ? haversineKm(here, v) : null;
+    v._km = km;
+    const dist = km != null ? `${(km * 0.621).toFixed(km < 16 ? 1 : 0)} mi` : v.area || "";
+    v._note = [dist, v._next ? `next ${whenTxt(v._next, v.timezone)}` : ""].filter(Boolean).join(" · ");
+  });
+  rows.sort((a, b) => (a._next ? 0 : 1) - (b._next ? 0 : 1)
+    || (a._next && b._next ? (a._next.date + a._next.time).localeCompare(b._next.date + b._next.time) : 0)
+    || (a._km != null && b._km != null ? a._km - b._km : 0)
+    || (order.get(a.slug) ?? 0) - (order.get(b.slug) ?? 0));
+  // the post's own pick for each restaurant (0231: its best photo or dish, the cover only as a fallback)
+  const picked = Object.fromEntries((p.venues || []).filter((x) => x.slug && /^https:\/\//.test(x.photo || "")).map((x) => [x.slug, x.photo]));
+  rows.forEach((v) => { if (picked[v.slug]) v.photo = picked[v.slug]; });
   const grid = document.getElementById("grid"); if (!grid) return;
   grid.innerHTML = rows.length ? rows.map(isDesk() ? resultHtmlDesk : resultHtml).join("")
     : `<div class="card center muted">These restaurants aren't taking Early Bird bookings right now. <a href="#/">See other restaurants</a></div>`;
+}
+
+/* ───────────────────────────── an area (eatearlybird.com/a/<slug>[/follow] → #/a/<slug>[/follow], 0230_area_follows) ─────────────────────────────
+   Owner, 22 Nov 2026: stories per area that people "subscribe" to, so they hear about every new deal there. The page: the
+   area's restaurants with deals (the usual result cards and times), a Follow button, and the app plug (alerts arrive in
+   the app). /follow is the story's "Follow Silver Lake" sticker: the Follow button leads, but nothing is followed until
+   the visitor taps it (the follow is the opt-in). ?l=<code> is the story's tracked link (0204): the tap is counted once. */
+const areaTarget = (path) => {
+  const parts = path.split("/").filter(Boolean);
+  const follow = parts[parts.length - 1] === "follow";
+  if (follow) parts.pop();
+  return { slug: parts.join("/").toLowerCase(), follow };
+};
+function countAreaLink(code) {
+  if (!/^[A-Za-z0-9-]{3,40}$/.test(code || "")) return;
+  try { if (sessionStorage.getItem("eb.web.link." + code)) return; sessionStorage.setItem("eb.web.link." + code, "1"); } catch { /* private mode */ }
+  const ua = navigator.userAgent || "";
+  const platform = /iPhone|iPad|iPod/.test(ua) ? "ios" : /Android/.test(ua) ? "android" : /Mobi/.test(ua) ? "other" : "desktop";
+  let ref = ""; try { ref = document.referrer ? new URL(document.referrer).host : ""; } catch { ref = ""; }
+  rpc("link_click", { p_code: code, p_device: deviceId, p_surface: "web", p_platform: platform, p_referrer: ref || null }).catch(() => {});
+}
+async function viewArea(path, q) {
+  const { slug, follow } = areaTarget(path);
+  if (q.l) countAreaLink(q.l);
+  const a = await rpc("area_page", { p_area: slug }).catch(() => null);
+  if (!a || !a.slug) return go("/");
+  await Promise.all([loadConfig(), loadCities()]);
+  H.meal = ["breakfast", "lunch", "dinner"].includes(q.meal) ? q.meal : H.meal;
+  H.diners = Math.min(Math.max(Number(q.diners) || H.diners, 1), S.config.max_party || 12);
+  setTitle(`Early tables in ${a.name}`);
+  const here = `#/a/${encodeURIComponent(a.slug)}${follow ? "/follow" : ""}${q.l ? `?l=${encodeURIComponent(q.l)}` : ""}`;
+  const where = a.kind === "city" ? a.name : `${a.name}, ${a.city.name}`;
+  const n = (a.venues || []).length, total = Math.max(Number(a.deal_count) || 0, n);   // the page lists up to 60
+  const followBtn = (on) => on
+    ? `<button class="btn pale" id="fol" aria-pressed="true">${ic("bell")}Following</button>`
+    : `<button class="btn" id="fol" aria-pressed="false">${ic("bell")}Follow ${esc(a.name)}</button>`;
+  const why = (on) => on ? `We'll tell you in the Early Bird app when a new deal or new times appear in ${esc(a.name)}.`
+    : `Get a notification in the Early Bird app when a new deal or new times appear in ${esc(a.name)}. At most one a day.`;
+  showPage(`<div class="postview areaview"><header class="posthead">
+      <p class="ph-kicker">${ic("tag")}50% off food, early tables</p>
+      <h1 class="display">Early tables in ${esc(a.name)}</h1>
+      <p class="muted">${esc(where)} · ${n ? `${total} restaurant${total === 1 ? "" : "s"} with a deal` : "No deals here yet. Follow to hear first."}</p>
+      ${a.kind === "group" && (a.areas || []).length ? `<p class="small muted">${esc(a.areas.map((x) => x.name).join(" · "))}</p>` : ""}
+      <div class="areafollow${follow && !a.following ? " lead" : ""}"><span id="folbtn">${followBtn(a.following)}</span><p class="small muted" id="folwhy">${why(a.following)}</p></div>
+    </header><div id="grid">${n ? '<p class="loading">Finding tables…</p>' : ""}</div>${appPlug()}</div>`, { size: "wide" });
+  const wire = (on) => {
+    const b = document.getElementById("fol"); if (!b) return;
+    b.onclick = async () => {
+      if (!Auth.session()) return navigate(`#/signin?next=${encodeURIComponent(here)}`);
+      b.disabled = true;
+      try {
+        const r = on ? await rpc("unfollow_area", { p_area: a.slug, p_city: a.city.slug })
+                     : await rpc("follow_area", { p_area: a.slug, p_city: a.city.slug, p_source: q.l ? "story" : "web", p_link: q.l || null });
+        const now = !!r?.following;
+        document.getElementById("folbtn").innerHTML = followBtn(now);
+        document.getElementById("folwhy").innerHTML = why(now);
+        toast(now ? `Following ${a.name}` : `Stopped following ${a.name}`);
+        wire(now);
+      } catch (e) { b.disabled = false; toast(friendly(e)); }
+    };
+  };
+  wire(a.following);
+  if (!n) return;
+  const rows = (a.venues || []).filter((v) => v && v.deal);
+  const avail = rows.length ? await loadAvail(rows.map((v) => v.id), H.meal, H.diners).catch(() => ({})) : {};
+  rows.forEach((v) => (v._avail = avail[v.id]));
+  const grid = document.getElementById("grid"); if (!grid) return;
+  grid.innerHTML = rows.map(isDesk() ? resultHtmlDesk : resultHtml).join("");
 }
 
 /* ───────────────────────────── desktop list (the First Table-style region page) ───────────────────────────── */
@@ -776,7 +878,7 @@ function resultHtmlDesk(v) {
   const where = [distTxt(v) && `<b class="dist">${distTxt(v)}</b>`, v.area && `${ic("pin")}${esc(v.area)}`, cuisineText(v) && `${ic("fork")}${esc(cuisineText(v))}`, priceTxt(v)].filter(Boolean).join("");
   return `<article class="drow"><a class="dthumb" href="${href}">${esc((v.name || "?").charAt(0))}${(v.photo || v.dish_photos?.[0]) ? `<img src="${esc(v.photo || v.dish_photos[0])}" alt="" loading="lazy" onerror="this.remove()">` : ""}${v.rating >= 4.7 && v.review_count >= 20 ? '<span class="ribbon">Top rated</span>' : ""}</a>
     <div class="dbody"><div class="dtop"><a class="dname" href="${href}">${esc(v.name)} <span aria-hidden="true">›</span></a>${v.rating != null ? `<span class="drate">${Number(v.rating).toFixed(1)} ${stars5(v.rating)} <span class="muted">(${v.review_count})</span></span>` : '<span class="drate muted">New on Early Bird</span>'}</div>
-      <div class="dwhere">${where}</div>
+      <div class="dwhere">${where}</div>${v._note ? `<div class="pnote">${esc(v._note)}</div>` : ""}
       ${d ? `<div class="dfacts"><span>${ic("card")}${m0(d.fee_per_diner_cents)} booking fee per diner</span><span>${ic("bird")}+${m0(S.config.reward_per_booking_cents || 0)} ${esc(CREDIT)}</span></div>` : ""}
       ${cols ? `<div class="ddays">${cols}</div>` : d ? `<p class="muted small">No ${H.meal} tables in these days.</p>` : ""}</div></article>`;
 }

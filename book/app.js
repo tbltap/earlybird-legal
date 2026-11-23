@@ -1280,6 +1280,8 @@ async function viewSignIn(q) {
   const head = () => `<div class="gate">${booking ? '<p style="margin:0 0 6px;font-size:12px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--ember)">Last step</p>' : ""}<h1 class="display">${next.startsWith("#/biz") ? "Sign in to list your restaurant" : booking ? "Sign in to book" : toLinked ? "Sign in to book your table" : "Sign in to book"}</h1>
     <p class="muted" style="font-size:18px">${booking ? "Your table is held. " : ""}${st.method === "phone" ? "We'll text you a code. New here? An account is made for you." : st.mode === "in" ? "Use the email and password you use in the Early Bird app." : "Create a free account. It works in the Early Bird app too."}</p>${booking ? `<p class="small" style="margin:8px 0 0"><a href="${esc(next)}">‹ Back to your booking</a></p>` : ""}</div>`;
   const legal = `<p class="tiny muted center" style="margin:12px 0 0">By continuing you accept the <a href="../terms.html" target="_blank" rel="noopener">Terms</a> and <a href="../privacy.html" target="_blank" rel="noopener">Privacy Policy</a>.</p>`;
+  // phone sign-in only (Twilio toll-free verification, 23 Nov 2026): the SMS consent line, same words as iOS 4bb5615
+  const legalSms = `<p class="tiny muted center" style="margin:12px 0 0">Early Bird will text a one-time sign-in code to this number, 1 message per request. Msg &amp; data rates may apply. Reply STOP to opt out, HELP for help. By continuing you accept the Early Bird <a href="../terms.html" target="_blank" rel="noopener">Terms</a> and <a href="../privacy.html" target="_blank" rel="noopener">Privacy Policy</a>.</p>`;
   const msgHtml = (m, k) => (m ? `<div class="msg ${k || "err"}" role="alert">${esc(m)}</div>` : "");
 
   function drawPhone(msg = "", kind = "err") {
@@ -1290,7 +1292,7 @@ async function viewSignIn(q) {
         <div style="display:flex;gap:8px;margin-top:-6px"><select id="p-dial" aria-label="Country code" style="width:96px;margin:0;flex:none">${DIALS.map(([f, d]) => `<option value="${d}" ${d === st.dial ? "selected" : ""}>${f} ${d}</option>`).join("")}</select>
           <input id="p-num" type="tel" inputmode="tel" autocomplete="tel-national" placeholder="Phone number" style="margin:0" value="${esc(st.phone)}"></div>
         <button class="btn" id="p-go" type="submit" style="margin-top:14px">Next</button>
-        ${legal}</form>
+        ${legalSms}</form>
       <p class="center"><button class="linklike" type="button" id="use-email">Use email instead</button></p>`);
     document.getElementById("use-email").onclick = () => { st.method = "email"; drawEmail(); };
     document.getElementById("pf").onsubmit = async (e) => {

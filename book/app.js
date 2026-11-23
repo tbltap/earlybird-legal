@@ -333,6 +333,11 @@ async function drawChrome(path) {
   list.addEventListener("click", () => { close(); hs.value = ""; });
   document.addEventListener("click", (e) => { if (!e.target.closest("#hsearch")) close(); });
 }
+/* Restaurants that haven't joined yet (owner, 22 Nov 2026; terms §2 and §6): a plain notice where it matters, and the
+   fee-back promise. is_partner comes from the backend (opted_in_at); until it's sent, every venue counts as not a partner. */
+const SUPPORT = "support@eatearlybird.com";
+const isPartner = (v) => v?.is_partner === true;
+const npNote = (v) => (isPartner(v) ? "" : `<div class="npnote">${ic("info")}<span><b>Not an Early Bird partner yet</b> · If they don't honour 50% off, your fee comes back. <a href="../terms.html#6-the-discount-and-the-rules-for-it" target="_blank" rel="noopener">How it works</a></span></div>`);
 const legalLinks = `<div class="legal"><a href="../terms.html">Terms</a><a href="../privacy.html">Privacy</a><a href="../credit-terms.html">${esc(CREDIT)} terms</a><a href="../support.html">Support</a></div>`;
 const topbar = (right = "") => `<div class="wash"><div class="col"><div class="topbar${right ? "" : " empty"}">${right}</div></div></div>`;
 const showPage = (inner, { wash = true, right = "", size = "" } = {}) => {
@@ -535,7 +540,7 @@ async function viewHome(q) {
       <div class="textsearch">${ic("search")}<input id="f-q" type="search" placeholder="Search restaurants or cuisines" aria-label="Search" value="${esc(H.q)}" autocomplete="off"></div>
     </form>
     <div class="chiprow scrollx" id="chips" role="group" aria-label="Near me and cuisine" style="margin:4px 0 16px">${nearChip()}</div>
-    <div class="sec"><h2 id="reshead">${H.cuisine ? esc(H.cuisine) + (H.near ? " near you" : " in " + esc(S.city.name)) : H.near ? "Near you" : "Most popular in " + esc(S.city.name)}</h2></div>
+    <div class="sec"><h2 id="reshead">${H.cuisine ? esc(H.cuisine) + (H.near ? " near you" : " in " + esc(S.city.name)) : H.near ? "Near you" : "Most popular in " + esc(H.areas.length === 1 ? H.areas[0] : S.city.name)}</h2></div>
     <div id="grid"></div>
     <div style="margin-top:8px"><button class="btn pale" id="more" hidden>Show more</button></div>
     <div class="card help" style="margin-top:18px"><div>${ic("help")}</div><div><div class="title">How do I get 50% off?</div><div class="muted">See how Early Bird works</div><a class="learn" href="../#how">Learn more</a></div></div>`,
@@ -946,7 +951,7 @@ async function viewVenue(slug, q) {
       <div id="slots"></div>
       <p class="tiny muted" style="margin-top:10px">${deal.booking_type === "walk_in" ? "Walk-in deal: arrive at your time and show your code." : `Your table is held for ${S.config.hold_minutes || 7} minutes while you check out.`}</p>
       <hr class="rule">
-      <h2 class="title">The deal</h2>
+      <h2 class="title">The deal</h2>${npNote(v)}
       <p style="margin:6px 0"><b>${deal.max_discount || deal.discount}% off your food bill</b>${deal.nodrink_discount ? `, or ${deal.nodrink_discount}% off with nothing extra to order` : ""}.</p>
       ${deal.requirements?.length ? `<p class="small muted">Order rules: ${deal.requirements.map((r) => `${r.per_person} ${esc(r.label.toLowerCase())} per person`).join(", ")}.</p>` : ""}
       <ul class="rules">${(deal.conditions || []).map((c) => `<li>${ic("check")}<span>${esc(c)}</span></li>`).join("")}</ul>` : `<p class="muted">This restaurant doesn't have early tables listed right now.</p>`}
@@ -1023,7 +1028,7 @@ async function viewVenueDesk(v, q) {
       <h2 class="serif">Overview</h2>
       <div class="vinline">${cuisineText(v) ? `<span>${ic("fork")}${esc(cuisineText(v))}</span>` : ""}${v.address ? `<button type="button" class="linklike" id="loc-btn">${ic("pin")}Location</button>` : ""}${menu.length ? `<a href="#menu" id="to-menu">${ic("book")}Menu</a>` : ""}<a href="#contact" id="to-contact">${ic("info")}Contact</a></div>
       <div class="about" id="about"><p>${esc(about)}</p></div>
-      ${deal ? `<h3 class="vh3">The deal</h3><p><b>${deal.max_discount || deal.discount}% off your food bill</b>${deal.nodrink_discount ? `, or ${deal.nodrink_discount}% off with nothing extra to order` : ""}. A booking fee of ${m0(deal.fee_per_diner_cents)} per diner holds the table.</p>` : ""}
+      ${deal ? `<h3 class="vh3">The deal</h3>${npNote(v)}<p><b>${deal.max_discount || deal.discount}% off your food bill</b>${deal.nodrink_discount ? `, or ${deal.nodrink_discount}% off with nothing extra to order` : ""}. A booking fee of ${m0(deal.fee_per_diner_cents)} per diner holds the table.</p>` : ""}
       ${menu.length ? `<div class="menu" id="menu"><h2 class="serif">Menu</h2>${v.deal_menu ? '<p class="muted small">Items marked “On the deal” are covered by the discount.</p>' : ""}
         ${menu.map((s, i) => `<details ${i < 2 ? "open" : ""}><summary>${esc(s.title)}</summary>${s.items.map((it) => `
           <div class="item"><div><span>${esc(it.name)}</span>${v.deal_menu && it.on_deal ? ' <span class="badge">On the deal</span>' : ""}${it.description ? `<div class="d">${esc(it.description)}</div>` : ""}</div><div class="p">${it.price_cents != null ? money(it.price_cents) : ""}</div></div>`).join("")}</details>`).join("")}</div>` : ""}
@@ -1343,6 +1348,7 @@ async function viewCheckout(q) {
         <div class="policy">Cancellations come back as ${esc(CREDIT)} for booking fees on other Early Bird bookings, used first on your next one, for ${cfg.credit_valid_days} days.
         <table><tr><td>Within ${cfg.cancel_full_credit_minutes} minutes of booking</td><td>The whole fee</td></tr><tr><td>Later, before the day</td><td>${cfg.cancel_before_day_percent}% of the fee</td></tr><tr><td>On the day, or no-show</td><td>Nothing</td></tr></table></div></details>
       <div class="lines-m">${linesHtml()}</div>
+      ${npNote(v)}
       <div class="grow-f agree" id="w-c-ok"><label class="check"><input type="checkbox" id="c-ok" ${d.accepted ? "checked" : ""}><span>I agree to the Early Bird conditions, the cancellation policy and the <a href="../terms.html" target="_blank" rel="noopener">booking terms</a></span></label><div class="ferr" id="e-c-ok" role="alert" hidden></div></div>
       <fieldset class="fv"><legend>Been to ${esc(v.name)} before? <em>Optional</em></legend>
         <label><input type="radio" name="c-fv" value="true" ${d.firstVisit === true ? "checked" : ""}><span>First time here</span></label>
@@ -1546,6 +1552,18 @@ function cancelPreview(b) {
   else if (today < b.date) { pct = cfg.cancel_before_day_percent; why = `You're cancelling before the day of the booking, so you get ${pct}% of the fee back.`; }
   return { pct, cents: Math.round((b.fee_cents * pct) / 100), why };
 }
+// Get help on a booking: "Didn't get the discount?" (terms §6: report within 7 days of the booking time; the whole fee
+// comes back, to the card or as credit). By email with the booking details filled in, so nothing is lost.
+function helpCard(b, v) {
+  if (b.status !== "confirmed" && b.status !== "completed" && b.status !== "no_show") return "";
+  const days = (Date.now() - new Date(`${b.date}T12:00:00Z`).getTime()) / 864e5;
+  if (days > 8) return "";
+  const subject = `Didn't get the discount: booking ${b.code || b.id}`;
+  const body = `Restaurant: ${v.name || ""}\nDate and time: ${b.date} ${b.time}\nBooking code: ${b.code || ""}\nBooking id: ${b.id}\n\nWhat happened:\n\nI'd like my booking fee back: to my card / as Early Bird credit (delete one)\n`;
+  return `<div class="card" style="margin-top:14px"><div class="title">Get help</div>
+    <a class="helprow" href="mailto:${SUPPORT}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}"><span><b>Didn't get the discount?</b><small>${isPartner(v) ? "Tell us within 7 days and we'll refund your booking fee and follow it up." : "This restaurant isn't an Early Bird partner yet. Tell us within 7 days and your whole fee comes back, to your card or as credit."}</small></span>${ic("arrow")}</a>
+    <p class="tiny muted" style="margin:8px 0 0">Or email <a href="mailto:${SUPPORT}">${SUPPORT}</a> with your booking code.</p></div>`;
+}
 async function viewBooking(id, q) {
   await loadConfig();
   const b = await rpc("booking", { p_device: deviceId, p_booking: id });
@@ -1573,6 +1591,7 @@ async function viewBooking(id, q) {
         ${v.phone ? `<dt>Phone</dt><dd><a href="tel:${esc(v.phone)}">${esc(v.phone)}</a></dd>` : ""}</dl>
       ${b.reward_cents > 0 && b.status === "confirmed" ? `<p class="small" style="margin:12px 0 0;color:var(--slot)">+${money(b.reward_cents)} ${esc(CREDIT)} for this booking, available after your visit.</p>` : ""}</div>
     <div class="actions">${b.status === "confirmed" ? `<button class="btn pale" id="ics" type="button">Add to calendar</button>` : ""}${v.slug ? `<a class="btn pale" href="#/r/${esc(v.slug)}">Restaurant</a>` : ""}</div>
+    ${helpCard(b, v)}
     ${cancellable ? `<div class="card" style="margin-top:14px"><div class="title">Cancel this booking</div><p class="small muted" style="margin:6px 0 12px">${esc(cp.why)} ${cp.cents ? `That's about <b>${money(cp.cents)}</b> as ${esc(CREDIT)}.` : ""}</p><button class="btn danger" id="cancel" type="button">Cancel booking</button></div>` : ""}`);
   const ics = document.getElementById("ics"); if (ics) ics.onclick = () => downloadIcs(b);
   const cb = document.getElementById("cancel");

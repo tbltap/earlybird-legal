@@ -375,3 +375,21 @@ html.pk-open body.desk .fbar{z-index:45}
 .appplug b{display:block;font-size:16px;font-weight:600}.appplug span{color:var(--muted);font-size:14px}
 .appplug .btn{width:auto;flex:none;padding:12px 20px;font-size:15px;margin:0}
 @media (min-width:1024px){.postview{max-width:880px;margin:0 auto}.posthead .ph-img{aspect-ratio:16/7}}
+
+/* Profile → AI bookings (0213): the row on Profile, the switch, limits (owner, 22 Nov 2026) */
+a.card.airow{display:flex;align-items:center;gap:14px;text-decoration:none;color:inherit}
+a.card.airow>span:nth-child(2){flex:1;min-width:0}
+a.card.airow b{display:block;font-size:16px;font-weight:600}a.card.airow small{color:var(--muted);font-size:14px}
+.ai-ic{flex:none;width:40px;height:40px;border-radius:50%;display:grid;place-items:center;background:var(--well);color:var(--ember)}
+.ai-ic .i{width:20px;height:20px}a.card.airow>.i{width:18px;height:18px;color:var(--muted)}
+.aiswitch{display:flex;align-items:center;gap:16px}
+.aiswitch>div{flex:1;min-width:0}.aiswitch b{display:block;font-size:16px;font-weight:600}.aiswitch small{display:block;color:var(--muted);font-size:14px;margin-top:2px}
+.sw{flex:none;width:52px;height:32px;border-radius:99px;border:0;padding:3px;background:#D6CEC2;cursor:pointer;transition:background .25s}
+.sw i{display:block;width:26px;height:26px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.2);transition:transform .25s cubic-bezier(.2,.7,.2,1)}
+.sw[aria-checked=true]{background:var(--sage,#4F7350)}.sw[aria-checked=true] i{transform:translateX(20px)}
+.ai-lim{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;border-top:1px solid var(--line)}
+.ai-lim:first-of-type{border-top:0}.ai-lim label{font-size:15px}
+.ai-lim select{width:auto;margin:0;padding:8px 12px;border-radius:999px}
+.ai-money{display:inline-flex;align-items:center;gap:4px;color:var(--muted)}.ai-money input{width:78px;margin:0;text-align:center;padding:8px 10px;border-radius:12px}
+.card .item .btn{width:auto;padding:8px 14px;font-size:14px;margin:0}
+@media (prefers-reduced-motion:reduce){.sw,.sw i{transition:none}}

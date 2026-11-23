@@ -405,7 +405,7 @@ async function route() {
     // Restaurants listing themselves (eatearlybird.com/restaurants): its own module, loaded only when opened.
     if (path === "/biz" || path.startsWith("/biz/")) return await (await import("./biz.js" + new URL(import.meta.url).search)).default(path, q);
     if (Auth.session() && store.get(IKEY)) claimInvite();
-    const needsAccount = path === "/bookings" || path.startsWith("/booking/") || path === "/account" || new URLSearchParams(location.search).get("pay");
+    const needsAccount = path === "/account/ai" || path === "/bookings" || path.startsWith("/booking/") || path === "/account" || new URLSearchParams(location.search).get("pay");
     if (!Auth.session() && (needsAccount || path === "/signin")) {
       const sq = new URLSearchParams(location.search);
       const next = sq.get("pay") ? "" : path === "/signin" ? q.next || "#/" : location.hash || "#/";
@@ -421,6 +421,7 @@ async function route() {
     if (path === "/bookings") return await viewBookings();
     if (path.startsWith("/booking/")) return await viewBooking(path.slice(9), q);
     if (path === "/account") return await viewAccount();
+    if (path === "/account/ai") return await viewAiBookings();
     showPage(`<div class="gate"><h1 class="display">Page not found</h1><p><a class="btn" href="#/">Home</a></p></div>`);
   } catch (e) {
     if (e.code === "not_signed_in") {
@@ -1489,9 +1490,11 @@ async function viewAccount() {
       <p class="small muted" style="margin-top:8px">Credit from a cancellation is used first on your next booking fee. Credit you earn is used only when it covers a whole booking fee. It's for booking fees only and has no cash value. <a href="../credit-terms.html">${esc(CREDIT)} terms</a></p>
       ${(cr.credits || []).length ? `<div class="title" style="font-size:16px;margin:14px 0 4px">Expiring soonest</div>${cr.credits.slice(0, 6).map((c) => `<div class="item"><div><span>${esc(c.title)}</span><div class="d">${c.pending ? "Pending" : c.expires_at ? "Use by " + esc(fmtStamp(c.expires_at)) : ""}</div></div><div class="p">${money(c.cents)}</div></div>`).join("")}` : ""}</div>
     ${passCard}${codeCard}
+    <a class="card airow" href="#/account/ai"><span class="ai-ic">${ic("bird")}</span><span><b>AI bookings</b><small id="ai-state">Book from Claude or ChatGPT</small></span>${ic("arrow")}</a>
     <div class="actions"><a class="btn pale" href="#/bookings">Bookings</a><button class="btn grey" id="so" type="button">Sign out</button></div>
     <p class="center small muted" style="margin-top:20px"><a href="../account-deletion.html" style="color:inherit">Delete my account</a></p>`);
   document.getElementById("so").onclick = async () => { await Auth.signOut(); navigate("#/"); };
+  rpc("ai_booking_status").then((a) => { const el = document.getElementById("ai-state"); if (el && a) el.textContent = a.enabled ? `On · ${a.card ? `${cap(a.card.brand || "card")} •• ${a.card.last4}` : "no card"}` : "Off"; }).catch(() => {});
   document.getElementById("codef").onsubmit = async (e) => {
     e.preventDefault();
     const inp = document.getElementById("code-in"), out = document.getElementById("code-msg"), btn = e.target.querySelector("button");
@@ -1541,6 +1544,91 @@ async function viewAccount() {
       });
     };
   };
+}
+
+/* ───────────────────────────── Profile → AI bookings (0213/0216, backend/AI_BOOKINGS.md) ─────────────────────────────
+   One switch (off by default), the card that pays booking fees, two limits, the assistants connected to this account
+   (Supabase Auth OAuth grants) and what they booked. The card is saved with Stripe's Payment Element in setup mode
+   (pay: card_setup → confirmSetup → card_saved); the assistant never sees the card number. */
+async function viewAiBookings() {
+  setTitle("AI bookings");
+  const authFetch = async (path, method = "GET") => {
+    const token = await Auth.token();
+    const r = await fetch(`${CFG.url}/auth/v1${path}`, { method, headers: { apikey: CFG.key, Authorization: `Bearer ${token}` } });
+    if (r.status === 404) return null;   // OAuth server off (the local test stack)
+    if (!r.ok) throw new ApiError(`http_${r.status}`, "That didn't work. Try again.");
+    return r.status === 204 ? true : r.json().catch(() => true);
+  };
+  const [st, hist, grants] = await Promise.all([rpc("ai_booking_status"), rpc("ai_booking_history").catch(() => []), authFetch("/user/oauth/grants").catch(() => null)]);
+  const A = { st, hist: hist || [], grants: Array.isArray(grants) ? grants : grants?.grants || [], msg: "", adding: false };
+  const cardTxt = (c) => `${cap(c.brand || "Card")} •• ${esc(c.last4)}${c.exp_month ? ` <span class="muted">· ${String(c.exp_month).padStart(2, "0")}/${String(c.exp_year).slice(-2)}</span>` : ""}`;
+  const gName = (g) => g.client?.client_name || g.client?.name || g.client_name || g.name || "An assistant";
+  const gId = (g) => g.client?.client_id || g.client?.id || g.client_id || g.id;
+  const who = (c) => (/claude/i.test(c || "") ? "Claude" : /chatgpt|openai/i.test(c || "") ? "ChatGPT" : "An assistant");
+  let stripe = null, elements = null;
+
+  function draw() {
+    const s = A.st, on = !!s.enabled;
+    showPage(`<p style="margin:10px 0 0"><a href="#/account">‹ Profile</a></p>
+      <h1 class="display" style="margin:8px 0 6px">AI bookings</h1>
+      <p class="muted" style="margin:0 0 16px">Let AI assistants book for you. When you ask Claude or ChatGPT for a table, they can book it and pay the booking fee with this card. They never see your card number. Off by default.</p>
+      ${A.msg ? `<div class="msg err" role="alert">${esc(A.msg)}</div>` : ""}
+      <div class="card aiswitch"><div><b>Let assistants book and pay</b><small>${on ? "On. An assistant asks you to confirm each booking in the chat first." : s.card ? "Off. Assistants send you a link to book instead." : "Add a card to switch this on."}</small></div>
+        <button type="button" class="sw" id="ai-sw" role="switch" aria-checked="${on}" aria-label="Let assistants book and pay"><i></i></button></div>
+      <div class="card"><div class="title">Card for booking fees</div>
+        ${A.adding ? `<div id="ai-pe" style="margin:10px 0"></div><div id="ai-pe-msg"></div><div class="actions"><button class="btn" id="ai-save" type="button">Save card</button><button class="btn grey" id="ai-cancel" type="button">Cancel</button></div><p class="tiny muted" style="margin:8px 0 0">By saving it, you let Early Bird charge this card later for the booking fee on bookings an assistant makes for you, after you confirm each one in the chat and within your limits. Stored by Stripe; Early Bird keeps only the brand, last 4 digits and expiry.</p>`
+          : s.card ? `<div class="item"><div><span>${cardTxt(s.card)}</span></div></div><div class="actions"><button class="btn pale" id="ai-add" type="button">Replace card</button><button class="btn grey" id="ai-rm" type="button">Remove</button></div>`
+          : `<p class="small muted" style="margin:6px 0 10px">No card yet.</p><button class="btn pale" id="ai-add" type="button">Add a card</button>`}</div>
+      <div class="card"><div class="title">Limits</div>
+        <div class="ai-lim"><label for="ai-party">Biggest party</label><select id="ai-party">${Array.from({ length: 12 }, (_, i) => `<option value="${i + 1}" ${i + 1 === (s.max_party || 6) ? "selected" : ""}>${i + 1} ${i ? "diners" : "diner"}</option>`).join("")}</select></div>
+        <div class="ai-lim"><label for="ai-fee">Highest booking fee</label><span class="ai-money">$<input id="ai-fee" type="number" inputmode="numeric" min="0" max="200" step="1" value="${Math.round((s.max_fee_cents ?? 3000) / 100)}"></span></div>
+        <p class="small muted" style="margin:8px 0 10px">Bigger parties or higher fees get a link to book yourself instead.</p>
+        <button class="btn pale" id="ai-lims" type="button">Save limits</button></div>
+      <div class="card"><div class="title">Connected assistants</div>
+        ${A.grants.length ? A.grants.map((g) => `<div class="item"><div><span>${esc(gName(g))}</span>${g.granted_at || g.created_at ? `<div class="d">Connected ${esc(fmtStamp(g.granted_at || g.created_at))}</div>` : ""}</div><button class="btn grey ai-dc" type="button" data-id="${esc(gId(g))}">Disconnect</button></div>`).join("")
+          : `<p class="small muted" style="margin:6px 0 0">None yet. Add Early Bird in Claude or ChatGPT to connect one. <a href="../ai/">How</a></p>`}</div>
+      <div class="card"><div class="title">Booked by an assistant</div>
+        ${A.hist.length ? A.hist.map((h) => `<a class="item" href="#/booking/${esc(h.booking_id)}"><div><span>${esc(h.venue)}</span><div class="d">${esc(fmtDate(h.date, { weekday: "short", day: "numeric", month: "short" }))}, ${time12(h.time)} · ${h.party} ${h.party === 1 ? "diner" : "diners"} · ${who(h.client)}${h.status && h.status !== "confirmed" ? ` · ${esc(cap(h.status))}` : ""}</div></div><b>${money(h.fee_cents)}</b></a>`).join("")
+          : `<p class="small muted" style="margin:6px 0 0">Nothing yet.</p>`}</div>`);
+    bind();
+  }
+  const fail = (e) => { A.msg = friendly(e); A.adding = false; draw(); };
+  async function setAi(enabled) {
+    const party = Number(document.getElementById("ai-party").value), fee = Math.min(200, Math.max(0, Math.round(Number(document.getElementById("ai-fee").value) || 0)));
+    try { A.st = { ...A.st, ...(await rpc("set_ai_booking", { p_enabled: enabled, p_max_party: party, p_max_fee_cents: fee * 100 })) }; A.msg = ""; draw(); return true; }
+    catch (e) { if (e.code === "card_required") { A.wantOn = true; await startAdd(); return false; } fail(e); return false; }
+  }
+  async function startAdd() {
+    A.adding = true; A.msg = ""; draw();
+    try {
+      const r = await pay("card_setup");
+      stripe = Stripe(r.publishable_key);
+      elements = stripe.elements({ clientSecret: r.client_secret, appearance: { theme: "stripe", variables: { colorPrimary: "#1C1A17", colorText: "#1C1A17", colorDanger: "#A8401C", fontFamily: "-apple-system, BlinkMacSystemFont, system-ui, sans-serif", borderRadius: "12px", fontSizeBase: "16px" } } });
+      elements.create("payment", { layout: "tabs", paymentMethodOrder: ["card"], wallets: { applePay: "never", googlePay: "never" } }).mount("#ai-pe");
+    } catch (e) { fail(e); }
+  }
+  function bind() {
+    const $ = (id) => document.getElementById(id);
+    $("ai-sw").onclick = () => setAi(!A.st.enabled);
+    $("ai-lims").onclick = async () => { if (await setAi(!!A.st.enabled)) toast("Limits saved."); };
+    if ($("ai-add")) $("ai-add").onclick = startAdd;
+    if ($("ai-cancel")) $("ai-cancel").onclick = () => { A.adding = false; draw(); };
+    if ($("ai-rm")) $("ai-rm").onclick = async () => {
+      if (!confirm("Remove this card? AI bookings switch off.")) return;
+      try { await pay("card_remove"); A.st = await rpc("ai_booking_status"); toast("Card removed."); draw(); } catch (e) { fail(e); }
+    };
+    if ($("ai-save")) $("ai-save").onclick = async () => {
+      const b = $("ai-save"); b.disabled = true; b.textContent = "Saving…";
+      const { error, setupIntent } = await stripe.confirmSetup({ elements, redirect: "if_required", confirmParams: { return_url: location.href } });
+      if (error) { b.disabled = false; b.textContent = "Save card"; $("ai-pe-msg").innerHTML = `<div class="msg err" role="alert">${esc(error.message || "That card didn't work.")}</div>`; return; }
+      try { await pay("card_saved", { setup_intent: setupIntent.id }); A.st = await rpc("ai_booking_status"); A.adding = false; toast("Card saved."); draw(); if (A.wantOn && !A.st.enabled) { A.wantOn = false; await setAi(true); } } catch (e) { fail(e); }
+    };
+    document.querySelectorAll(".ai-dc").forEach((b) => (b.onclick = async () => {
+      b.disabled = true;
+      try { await authFetch(`/user/oauth/grants?client_id=${encodeURIComponent(b.dataset.id)}`, "DELETE"); A.grants = A.grants.filter((g) => gId(g) !== b.dataset.id); toast("Disconnected."); draw(); } catch (e) { fail(e); }
+    }));
+  }
+  draw();
 }
 
 /* ───────────────────────────── shared with biz.js (the restaurant pages) ───────────────────────────── */

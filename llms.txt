@@ -4,7 +4,6 @@
 
 ## Key pages
 
-- [How Early Bird works](https://eatearlybird.com/?about): what Early Bird is, how it works, costs
 - [Book a table](https://eatearlybird.com/book/): live restaurants and open times (interactive app)
 - [Restaurant deals in New York](https://eatearlybird.com/new-york/)
 - [Restaurant deals in Los Angeles](https://eatearlybird.com/los-angeles/)
@@ -13,7 +12,6 @@
 
 ## Book from an AI assistant
 
-- [How to book from Claude or ChatGPT](https://eatearlybird.com/ai/)
 - MCP server (Streamable HTTP, no sign-in for search): https://xopcdblqmmrvyocqomqz.supabase.co/functions/v1/mcp
   Tools: search_deals, restaurant, availability, start_booking (returns a link to Early Bird's checkout; payment is never taken in chat).
 
@@ -30,7 +28,7 @@
 - [BADMAASH](https://eatearlybird.com/restaurant/badmaashvenice/): Venice, Los Angeles; 50% off food
 - [Barney's Beanery](https://eatearlybird.com/restaurant/barneysbeanery/): Santa Monica, Los Angeles; 50% off food
 - [Beach & Brew Venice](https://eatearlybird.com/restaurant/beachandbrewvenice/): Venice, Los Angeles; 50% off food
-- [Beach Pizza - Los Angeles](https://eatearlybird.com/restaurant/beach-pizza-la-demo/): Venice, Los Angeles; 50% off food
+- [Beach Pizza - Los Angeles](https://eatearlybird.com/restaurant/beach-pizza-la/): Venice, Los Angeles; 50% off food
 - [Belles Beach House](https://eatearlybird.com/restaurant/bellesbeachhouse/): Venice, Los Angeles; 50% off food
 - [Benihana Santa Monica](https://eatearlybird.com/restaurant/benihanasantamonica/): Santa Monica, Los Angeles; 50% off food
 - [Benny's](https://eatearlybird.com/restaurant/bennys/): Santa Monica, Los Angeles; 50% off food
@@ -40,9 +38,9 @@
 - [Blue Ribbon Sushi Bar & Grill](https://eatearlybird.com/restaurant/blueribbonsushibargrill/): Fairfax, Los Angeles; 50% off food
 - [BOA Steakhouse](https://eatearlybird.com/restaurant/boasteakhouse/): Santa Monica, Los Angeles; 50% off food
 - [Bobby's Pizzeria](https://eatearlybird.com/restaurant/bobbys-pizzeria-los-angeles/): Fairfax, Los Angeles; 50% off food
-- [BRADO NYCThinCrust Pizza - Brado](https://eatearlybird.com/restaurant/brado-nycthincrust-pizza-brado-demo/): Brooklyn Heights, New York; 50% off food
+- [BRADO NYCThinCrust Pizza - Brado](https://eatearlybird.com/restaurant/brado-nycthincrust-pizza-brado/): Brooklyn Heights, New York; 50% off food
 - [BRAVO PIZZA](https://eatearlybird.com/restaurant/bravo-pizza/): Gramercy, New York; 50% off food
-- [Broad Nosh Bagels](https://eatearlybird.com/restaurant/broad-nosh-bagels-2-314-west-58th-demo/): Hell's Kitchen, New York; 50% off food
+- [Broad Nosh Bagels](https://eatearlybird.com/restaurant/broad-nosh-bagels-2-314-west-58th/): Hell's Kitchen, New York; 50% off food
 - [Brooklyn Bagel](https://eatearlybird.com/restaurant/brooklyn-bagel-williamsburg/): Williamsburg, New York; 50% off food
 - [Brooklyn Bread Cafe](https://eatearlybird.com/restaurant/brooklyn-bread-cafe/): Tribeca, New York; 50% off food
 - [Bruno's Italian Restaurant](https://eatearlybird.com/restaurant/brunositalianrestaurant/): Santa Monica, Los Angeles; 50% off food
@@ -97,7 +95,7 @@
 - [MARELLE Santa Monica](https://eatearlybird.com/restaurant/marellesantamonica/): Santa Monica, Los Angeles; 50% off food
 - [Market](https://eatearlybird.com/restaurant/market/): Venice, Los Angeles; 50% off food
 - [Meat On Ocean](https://eatearlybird.com/restaurant/meatonocean/): Santa Monica, Los Angeles; 50% off food
-- [Mee Dee Thai Kitchen](https://eatearlybird.com/restaurant/mee-dee-thai-demo/): Fairfax, Los Angeles; 50% off food
+- [Mee Dee Thai Kitchen](https://eatearlybird.com/restaurant/mee-dee-thai/): Fairfax, Los Angeles; 50% off food
 - [Mélisse](https://eatearlybird.com/restaurant/melisse/): Santa Monica, Los Angeles; 50% off food
 - [Michael's](https://eatearlybird.com/restaurant/michaels/): Santa Monica, Los Angeles; 50% off food
 - [Milo & Olive](https://eatearlybird.com/restaurant/miloandolive/): Santa Monica, Los Angeles; 50% off food
@@ -106,7 +104,7 @@
 - [Nalu Vida Venice Beach](https://eatearlybird.com/restaurant/naluvidavenicebeach/): Venice, Los Angeles; 50% off food
 - [Namoo Korean BBQ](https://eatearlybird.com/restaurant/namookoreanbbq/): Venice, Los Angeles; 50% off food
 - [Night + Market Sahm (Venice)](https://eatearlybird.com/restaurant/nightmarketsahmvenice/): Venice, Los Angeles; 50% off food
-- [Noshi Sushi](https://eatearlybird.com/restaurant/noshi-sushi-demo/): Koreatown, Los Angeles; 50% off food
+- [Noshi Sushi](https://eatearlybird.com/restaurant/noshi-sushi/): Koreatown, Los Angeles; 50% off food
 - [Not No Bar](https://eatearlybird.com/restaurant/notnobar/): Santa Monica, Los Angeles; 50% off food
 - [Olea](https://eatearlybird.com/restaurant/olea/): Fort Greene, New York; 50% off food
 - [Orto Santa Monica](https://eatearlybird.com/restaurant/ortosantamonica/): Santa Monica, Los Angeles; 50% off food
@@ -120,7 +118,7 @@
 - [PLANTA Cocina Marina Del Rey](https://eatearlybird.com/restaurant/plantacocinamarinadelrey/): Venice, Los Angeles; 50% off food
 - [Rock N' Pies Pizza](https://eatearlybird.com/restaurant/rocknpiespizza/): Santa Monica, Los Angeles; 50% off food
 - [Rocky's Pizzeria](https://eatearlybird.com/restaurant/rocky-s-pizzeria/): Murray Hill, New York; 50% off food
-- [Ronan](https://eatearlybird.com/restaurant/ronan-demo/): West Hollywood, Los Angeles; 50% off food
+- [Ronan](https://eatearlybird.com/restaurant/ronan/): West Hollywood, Los Angeles; 50% off food
 - [Rosti Tuscan Kitchen - Santa Monica](https://eatearlybird.com/restaurant/rostituscankitchensantamonica/): Santa Monica, Los Angeles; 50% off food
 - [Rustic Canyon](https://eatearlybird.com/restaurant/rusticcanyon/): Santa Monica, Los Angeles; 50% off food
 - [Salt](https://eatearlybird.com/restaurant/salt/): Venice, Los Angeles; 50% off food
@@ -145,8 +143,8 @@
 - [TerraTorry](https://eatearlybird.com/restaurant/terratorry/): Santa Monica, Los Angeles; 50% off food
 - [The Backyard](https://eatearlybird.com/restaurant/thebackyard/): Santa Monica, Los Angeles; 50% off food
 - [The Brixton](https://eatearlybird.com/restaurant/thebrixton/): Sawtelle, Los Angeles; 50% off food
-- [The Butcher's Daughter](https://eatearlybird.com/restaurant/thebutchersdaughterwilliamsburg/): Williamsburg, New York; 50% off food
 - [The Butcher's Daughter](https://eatearlybird.com/restaurant/thebutchersdaughtervenice/): Venice, Los Angeles; 50% off food
+- [The Butcher's Daughter](https://eatearlybird.com/restaurant/thebutchersdaughterwilliamsburg/): Williamsburg, New York; 50% off food
 - [The Courtyard Kitchen](https://eatearlybird.com/restaurant/thecourtyardkitchen/): Santa Monica, Los Angeles; 50% off food
 - [The Galley](https://eatearlybird.com/restaurant/thegalley/): Santa Monica, Los Angeles; 50% off food
 - [The Lobster](https://eatearlybird.com/restaurant/thelobster/): Santa Monica, Los Angeles; 50% off food
@@ -157,7 +155,7 @@
 - [Trattoria Amici](https://eatearlybird.com/restaurant/trattoriaamicisantamonica/): Santa Monica, Los Angeles; 50% off food
 - [Two Boots Pizza West Village](https://eatearlybird.com/restaurant/two-boots-pizza-west-village/): Greenwich Village, New York; 50% off food
 - [Venice Steakhouse](https://eatearlybird.com/restaurant/venicesteakhouse/): Venice, Los Angeles; 50% off food
-- [VEZZO NYCThinCrust Pizza - Vezzo](https://eatearlybird.com/restaurant/vezzo-nycthincrust-pizza-vezzo-demo/): Murray Hill, New York; 50% off food
+- [VEZZO NYCThinCrust Pizza - Vezzo](https://eatearlybird.com/restaurant/vezzo-nycthincrust-pizza-vezzo/): Murray Hill, New York; 50% off food
 - [Wallflower](https://eatearlybird.com/restaurant/wallflower/): Venice, Los Angeles; 50% off food
 - [Wally's Santa Monica](https://eatearlybird.com/restaurant/wallyssantamonica/): Santa Monica, Los Angeles; 50% off food
 - [Wally's Wine And Spirits](https://eatearlybird.com/restaurant/wallyswineandspirits/): Beverly Hills, Los Angeles; 50% off food
@@ -170,7 +168,7 @@
 - [Yamashiro](https://eatearlybird.com/restaurant/yamashiro/): Fort Greene, New York; 50% off food
 - [Ye Olde Kings Head](https://eatearlybird.com/restaurant/yeoldekingshead/): Santa Monica, Los Angeles; 50% off food
 - [Zinqué (zin-kae) Venice](https://eatearlybird.com/restaurant/zinquezinkaevenice/): Venice, Los Angeles; 50% off food
-- [Zutto -TriBeCa](https://eatearlybird.com/restaurant/zutto-tribeca-demo/): Tribeca, New York; 50% off food
+- [Zutto -TriBeCa](https://eatearlybird.com/restaurant/zutto-tribeca/): Tribeca, New York; 50% off food
 
 ## Facts
 

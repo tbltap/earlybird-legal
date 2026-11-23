@@ -25,6 +25,7 @@ const ERRS = {
   venue_not_found: "We couldn't find that restaurant.",
   claim_not_pending: "This claim was already decided.",
   owners_only: "Only the owner can accept the terms.",
+  discount_below_minimum: "Early Bird deals are at least 50% off food. Choose 50% or more.",
   terms_required: "Accept the Restaurant Terms first.",
   location_needed: "We couldn't place your address on the map, so it can't go live yet. Early Bird will fix the location and tell you.",
   too_many_documents: "That's the most documents you can send for one claim.",

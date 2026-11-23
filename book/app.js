@@ -86,6 +86,7 @@ const ERR = {
   code_busy: "Please try again in a moment.",
   payments_not_configured: "Card payments aren't switched on yet. Please try again later.",
   config_unavailable: "Payments are temporarily unavailable. Please try again.",
+  not_yet_bookable: "This restaurant isn't taking Early Bird bookings yet. Tap Notify me and we'll tell you in the app when it does.",
 };
 class ApiError extends Error { constructor(code, message, status) { super(message || code); this.code = code; this.status = status; } }
 const friendly = (e) => (e?.code === "overlapping_booking" && e.details) || ERR[e?.code] || (e?.code && !/^http_|^\d+$|^PGRST|^\d{5}$/.test(e.code) && /\s/.test(e.message) ? e.message : null) || "Something went wrong. Please try again.";
@@ -616,6 +617,29 @@ function thumbHtml(v) {
   const img = v.photo || (v.dish_photos || [])[0];
   return `<div class="thumb">${esc((v.name || "?").charAt(0))}${img ? `<img src="${esc(img)}" alt="" loading="lazy" onerror="this.remove()">` : ""}</div>`;
 }
+/* Preview listings (backend 0263, 23 Nov 2026): a listed restaurant that hasn't joined Early Bird (not a partner on the
+   current terms, or still on a demo deal) is a preview. Guests see it with its photos, menu and deal, but no times and no
+   Book; instead a Notify me (api.notify_when_bookable, signed in) so the app tells them when it takes bookings. Testers
+   get can_book true and book it as a test booking. Wording: "Not on Early Bird yet" and "if they join", not "coming
+   soon", because the restaurant hasn't agreed to anything (see the Restaurant Terms notes on unclaimed listings). */
+const isPreview = (v) => !!(v && v.preview && v.can_book === false);
+const pvOff = (v) => v?.deal?.max_discount || v?.deal?.discount || 50;
+const notifyBtn = (v) => `<button type="button" class="btn pale pvbtn" data-notify="${esc(v.id)}" aria-pressed="${!!v.notify_subscribed}">${ic("bell")}<span>${v.notify_subscribed ? "We'll tell you" : "Notify me"}</span></button>`;
+const previewHtml = (v) => `<div class="pvnote"><div class="pvtxt"><b>Not on Early Bird yet</b><span>If ${esc(v.name || "they")} ${v.name ? "joins" : "join"}, it's ${pvOff(v)}% off food. We'll tell you in the Early Bird app when you can book.</span></div>${notifyBtn(v)}</div>`;
+document.addEventListener("click", async (e) => {
+  const b = e.target.closest && e.target.closest("[data-notify]"); if (!b) return;
+  e.preventDefault(); e.stopPropagation();
+  if (!Auth.session()) return navigate(`#/signin?next=${encodeURIComponent(location.hash || "#/")}`);
+  const on = b.getAttribute("aria-pressed") !== "true";
+  b.disabled = true;
+  try {
+    const r = await rpc("notify_when_bookable", { p_venue: b.dataset.notify, p_on: on });
+    if (r?.bookable) { toast("Good news: you can book this restaurant now."); return route(); }
+    const now = !!r?.notify_subscribed;
+    document.querySelectorAll(`[data-notify="${CSS.escape(b.dataset.notify)}"]`).forEach((x) => { x.setAttribute("aria-pressed", String(now)); x.querySelector("span").textContent = now ? "We'll tell you" : "Notify me"; });
+    toast(now ? "We'll tell you in the app when you can book." : "Notifications off for this restaurant.");
+  } catch (err) { toast(friendly(err)); } finally { b.disabled = false; }
+});
 function resultHtml(v) {
   const d = v.deal, a = v._avail;
   const href = `#/r/${esc(v.slug)}?meal=${H.meal}&diners=${H.diners}`;
@@ -632,6 +656,8 @@ function resultHtml(v) {
         ${rest > 0 ? `<a class="slot more" href="${href}&date=${day.date}">${rest} more</a>` : ""}</div>`;
     }).join("");
   }
+  if (isPreview(v)) return `<article class="res pv"><a class="head" href="${href}">${thumbHtml(v)}<div><div class="nm">${esc(v.name)}</div><div class="meta">${esc(sub)}</div></div></a>
+    ${previewHtml(v)}</article>`;
   return `<article class="res"><a class="head" href="${href}">${thumbHtml(v)}<div><div class="nm">${esc(v.name)}</div><div class="meta">${esc(sub)}</div>${v._note ? `<div class="pnote">${esc(v._note)}</div>` : ""}</div></a>
     ${d ? `<div class="chips chiprow"><span class="pill">${ic("card")}${m0(d.fee_per_diner_cents)} booking fee</span><span class="pill">${ic("bird")}+${m0(S.config.reward_per_booking_cents || 0)} credit</span></div>` : ""}
     ${cols ? `<div class="days">${cols}</div>` : d ? `<p class="muted small" style="padding:12px 18px 0">No ${H.meal} tables listed.</p>` : ""}</article>`;
@@ -947,10 +973,10 @@ function resultHtmlDesk(v) {
   }
   const where = [distTxt(v) && `<b class="dist">${distTxt(v)}</b>`, v.area && `${ic("pin")}${esc(v.area)}`, cuisineText(v) && `${ic("fork")}${esc(cuisineText(v))}`, priceTxt(v)].filter(Boolean).join("");
   return `<article class="drow"><a class="dthumb" href="${href}">${esc((v.name || "?").charAt(0))}${(v.photo || v.dish_photos?.[0]) ? `<img src="${esc(v.photo || v.dish_photos[0])}" alt="" loading="lazy" onerror="this.remove()">` : ""}${v.rating >= 4.7 && v.review_count >= 20 ? '<span class="ribbon">Top rated</span>' : ""}</a>
-    <div class="dbody"><div class="dtop"><a class="dname" href="${href}">${esc(v.name)} <span aria-hidden="true">›</span></a>${v.rating != null ? `<span class="drate">${Number(v.rating).toFixed(1)} ${stars5(v.rating)} <span class="muted">(${v.review_count})</span></span>` : '<span class="drate muted">New on Early Bird</span>'}</div>
-      <div class="dwhere">${where}</div>${v._note ? `<div class="pnote">${esc(v._note)}</div>` : ""}
+    <div class="dbody"><div class="dtop"><a class="dname" href="${href}">${esc(v.name)} <span aria-hidden="true">›</span></a>${v.rating != null ? `<span class="drate">${Number(v.rating).toFixed(1)} ${stars5(v.rating)} <span class="muted">(${v.review_count})</span></span>` : isPreview(v) ? "" : '<span class="drate muted">New on Early Bird</span>'}</div>
+      <div class="dwhere">${where}</div>${isPreview(v) ? previewHtml(v) + "</div></article>" : `${v._note ? `<div class="pnote">${esc(v._note)}</div>` : ""}
       ${d ? `<div class="dfacts"><span>${ic("card")}${m0(d.fee_per_diner_cents)} booking fee per diner</span><span>${ic("bird")}+${m0(S.config.reward_per_booking_cents || 0)} ${esc(CREDIT)}</span></div>` : ""}
-      ${cols ? `<div class="ddays">${cols}</div>` : d ? `<p class="muted small">No ${H.meal} tables in these days.</p>` : ""}</div></article>`;
+      ${cols ? `<div class="ddays">${cols}</div>` : d ? `<p class="muted small">No ${H.meal} tables in these days.</p>` : ""}</div></article>`}`;
 }
 const priceTxt = (v) => (v.price_tier ? `<span class="price">${"$".repeat(v.price_tier)}</span>` : "");
 // Map of the current results: Leaflet + OpenStreetMap tiles, loaded only when the map is opened.
@@ -1000,13 +1026,18 @@ async function viewVenue(slug, q) {
   showPage(`
     <div class="hero">${img ? `<img src="${esc(img)}" alt="" onerror="this.remove()">` : ""}<a class="round l" href="#/" aria-label="Back">${ic("back")}</a></div>
     <h1 class="vtitle">${esc(v.name)}</h1>
-    ${v.rating != null ? `<div class="info"><span class="stars">★</span><span>${Number(v.rating).toFixed(1)}${v.review_count ? ` (${visitsTxt(v.review_count)})` : ""}</span></div>` : `<div class="info">${ic("bird")}<span>New on Early Bird</span></div>`}
+    ${v.rating != null ? `<div class="info"><span class="stars">★</span><span>${Number(v.rating).toFixed(1)}${v.review_count ? ` (${visitsTxt(v.review_count)})` : ""}</span></div>` : isPreview(v) ? "" : `<div class="info">${ic("bird")}<span>New on Early Bird</span></div>`}
     ${v.address ? `<div class="info">${ic("pin")}<a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(v.name + " " + v.address)}" target="_blank" rel="noopener" style="color:inherit">${esc(v.address)}</a></div>` : ""}
     ${cuisineText(v) ? `<div class="info">${ic("fork")}<span>${esc(cuisineText(v))}</span></div>` : ""}
     ${v.description ? `<p style="margin:10px 0">${esc(v.description)}</p>` : ""}
     ${menu.length ? `<a class="btn pale" href="#menu" id="menu-btn" style="margin:14px 0">${ic("book")}&nbsp; Menu</a>` : ""}
     <hr class="rule">
-    ${deal ? `<h2 class="title" style="font-size:26px">Availability</h2>
+    ${deal && isPreview(v) ? `<h2 class="title" style="font-size:26px">Availability</h2>${previewHtml(v)}
+      <hr class="rule">
+      <h2 class="title">The deal, if they join</h2>
+      <p style="margin:6px 0"><b>${deal.max_discount || deal.discount}% off your food bill</b>${deal.nodrink_discount ? `, or ${deal.nodrink_discount}% off with nothing extra to order` : ""}.</p>
+      ${deal.requirements?.length ? `<p class="small muted">Order rules: ${deal.requirements.map((r) => `${r.per_person} ${esc(r.label.toLowerCase())} per person`).join(", ")}.</p>` : ""}`
+    : deal ? `<h2 class="title" style="font-size:26px">Availability</h2>
       <div class="assure"><span>${ic("cal")}Guaranteed booking</span><span>${ic("cancel")}Flexible cancellation</span></div>
       <div class="filters">
         <label>${ic("fork")}<select id="b-meal" aria-label="Meal">${meals.map((m) => `<option value="${m}" ${m === B.meal ? "selected" : ""}>${m[0].toUpperCase() + m.slice(1)}</option>`).join("")}</select></label>
@@ -1026,10 +1057,10 @@ async function viewVenue(slug, q) {
         <div class="item"><div><span>${esc(it.name)}</span>${v.deal_menu && it.on_deal ? ' <span class="badge">On the deal</span>' : ""}${it.description ? `<div class="d">${esc(it.description)}</div>` : ""}</div><div class="p">${it.price_cents != null ? money(it.price_cents) : ""}</div></div>`).join("")}</details>`).join("")}</div>` : ""}
     <hr class="rule"><h2 class="title" style="margin-bottom:8px">Opening hours</h2><table class="hours">${hoursRows}</table>
     ${(v.reviews || []).length ? `<hr class="rule"><h2 class="title" style="margin-bottom:6px">Reviews</h2>${v.reviews.map((r) => `<div class="review"><div><span class="stars">${"★".repeat(r.rating)}</span> <b>${esc(r.author)}</b> ${r.verified ? '<span class="status ok">Verified visit</span>' : ""}${r.edited ? ' <span class="muted small">· Edited</span>' : ""}</div>${r.text ? `<div>${esc(r.text)}</div>` : ""}${revExtras(r, v)}</div>`).join("")}` : ""}
-    ${deal ? `<div class="stickybook"><div class="in"><button class="btn" id="b-go">Book</button></div></div>` : ""}`, { wash: false });
+    ${deal && !isPreview(v) ? `<div class="stickybook"><div class="in"><button class="btn" id="b-go">Book</button></div></div>` : ""}`, { wash: false });
   const mb = document.getElementById("menu-btn");
   if (mb) mb.onclick = (e) => { e.preventDefault(); document.getElementById("menu").scrollIntoView({ behavior: "smooth" }); };
-  if (!deal) return;
+  if (!deal || isPreview(v)) return;
   const slotsEl = document.getElementById("slots"), goBtn = document.getElementById("b-go");
   async function fetchAvail() {
     B.loading = true; B.time = null; drawSlots();
@@ -1077,12 +1108,12 @@ async function viewVenueDesk(v, q) {
   const menu = (v.menu || []).filter((s) => (s.items || []).length);
   const reviews = v.reviews || [];
   const rules = [...(deal?.requirements || []).map((r) => `Order ${r.per_person} ${r.label.toLowerCase()} per person`), ...(deal?.conditions || [])];
-  const about = v.description || `${v.name}${cuisineText(v) ? ` serves ${cuisineText(v)}` : " is a restaurant"}${v.area ? ` in ${v.area}` : ""}. Book an early table on Early Bird and get ${deal ? deal.max_discount || deal.discount : 50}% off your food bill.`;
+  const about = v.description || `${v.name}${cuisineText(v) ? ` serves ${cuisineText(v)}` : " is a restaurant"}${v.area ? ` in ${v.area}` : ""}.${isPreview(v) ? ` It isn't on Early Bird yet. If it joins, its Early Bird deal is ${pvOff(v)}% off your food bill.` : ` Book an early table on Early Bird and get ${deal ? deal.max_discount || deal.discount : 50}% off your food bill.`}`;
   const tile = (src, i) => `<button type="button" class="gtile" data-ph="${i}">${src ? `<img src="${esc(src)}" alt="" loading="lazy" onerror="this.remove()">` : ""}</button>`;
   showRaw(`<div class="wide">
     <div class="crumbs vcrumbs"><a href="#/">${esc(v.city || "Restaurants")}</a>${v.area ? `<span>/</span><a href="#/?${new URLSearchParams({ city: city?.slug || "", a: v.area })}">${esc(v.area)}</a>` : ""}<span>/</span>${esc(v.name)}</div>
     <div class="vhead"><div><h1>${esc(v.name)}</h1>
-      <div class="vrate">${v.rating != null ? `${stars5(v.rating)} <a href="#reviews" id="to-rev">${visitsTxt(v.review_count)}</a>` : `${ic("bird")} New on Early Bird`}</div></div>
+      <div class="vrate">${v.rating != null ? `${stars5(v.rating)} <a href="#reviews" id="to-rev">${visitsTxt(v.review_count)}</a>` : isPreview(v) ? "" : `${ic("bird")} New on Early Bird`}</div></div>
       <div class="vlinks">${v.website ? `<a href="${esc(v.website)}" target="_blank" rel="noopener" aria-label="Website">${ic("share")}</a>` : ""}${v.phone ? `<a href="tel:${esc(v.phone)}" aria-label="Phone">${ic("info")}</a>` : ""}</div></div>
   </div>
   <div class="gallery ${photos.length > 1 ? "" : "one"}">
@@ -1094,7 +1125,7 @@ async function viewVenueDesk(v, q) {
       <h2 class="serif">Overview</h2>
       <div class="vinline">${cuisineText(v) ? `<span>${ic("fork")}${esc(cuisineText(v))}</span>` : ""}${v.address ? `<button type="button" class="linklike" id="loc-btn">${ic("pin")}Location</button>` : ""}${menu.length ? `<a href="#menu" id="to-menu">${ic("book")}Menu</a>` : ""}<a href="#contact" id="to-contact">${ic("info")}Contact</a></div>
       <div class="about" id="about"><p>${esc(about)}</p></div>
-      ${deal ? `<h3 class="vh3">The deal</h3>${npNote(v)}<p><b>${deal.max_discount || deal.discount}% off your food bill</b>${deal.nodrink_discount ? `, or ${deal.nodrink_discount}% off with nothing extra to order` : ""}. A booking fee of ${m0(deal.fee_per_diner_cents)} per diner holds the table.</p>` : ""}
+      ${deal ? `<h3 class="vh3">${isPreview(v) ? "The deal, if they join" : "The deal"}</h3>${isPreview(v) ? "" : npNote(v)}<p><b>${deal.max_discount || deal.discount}% off your food bill</b>${deal.nodrink_discount ? `, or ${deal.nodrink_discount}% off with nothing extra to order` : ""}.${isPreview(v) ? "" : ` A booking fee of ${m0(deal.fee_per_diner_cents)} per diner holds the table.`}</p>` : ""}
       ${menu.length ? `<div class="menu" id="menu"><h2 class="serif">Menu</h2>${v.deal_menu ? '<p class="muted small">Items marked “On the deal” are covered by the discount.</p>' : ""}
         ${menu.map((s, i) => `<details ${i < 2 ? "open" : ""}><summary>${esc(s.title)}</summary>${s.items.map((it) => `
           <div class="item"><div><span>${esc(it.name)}</span>${v.deal_menu && it.on_deal ? ' <span class="badge">On the deal</span>' : ""}${it.description ? `<div class="d">${esc(it.description)}</div>` : ""}</div><div class="p">${it.price_cents != null ? money(it.price_cents) : ""}</div></div>`).join("")}</details>`).join("")}</div>` : ""}
@@ -1107,7 +1138,8 @@ async function viewVenueDesk(v, q) {
           <dl class="kv">${v.address ? `<dt>Address</dt><dd><a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(v.name + " " + v.address)}" target="_blank" rel="noopener">${esc(v.address)}</a></dd>` : ""}${v.phone ? `<dt>Phone</dt><dd><a href="tel:${esc(v.phone)}">${esc(v.phone)}</a></dd>` : ""}${v.website ? `<dt>Website</dt><dd><a href="${esc(v.website)}" target="_blank" rel="noopener">${esc(v.website.replace(/^https?:\/\/(www\.)?/, "").replace(/\/$/, ""))}</a></dd>` : ""}</dl></div></div>
     </div>
     <aside class="vbook" id="vbook">
-      ${deal ? `<h2 class="serif">Book early and save ${deal.max_discount || deal.discount}% on food</h2>
+      ${deal && isPreview(v) ? `<h2 class="serif">${pvOff(v)}% off food, if they join</h2>${previewHtml(v)}`
+      : deal ? `<h2 class="serif">Book early and save ${deal.max_discount || deal.discount}% on food</h2>
         <div class="assure"><span>${ic("check")}Guaranteed booking</span><span>${ic("cancel")}Flexible cancellation</span></div>
         <div class="vsel"><label>${ic("fork")}<select id="b-meal" aria-label="Meal">${meals.map((m) => `<option value="${m}" ${m === B.meal ? "selected" : ""}>${cap(m)}</option>`).join("")}</select></label>
           <label>${ic("person")}<select id="b-diners" aria-label="Diners">${Array.from({ length: maxD }, (_, i) => i + 1).map((n) => `<option ${n === B.diners ? "selected" : ""} value="${n}">${n} ${n === 1 ? "diner" : "diners"}</option>`).join("")}</select></label></div>
@@ -1133,7 +1165,7 @@ async function viewVenueDesk(v, q) {
       <a class="ncard" href="#/r/${esc(r.slug)}?meal=${B.meal}&diners=${B.diners}"><div class="nph">${esc(r.name.charAt(0))}${(r.photo || r.dish_photos?.[0]) ? `<img src="${esc(r.photo || r.dish_photos[0])}" alt="" loading="lazy" onerror="this.remove()">` : ""}</div>
         <b>${esc(r.name)}</b><span>${esc([r.area, (r.cuisines || [])[0]].filter(Boolean).join(" • "))}</span>${r.rating != null ? `<span>${stars5(r.rating)} ${Number(r.rating).toFixed(1)}</span>` : ""}</a>`).join("")}</div>`;
   }).catch(() => {});
-  if (!deal) return;
+  if (!deal || isPreview(v)) return;
   const slotsEl = document.getElementById("slots");
   async function fetchAvail() {
     slotsEl.innerHTML = '<p class="loading">Checking tables…</p>';
@@ -1323,11 +1355,13 @@ async function viewCheckout(q) {
   const v = C.venue;
   // overlapping_booking (0220): one table per 90 minutes, any restaurant; the server's line says which one, with a link to it
   const out = (msg, e) => { const other = e?.code === "overlapping_booking" && e.hint;
+    if (e?.code === "not_yet_bookable") return showPage(`<div class="sheethead"><h1>${esc(v.name)}</h1><a class="x" href="#/r/${esc(v.slug)}" aria-label="Close">${ic("x")}</a></div>${previewHtml(v)}<a class="btn pale" href="#/r/${esc(v.slug)}" style="margin-top:12px">See ${esc(v.name)}</a>`, { wash: false });
     showPage(`<div class="sheethead"><h1>${other ? "You already have a table then" : "Couldn't hold that table"}</h1><a class="x" href="#/r/${esc(v.slug)}" aria-label="Close">${ic("x")}</a></div><div class="msg err">${esc(msg)}</div>${other ? `<a class="btn" href="#/booking/${esc(other)}">View booking</a><a class="btn pale" href="#/r/${esc(v.slug)}" style="margin-top:10px">Choose another time</a>` : `<a class="btn" href="#/r/${esc(v.slug)}">Choose another time</a>`}`, { wash: false }); };
   const makeHold = async () => { C.hold = await rpc("hold", { p_device: deviceId, p_deal: wanted.deal, p_date: wanted.date, p_time: wanted.time, p_diners: wanted.diners, p_meal: wanted.meal, p_option: wanted.option }); };
   const hd = () => C.hold;
   const payNeeded = () => hd().payment_mode === "stripe" && hd().amount_due_cents > 0;
   const prepPayment = async () => { C.intent = payNeeded() && !guest ? await pay("intent", { claim_id: hd().booking_id }) : null; };
+  if (isPreview(v)) return out(ERR.not_yet_bookable, { code: "not_yet_bookable" });   // don't even try to hold
   try { await makeHold(); await prepPayment(); } catch (e) { if (e.code === "not_signed_in") throw e; return out(friendly(e), e); }
   C.details = { name: [profile.first_name, profile.last_name].filter(Boolean).join(" ").replace(/^Early Bird diner$/, ""), phone: profile.phone || "", request: "", share: true, marketing: false, accepted: false, venueRef: "", bookedWithVenue: false, firstVisit: null };
   // Back from signing in: put back what the visitor had typed (same table only), then they pay.
@@ -1353,7 +1387,8 @@ async function viewCheckout(q) {
   const reqText = () => (hd().requirements || []).map((r) => `${r.per_person} ${r.label.toLowerCase()} per person`).join(", ");
   const rules = () => { const r = [...(v.deal?.conditions || [])]; if (reqText() && hd().option !== "nodrink") r.unshift(`Order ${reqText()}`); if (!r.some((c) => /15 ?min/i.test(c))) r.unshift("Arrive within 15 minutes of your time"); return r; };
   const cfg = S.config;
-  const testBadge = (mode) => (mode === "test" ? '<span class="testbadge">TEST MODE · card 4242 4242 4242 4242</span>' : "");
+  // a tester's booking at a preview restaurant (0263): Stripe test mode, nothing is charged
+  const testBadge = (mode) => (hd()?.is_test ? '<span class="testbadge">Test booking: no real charge · card 4242 4242 4242 4242</span>' : mode === "test" ? '<span class="testbadge">TEST MODE · card 4242 4242 4242 4242</span>' : "");
   const due = () => (C.intent ? C.intent.amount_cents : hd().amount_due_cents);
   const goLabel = () => (guest ? "Continue" : payNeeded() ? `Pay ${money(due())} and book` : "Book now");
 
@@ -1640,9 +1675,10 @@ async function viewBooking(id, q) {
   }
   const v = b.venue || {}, walkIn = b.booking_type === "walk_in";
   const isNew = q.new === "1" && b.status === "confirmed";
+  const testNote = b.is_test ? '<div class="msg info"><b>Test booking: no real charge.</b> This restaurant isn\'t on Early Bird yet, so this booking is for testing only.</div>' : "";
   const cancellable = b.status === "confirmed" && b.date >= todayAt(v.timezone);
   const cp = cancellable ? cancelPreview(b) : null;
-  showPage(`
+  showPage(`${testNote}
     ${isNew ? `<div class="center"><div class="tick" aria-hidden="true">${ic("check")}</div><h1 class="display">Booking successful</h1><p class="muted" style="margin-top:6px">Show this code to the staff when you order.</p></div>` : `<div class="sheethead"><h1>Your booking ${statusPill(b)}</h1></div>`}
     ${b.status === "confirmed" ? `<div class="card" style="margin-top:16px"><div class="center muted small">${walkIn ? "Walk-in deal" : "Table booking"}</div><div class="code" aria-label="Booking code ${esc(b.code)}">${esc(b.code)}</div>
       <p class="center small muted" style="margin:0">${walkIn ? `Arrive at ${time12(b.time)}. Show this code at the counter when you order.` : `Arrive within your booked time and show this code. ${b.discount}% off your food bill.`}</p></div>` : ""}

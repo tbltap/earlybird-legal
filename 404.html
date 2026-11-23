@@ -48,6 +48,14 @@ a.btn{display:inline-block;background:#265682;color:#fff;border-radius:3px;paddi
   var CFG = window.EB_CONFIG || {}, done = false;
   var go = function (to) { if (!done) { done = true; location.replace(to); } };
   var dest = function (r) {
+    // A slot link (0261, "Tonight at 5:30" Stories): that table's booking step. booking_path is /b/<slug>?deal=…&date=…,
+    // which the /b/ handler above opens as /book/#/book?v=<slug>&…; go there directly. A slot that has started or whose
+    // deal is off comes back as 'venue' or 'home' instead.
+    if (r && r.destination === "slot") {
+      var bp = String(r.booking_path || "").match(/^\/b\/([a-z0-9-]+)\/?(?:\?([^#]*))?$/);
+      if (bp) return "/book/#/book?v=" + bp[1] + (bp[2] ? "&" + bp[2] : "");
+      if (r.venue_slug) return "/book/#/r/" + encodeURIComponent(r.venue_slug);
+    }
     if (r && r.destination === "venue" && r.venue_slug) return "/book/#/r/" + encodeURIComponent(r.venue_slug);
     // A post link (0215): the post's restaurants inside the booking site (viewPost in book/app.js), with the app plug.
     if (r && r.destination === "post") return "/book/#/post/" + encodeURIComponent(g[1].toLowerCase());

@@ -2,14 +2,25 @@
   "applinks": {
     "details": [
       {
-        "appIDs": ["593W8AEV33.com.tbltap.earlybird"],
+        "appIDs": [
+          "593W8AEV33.com.tbltap.earlybird"
+        ],
         "components": [
-          { "/": "/go/*", "comment": "Tagged post and ad links (backend 0204): open the app when it is installed" }
+          {
+            "/": "/go/*",
+            "comment": "Tagged post and ad links (backend 0204): open the app when it is installed"
+          },
+          {
+            "/": "/b/*",
+            "comment": "Booking links from AI assistants (AI_BOOKINGS.md): open the app at the booking step"
+          }
         ]
       }
     ]
   },
   "webcredentials": {
-    "apps": ["593W8AEV33.com.tbltap.earlybird"]
+    "apps": [
+      "593W8AEV33.com.tbltap.earlybird"
+    ]
   }
 }

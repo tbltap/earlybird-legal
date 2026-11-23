@@ -37,6 +37,7 @@ const IC = {
 const POS_HELP = [["Toast", "Reports › Sales › Sales by time of day, or Orders › Export"], ["Square", "Reports › Sales trends › by hour, or Transactions › Export"],
   ["Clover", "Reports › Sales › Hourly sales"], ["Lightspeed", "Reports › Sales by hour"]];
 const REQ = { drink: { label: "Drink", per_person: 1, counts_as: ["Soft drinks", "Juice", "Beer", "Wine", "Cocktails", "Coffee & tea"], excludes: ["Tap water"] },
+  side: { label: "Side", per_person: 1, counts_as: ["Sides"], excludes: [] },
   starter: { label: "Starter", per_person: 1, counts_as: [], excludes: [] }, dessert: { label: "Dessert", per_person: 1, counts_as: [], excludes: [] } };
 
 const mins = (t) => { const [h, m] = String(t).split(":").map(Number); return h * 60 + (m || 0); };
@@ -172,8 +173,12 @@ export default async function dealSetup(venueId, q, h) {
   const windows = () => (S.plan.windows || []).map((w) => ({ ...w, weekdays: w.weekdays.filter((d) => open().includes(d)) })).filter((w) => w.weekdays.length);
   const dealDishes = () => (data.dishes || []).filter((d) => d.kind === "main" || d.kind === "starter");
   const option = () => S.rec?.options.find((o) => o.key === (S.plan.option || "balanced"));
-  const items = () => S.plan.deal_items ?? option()?.deal_items ?? [];
-  const tables = () => S.plan.tables ?? option()?.tables ?? 4;
+  // the older single required_item takes drink | starter | dessert | none; a side counts as a starter there (as 0275 does)
+  const legacyItem = (k) => (!k ? "none" : k === "side" ? "starter" : k);
+  const items2 = () => Array.isArray(S.plan.required_items) ? S.plan.required_items
+    : S.plan.required_item === "none" ? [] : [S.plan.required_item || "drink"];   // older plans had one required_item
+  const items = () => [];   // offer-only (0265): no deal menu, the 50% covers the food menu
+  const tables = () => Math.min(5, S.plan.tables ?? option()?.tables ?? 4);   // up to 5 a time (0265)
   // staff (0211): what the quiet windows cost and how many tables cover it
   const staffN = () => S.plan.staff_count ?? S.rec?.staff?.count ?? 3;
   const wage = () => S.plan.staff_wage ?? S.rec?.staff?.wage ?? 20;
@@ -189,7 +194,7 @@ export default async function dealSetup(venueId, q, h) {
   const save = async () => { S.plan.step = S.step; try { data = await rpc("save_deal_setup", { p_venue: venueId, p_plan: clean(S.plan) }); } catch (e) { S.msg = errText(e); } };
   const clean = (p) => ({ ...p, windows: p.windows?.map(({ share, ...w }) => w) });
   const loadRec = async () => {
-    try { S.rec = await rpc("deal_recommendation", { p_venue: venueId, p_overrides: clean({ windows: windows().length ? windows() : undefined, open_days: open(), food_cost_pct: S.plan.food_cost_pct, required_item: S.plan.required_item, staff_count: S.plan.staff_count, staff_wage: S.plan.staff_wage }) }); }
+    try { S.rec = await rpc("deal_recommendation", { p_venue: venueId, p_overrides: clean({ windows: windows().length ? windows() : undefined, open_days: open(), food_cost_pct: S.plan.food_cost_pct, required_item: legacyItem(items2()[0]), required_items: items2(), staff_count: S.plan.staff_count, staff_wage: S.plan.staff_wage }) }); }
     catch (e) { S.msg = errText(e); }
   };
   const next = async () => { S.msg = ""; await save(); S.step = Math.min(STEPS - 1, S.step + 1); S.sub = null; if (S.step >= 5) await loadRec(); draw(); };
@@ -214,7 +219,7 @@ export default async function dealSetup(venueId, q, h) {
     if (S.step === 0) return "";
     const bits = [dayList(open())], ws = windows();
     if (ws.length) bits.push(ws.slice(0, 2).map(winLabel).join(" & ") + (ws.length > 2 ? ` +${ws.length - 2}` : ""));
-    if (S.step >= 6) { const n = items().length || dealDishes().length; if (n) bits.push(`${n} dishes`); bits.push(`${tables()} tables`); }
+    if (S.step >= 6) bits.push(`${tables()} tables`);
     return `<p class="prev"><b>50% off food</b>${esc(bits.join(" · "))}</p>`;
   }
   const big = (id, icon, title, detail, on) => `<button type="button" class="big" data-a="${id}" ${on !== undefined ? `aria-pressed="${!!on}"` : ""}><span class="ic">${IC[icon] || icon}</span><span><b>${esc(title)}</b>${detail ? `<small>${esc(detail)}</small>` : ""}</span>${on !== undefined ? `<span class="dtk">${IC.tick}</span>` : ""}</button>`;
@@ -382,29 +387,26 @@ export default async function dealSetup(venueId, q, h) {
         ${o.net_per_month != null ? `<div class="kv"><span>Quiet hours now (staff, empty tables)</span><span>${signed(-o.staff_cost_per_month)}/mo</span></div><div class="kv tot"><b>With Early Bird, after staff</b><b>${est ? `${signed(est.net_per_month.low)} to ${signed(est.net_per_month.likely)}` : `${signed(o.net_per_month_half_full)} to ${signed(o.net_per_month)}`}/mo</b></div>` : ""}
         ${est && est.offer_for_break_even ? `<p class="sub small">${offerLine(est)}</p>` : ""}
         <p class="sub small">${est ? "Estimate: a likely range from demand near you, not a promise of bookings." : "Estimate: half the tables booked to every table booked. Not a promise of bookings."}</p></div>` : ""}
-      <div class="crd"><b>Each guest also orders, at full price</b><div class="pills">${[["drink", "A drink"], ["starter", "A starter"], ["dessert", "A dessert"], ["none", "Nothing"]].map(([k, l]) => `<button type="button" class="pill ri" data-k="${k}" aria-pressed="${(S.plan.required_item || "drink") === k}">${l}</button>`).join("")}</div>
-        <p class="sub small">That's where most of your margin is. A drink is the usual choice.</p></div>
-      <div class="crd"><b>On the deal menu</b><p class="sub small">${whole ? "Your whole food menu. Untick dishes to keep them off the deal." : "Best margin at 50% off, and your best sellers. Drinks and desserts stay off the deal."}</p>
-        ${list.length ? list.map((d) => `<label class="dish"><input type="checkbox" class="di" data-id="${esc(d.id)}" ${whole || chosen.has(d.id) ? "checked" : ""}><span class="nm">${esc(d.name)}<small class="${d.note === "Thin at 50% off" ? "thin" : ""}">You keep ${usd(d.keep_at_half, true)} after food cost${d.note ? " · " + esc(d.note) : ""}</small></span><span>${usd(d.price, d.price % 1 !== 0)}</span></label>`).join("")
-          : `<p class="sub small">Add your menu to pick dishes. Until then, the deal covers your whole food menu.</p>`}
-        <div id="ds-check">${S.check && !S.check.ok ? note(S.check.errors.join(". ")) : ""}</div></div>
+      <div class="crd"><b>Each guest also orders, at full price</b><p class="sub small">Up to two: a drink, and one side, starter or dessert.</p><div class="pills">${[["drink", "A drink"], ["side", "A side"], ["starter", "A starter"], ["dessert", "A dessert"]].map(([k, l]) => `<button type="button" class="pill ri" data-k="${k}" aria-pressed="${items2().includes(k)}">${l}</button>`).join("")}</div>
+        <p class="sub small">${items2().length === 2 ? "A second item makes each booking worth more, but fewer may book: our estimate is about 20% fewer bookings. An estimate; we haven't measured this yet." : items2().length ? "That's where most of your margin is. A drink is the usual choice." : "Nothing at full price: each guest is worth less. A drink is the usual choice."}</p></div>
+      <!-- offer-only (0265, owner 23 Nov 2026): no deal menu; the 50% covers the food on the menu -->
       <details><summary>How we worked this out</summary><ul>${r.assumptions.lines.map((l) => `<li>${esc(l)}</li>`).join("")}<li>The same averages as <a href="../restaurants/">our restaurants page</a>.</li></ul></details>
       ${foot(`Use ${(o?.title || "this").toLowerCase()}`, null, !(S.check && !S.check.ok))}`;
   }
 
-  const req = () => REQ[S.plan.required_item || "drink"] || null;
+  const reqs = () => items2().map((k) => REQ[k]).filter(Boolean);
   const uncovered = () => open().filter((d) => !(S.leave || []).includes(d) && !windows().some((w) => w.weekdays.includes(d)));
-  const wordingChanged = () => approved && JSON.stringify((ls.setup?.requirements || []).map((r) => r.label)) !== JSON.stringify(req() ? [req().label] : []);
+  const wordingChanged = () => approved && JSON.stringify((ls.setup?.requirements || []).map((r) => r.label)) !== JSON.stringify(reqs().map((r) => r.label));
   const beLine = () => { const be = breakEven(), t = tables(); return t >= be ? `${be} ${be === 1 ? "table covers" : "tables cover"} your staff (${usd(staffWin())} each time). Every table after that is extra.` : `You need ${be} tables to cover your staff (${usd(staffWin())} each time). Add ${be - t} more.`; };
   function reviewBody() {
     const pl = ls.pledge || {};
     return `<h1 class="q">Your deal</h1><p class="sub">This is what diners will see.</p>
       <div class="crd"><div class="kv"><span>Days</span><span>${dayList(open().filter((d) => !(S.leave || []).includes(d)))}</span></div>
         <div class="kv"><span>When</span><span>${windows().map((w) => `${winLabel(w)} ${dayList(w.weekdays)}`).join("<br>") || "—"}</span></div>
-        <div class="kv"><span>Tables each time</span><span><label class="field"><input type="number" id="ds-tables" min="1" max="20" value="${tables()}" inputmode="numeric" aria-label="Tables each time"></label></span></div>
+        <div class="kv"><span>Tables each time</span><span><label class="field"><input type="number" id="ds-tables" min="1" max="5" value="${tables()}" inputmode="numeric" aria-label="Tables each time"></label></span></div>
         <p class="small ${tables() >= breakEven() ? "okt" : "warn"}" id="ds-ber">${beLine()}</p>
         <div class="kv"><span>Deal</span><span>${items().length ? `50% off ${items().length} dishes` : "50% off your food menu"}</span></div>
-        <div class="kv"><span>Each guest also orders</span><span>${req() ? `1 ${req().label.toLowerCase()}, full price` : "Nothing"}</span></div></div>
+        <div class="kv"><span>Each guest also orders</span><span>${reqs().length ? reqs().map((r) => `1 ${r.label.toLowerCase()}`).join(" and ") + ", full price" : "Nothing"}</span></div></div>
       ${uncovered().map((d) => `<div class="msg info"><b>${DAYS[d]} has no deal time.</b> Early Bird needs at least one table each day you list.<div class="pills"><button type="button" class="pill fix" data-day="${d}">Add 1 table, 5:00–6:30PM</button><button type="button" class="pill leave" data-day="${d}">Leave ${SHORT[d]} out</button></div></div>`).join("")}
       ${wordingChanged() && pl.version ? `<div class="pledge"><div class="title">${esc(pl.title || "Our fair-deal promise")}</div><ul>${(pl.statements || []).map((s) => `<li>${esc(s)}</li>`).join("")}</ul><label class="check"><input type="checkbox" id="ds-pl"><span>You changed what each guest orders, so tick it again: ${esc((pl.checkbox || "We agree to all three, for <restaurant name>.").replace(/<restaurant name>/i, ls.venue_name || "our restaurant"))}</span></label></div>` : ""}
       <p class="sub small">${approved ? "Saving changes your live deal at once." : "Nothing goes to diners yet. Next you'll promise to honour it and send it, from your listing page."}</p>
@@ -533,19 +535,18 @@ export default async function dealSetup(venueId, q, h) {
     if (S.step === 6) {
       if (!S.rec) { go.onclick = () => busy("Working it out…", loadRec); return; }
       all(".opt").forEach((b) => (b.onclick = () => { const o = S.rec.options.find((x) => x.key === b.dataset.o); S.plan.option = o.key; S.plan.deal_items = null; S.plan.tables = null; S.check = null; if (o.key === "margin" || !windows().length) S.plan.windows = o.windows; draw(); }));
-      all(".ri").forEach((b) => (b.onclick = () => { S.plan.required_item = b.dataset.k; busy("Working it out…", loadRec); }));
-      all(".di").forEach((b) => (b.onchange = async () => {
-        const list = [...all(".di")]; const chosen = list.filter((x) => x.checked).map((x) => x.dataset.id);
-        S.plan.deal_items = chosen.length === list.length ? [] : chosen;
-        S.check = await rpc("deal_menu_preview", { p_venue: venueId, p_items: S.plan.deal_items }).catch(() => null);
-        $("ds-check").innerHTML = S.check && !S.check.ok ? note(S.check.errors.join(". ")) : ""; $("ds-go").disabled = !!(S.check && !S.check.ok);
+      // a drink and/or one of side, starter or dessert (0275): tapping an extra replaces the other extra
+      all(".ri").forEach((b) => (b.onclick = () => {
+        const k = b.dataset.k, cur = items2();
+        let next = cur.includes(k) ? cur.filter((x) => x !== k) : k === "drink" ? ["drink", ...cur] : [...cur.filter((x) => x === "drink"), k];
+        S.plan.required_items = next; S.plan.required_item = legacyItem(next[0]); busy("Working it out…", loadRec);
       }));
-      go.onclick = () => { const o = option(); if (o) { S.plan.option = o.key; S.plan.deal_items ??= o.deal_items; S.plan.tables ??= o.tables; if (!windows().length) S.plan.windows = o.windows; } next(); };
+      go.onclick = () => { const o = option(); if (o) { S.plan.option = o.key; S.plan.deal_items = null; S.plan.tables ??= Math.min(5, o.tables || 5); if (!windows().length) S.plan.windows = o.windows; } next(); };
     }
     if (S.step === 7) {
       // came back straight to the review without times: use the recommendation's
       if (!windows().length && (option()?.windows?.length || S.rec?.windows?.length)) { S.plan.windows = option()?.windows?.length ? option().windows : S.rec.windows; return draw(); }
-      const t = $("ds-tables"); if (t) t.oninput = () => { S.plan.tables = Math.min(20, Math.max(1, +t.value || 1)); const b = $("ds-ber"); b.textContent = beLine(); b.className = "small " + (tables() >= breakEven() ? "okt" : "warn"); };
+      const t = $("ds-tables"); if (t) t.oninput = () => { S.plan.tables = Math.min(5, Math.max(1, +t.value || 1)); const b = $("ds-ber"); b.textContent = beLine(); b.className = "small " + (tables() >= breakEven() ? "okt" : "warn"); };
       all(".fix").forEach((b) => (b.onclick = () => { S.plan.windows = [...(S.plan.windows || []), { meal: "dinner", start: "17:00", end: "18:30", weekdays: [+b.dataset.day] }]; draw(); }));
       all(".leave").forEach((b) => (b.onclick = () => { S.leave = [...(S.leave || []), +b.dataset.day]; draw(); }));
       go.onclick = () => {
@@ -553,11 +554,10 @@ export default async function dealSetup(venueId, q, h) {
         if (wordingChanged() && !$("ds-pl")?.checked) { S.msg = "Tick the fair-deal promise first."; return draw(); }
         busy("Saving your deal…", async () => {
           const days = open().filter((d) => !(S.leave || []).includes(d));
-          const setup = { meals: meals(), closed_days: [0, 1, 2, 3, 4, 5, 6].filter((d) => !days.includes(d)), requirements: req() ? [req()] : [],
-            conditions: ls.setup?.conditions?.length ? ls.setup.conditions : CONDITIONS, ...(wordingChanged() ? { pledge: ls.pledge?.version } : {}) };
+          const setup = { meals: meals(), closed_days: [0, 1, 2, 3, 4, 5, 6].filter((d) => !days.includes(d)), requirements: reqs(),
+            conditions: CONDITIONS,   // offer-only (0265): the standard three, as the iOS setup ...(wordingChanged() ? { pledge: ls.pledge?.version } : {}) };
           S.plan.step = 6; await rpc("save_deal_setup", { p_venue: venueId, p_plan: clean(S.plan) });
           await rpc("quick_deal", { p_venue: venueId, p_setup: setup });
-          if (approved && S.plan.deal_items) await rpc("save_deal_menu", { p_venue: venueId, p_items: S.plan.deal_items });
           toast(approved ? "Saved. Diners see it now." : "Deal saved.");
           navigate(`#/biz/v/${venueId}`);
         });

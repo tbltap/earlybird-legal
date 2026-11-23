@@ -26,13 +26,14 @@ const ERRS = {
   claim_not_pending: "This claim was already decided.",
   owners_only: "Only the owner can accept the terms.",
   discount_below_minimum: "Early Bird deals are at least 50% off food. Choose 50% or more.",
+  not_in_offer: "That isn't part of the Early Bird offer: 50% off food, up to two full-price items per diner (a drink and one side, starter or dessert), up to 5 tables a time.",
   terms_required: "Accept the Restaurant Terms first.",
   location_needed: "We couldn't place your address on the map, so it can't go live yet. Early Bird will fix the location and tell you.",
   too_many_documents: "That's the most documents you can send for one claim.",
   claim_not_found: "This claim is no longer open.",
   document_not_found: "That document is no longer there.",
   invalid_path: "The photo didn't upload properly. Try again.",
-  bad_requirements: "Check what each diner orders: up to 4 rules, each with a short name.",
+  bad_requirements: "Check the full-price items: a drink and/or one side, starter or dessert.",
   bad_conditions: "Up to 8 conditions.",
   too_many_photos: "That's the most photos you can add. Remove one first.",
   already_added: "That photo is already on your page.",
@@ -146,22 +147,53 @@ function viewWhy() {
 }
 
 /* ───────────────────────────── what we offer restaurants, with the maths ───────────────────────────── */
-// Owner, 21 Nov: show restaurants visually how a table that would sit empty still makes money: full-price drinks and
-// sides, the main at half price, staff they pay anyway, a month of extra money from averages, the guest list they own,
+// Owner, 21 Nov: show restaurants visually how a table that would sit empty still makes money: the full-price items each
+// guest orders (a drink and/or a side, starter or dessert, the restaurant picks; 0275, 23 Nov), the food at half price, staff they pay anyway, a month of extra money from averages, the guest list they own,
 // and that they choose the slow times while Early Bird does the marketing. Example numbers only; never the booking fee.
 const EX = { tables: 2, perTable: 2, nights: 26, full: 75, main: 24, drink: 9, side: 11, foodPct: 30, drinkPct: 22, card: 3 };
+// The full-price items (0275): a drink and/or one of side, starter or dessert. A second item makes each guest worth more but
+// costs bookings: the backend's estimate (api.offer_impact's assumption) is about 20% fewer bookings for the second item.
+const EXTRA = { side: "A side", starter: "A starter", dessert: "A dessert" };
+const SECOND_ITEM_FACTOR = 0.8;
+const PITCH = { drink: true, extra: "" };
 const usd = (n) => (n < 0 ? "−" : "") + "$" + Math.abs(n).toLocaleString("en-US", { maximumFractionDigits: n !== 0 && Math.abs(n) < 100 ? 2 : 0, minimumFractionDigits: n !== 0 && Math.abs(n) < 100 ? 2 : 0 });
-function guestMaths(x) {
-  const pays = x.main / 2 + x.drink + x.side;
-  const ingredients = x.main * x.foodPct / 100 + x.drink * x.drinkPct / 100 + x.side * x.foodPct / 100;
+function guestMaths(x, it = PITCH) {
+  const d = it.drink ? x.drink : 0, e = it.extra ? x.side : 0, n = (it.drink ? 1 : 0) + (it.extra ? 1 : 0);
+  const pays = x.main / 2 + d + e;
+  const ingredients = x.main * x.foodPct / 100 + d * x.drinkPct / 100 + e * x.foodPct / 100;
   const fees = pays * x.card / 100, keep = pays - ingredients - fees;
-  const guests = Math.round(x.tables * x.perTable * x.nights * x.full / 100);
+  const guests = Math.round(x.tables * x.perTable * x.nights * x.full / 100 * (n > 1 ? SECOND_ITEM_FACTOR : 1));
   return { pays, ingredients, fees, keep, guests, sales: guests * pays, cost: guests * (ingredients + fees), net: guests * keep };
 }
 const startHref = () => (Auth.session() ? "#/biz/find" : `#/signin?next=${encodeURIComponent("#/biz")}`);
 // Owner, 21 Nov: "listing is free no fees guests pay a small booking fee to cover our charges and you get incremental
 // revenue and guest contacts and own the guest relationship ... frame it as how much its costing you to not take
 // advantage of early bird", laid out cleanly, the way Apple would.
+// the item picker (pitch and deal editor): a drink on or off, plus nothing / a side / a starter / a dessert
+function itemPickHtml(it, pre) {
+  return `<label class="check"><input type="checkbox" id="${pre}-drink" ${it.drink ? "checked" : ""}><span>A drink</span></label>
+    <label class="itextra">Plus<select id="${pre}-extra"><option value="">nothing else</option>${Object.entries(EXTRA).map(([k, l]) => `<option value="${k}" ${it.extra === k ? "selected" : ""}>${l.toLowerCase()}</option>`).join("")}</select></label>`;
+}
+const readPick = (pre) => ({ drink: !!document.getElementById(pre + "-drink")?.checked, extra: document.getElementById(pre + "-extra")?.value || "" });
+function billHtml(x, it) {
+  const g = guestMaths(x, it);
+  return `<div class="ebill-h"><span class="badge">50% off food</span><span class="small muted">Example, per guest</span></div>
+      ${it.drink ? `<div><span>Drink, at full price</span><span>${usd(x.drink)}</span></div>` : ""}
+      ${it.extra ? `<div><span>${EXTRA[it.extra].slice(2).replace(/^./, (c) => c.toUpperCase())}, at full price</span><span>${usd(x.side)}</span></div>` : ""}
+      <div><span>Food</span><span><s>${usd(x.main)}</s> ${usd(x.main / 2)}</span></div>
+      <div class="tot"><span>The guest spends with you</span><span>${usd(g.pays)}</span></div>
+      <div class="minus"><span>Ingredients</span><span>−${usd(g.ingredients)}</span></div>
+      <div class="minus"><span>Card fees</span><span>−${usd(g.fees)}</span></div>
+      <div class="keep"><span>You keep</span><span>${usd(g.keep)}</span></div>`;
+}
+// what the choice does, against one drink (the usual choice): per guest and bookings, labelled an estimate
+function impactLine(x, it) {
+  const n = (it.drink ? 1 : 0) + (it.extra ? 1 : 0);
+  const base = guestMaths(x, { drink: true, extra: "" }), g = guestMaths(x, it);
+  if (n === 2) return `<b>Asking for a second item:</b> each guest spends about ${usd(g.pays - base.pays)} more, but fewer may book: our estimate is about ${Math.round((1 - SECOND_ITEM_FACTOR) * 100)}% fewer bookings. An estimate; we haven't measured this yet.`;
+  if (n === 0) return `<b>Nothing at full price:</b> each guest spends about ${usd(base.pays - g.pays)} less than with a drink. The full-price item is usually your best margin.`;
+  return "The full-price item is usually your best margin. The staff, rent and power are paid either way.";
+}
 function pitchHtml() {
   const g = guestMaths(EX);
   const slot = (t, k) => `<span class="eslot ${k}">${t}</span>`;
@@ -192,18 +224,10 @@ function pitchHtml() {
 
   <section class="p-sec">
     <h2 class="p-h2">One guest, one empty seat filled</h2>
-    <p class="p-p">Each guest orders a drink and a side or dessert at full price. The 50% covers the dishes you choose, for example the mains.</p>
-    <div class="ebill p-bill">
-      <div class="ebill-h"><span class="badge">50% off mains</span><span class="small muted">Example, per guest</span></div>
-      <div><span>Drink</span><span>${usd(EX.drink)}</span></div>
-      <div><span>Starter or dessert</span><span>${usd(EX.side)}</span></div>
-      <div><span>Main</span><span><s>${usd(EX.main)}</s> ${usd(EX.main / 2)}</span></div>
-      <div class="tot"><span>The guest spends with you</span><span>${usd(g.pays)}</span></div>
-      <div class="minus"><span>Ingredients</span><span>−${usd(g.ingredients)}</span></div>
-      <div class="minus"><span>Card fees</span><span>−${usd(g.fees)}</span></div>
-      <div class="keep"><span>You keep</span><span>${usd(g.keep)}</span></div>
-    </div>
-    <p class="p-note">Drinks and sides are your best-margin items. The staff, rent and power are paid either way.</p>
+    <p class="p-p">You choose what each guest orders at full price: a drink, and if you like a side, starter or dessert. The 50% covers the rest of their food.</p>
+    <div class="itempick" id="p-items">${itemPickHtml(PITCH, "p")}</div>
+    <div class="ebill p-bill" id="p-bill">${billHtml(EX, PITCH)}</div>
+    <p class="p-note" id="p-impact">${impactLine(EX, PITCH)}</p>
   </section>
 
   <section class="p-sec p-calc" id="ecalc">
@@ -218,7 +242,7 @@ function pitchHtml() {
       ${[["tables", "Early tables each evening", 1, 10, 1, ""], ["perTable", "Diners per table", 1, 6, 1, ""], ["nights", "Evenings a month", 4, 31, 1, ""], ["full", "How often they're booked", 20, 100, 5, "%"]].map(rng).join("")}
     </div>
     <details class="p-more"><summary>Your prices and costs</summary><div class="ecalc-in">
-      ${[["main", "Average main", 10, 60, 1, "$"], ["drink", "Average drink", 3, 25, 1, "$"], ["side", "Average starter or dessert", 4, 25, 1, "$"], ["foodPct", "Food cost", 20, 45, 1, "%"], ["drinkPct", "Drink cost", 10, 40, 1, "%"]].map(rng).join("")}
+      ${[["main", "Average food per guest", 10, 60, 1, "$"], ["drink", "Average drink", 3, 25, 1, "$"], ["side", "Average side, starter or dessert", 4, 25, 1, "$"], ["foodPct", "Food cost", 20, 45, 1, "%"], ["drinkPct", "Drink cost", 10, 40, 1, "%"]].map(rng).join("")}
     </div></details>
     <p class="p-note">An estimate from the numbers above, before tips and before anything guests spend when they come back.</p>
   </section>
@@ -257,7 +281,10 @@ function wireEcon() {
   const calc = () => {
     const x = { ...EX };
     box.querySelectorAll("input[type=range]").forEach((r) => { const k = r.id.slice(2); x[k] = +r.value; const u = r.dataset.u; document.getElementById("o-" + k).textContent = u === "$" ? "$" + r.value : r.value + u; });
-    const g = guestMaths(x);
+    Object.assign(PITCH, readPick("p"));
+    const g = guestMaths(x, PITCH);
+    document.getElementById("p-bill").innerHTML = billHtml(x, PITCH);
+    document.getElementById("p-impact").innerHTML = impactLine(x, PITCH);
     document.getElementById("r-guests").textContent = g.guests.toLocaleString("en-US");
     document.getElementById("r-sales").textContent = usd(g.sales);
     document.getElementById("r-cost").textContent = "−" + usd(g.cost);
@@ -265,6 +292,7 @@ function wireEcon() {
     document.getElementById("r-year").textContent = usd(g.net * 12);
   };
   box.querySelectorAll("input[type=range]").forEach((r) => { r.oninput = calc; });
+  ["p-drink", "p-extra"].forEach((id) => { const el = document.getElementById(id); if (el) el.onchange = calc; });
 }
 
 /* ───────────────────────────── find and claim ───────────────────────────── */
@@ -503,17 +531,22 @@ function mealRow(m, i) {
     <div class="dealtop"><select class="d-meal" aria-label="Meal">${Object.entries(MEALS).map(([k, l]) => `<option value="${k}" ${k === m.meal ? "selected" : ""}>${l}</option>`).join("")}</select>
       <button class="linkbtn d-rm" type="button" aria-label="Remove this time window">Remove</button></div>
     <div class="dealgrid"><label>From<select class="d-start">${timeOpts(m.start)}</select></label><label>Last booking<select class="d-end">${timeOpts(m.end)}</select></label>
-      <label>Tables<input class="d-tables" type="number" min="1" max="20" inputmode="numeric" value="${m.tables}"></label></div>
+      <label>Tables<input class="d-tables" type="number" min="1" max="5" inputmode="numeric" value="${m.tables}"></label></div>
     <div class="daychips" role="group" aria-label="Days">${DAY1.map((d, k) => `<button type="button" class="daychip ${m.weekdays.includes(k) ? "on" : ""}" data-k="${k}" aria-pressed="${m.weekdays.includes(k)}" aria-label="${DAYS[k]}">${d}</button>`).join("")}</div>
     <p class="small muted d-sum"></p></div>`;
 }
-function reqRow(r, i) {
-  return `<div class="reqrow" data-i="${i}"><div class="dealgrid"><label>What they order<input class="r-label" maxlength="40" placeholder="Drink" value="${esc(r.label)}"></label>
-      <label>Per diner<select class="r-pp">${[1, 2, 3].map((n) => `<option ${n === r.per_person ? "selected" : ""}>${n}</option>`).join("")}</select></label></div>
-    <label class="field">Counts as (optional)<input class="r-in" placeholder="Beer, wine, soft drink" value="${esc(r.counts_as.join(", "))}"></label>
-    <label class="field">Doesn't count (optional)<input class="r-ex" placeholder="Tap water" value="${esc(r.excludes.join(", "))}"></label>
-    <button class="linkbtn r-rm" type="button">Remove</button></div>`;
-}
+// The offer (0265 + 0275, owner 23 Nov 2026): up to two full-price items per diner, a drink and/or one of side, starter or
+// dessert, one of each; the standard three conditions; up to 5 tables a window. As the iOS deal setup.
+const STD_CONDITIONS = ["The discount is on food only. Drinks are full price.", "Arrive within your booked time and show your code.", "Can't be combined with other offers."];
+const ITEM_REQ = { drink: { label: "Drink", counts_as: ["Soft drinks", "Beer", "Wine", "Cocktails", "Coffee & tea"], excludes: ["Tap water"] },
+  side: { label: "Side", counts_as: ["Sides"], excludes: [] }, starter: { label: "Starter", counts_as: [], excludes: [] }, dessert: { label: "Dessert", counts_as: [], excludes: [] } };
+const itemKind = (label) => { const l = String(label || "").toLowerCase(); return /drink/.test(l) ? "drink" : /side/.test(l) ? "side" : /starter|app/.test(l) ? "starter" : /dessert/.test(l) ? "dessert" : null; };
+const pickFromReqs = (reqs) => { const k = (reqs || []).map((r) => itemKind(r.label)); return { drink: k.includes("drink"), extra: k.find((x) => x && x !== "drink") || "" }; };
+// keep a restaurant's own "counts as" / "doesn't count" lists for a kind it already had
+const reqsFromPick = (it, old) => [it.drink && "drink", it.extra].filter(Boolean).map((k) => {
+  const had = (old || []).find((r) => itemKind(r.label) === k);
+  return had ? { label: had.label, per_person: 1, counts_as: [...(had.counts_as || [])], excludes: [...(had.excludes || [])] } : { ...ITEM_REQ[k], per_person: 1, counts_as: [...ITEM_REQ[k].counts_as], excludes: [...ITEM_REQ[k].excludes] };
+});
 function dealHtml(s, ls) {
   const guided = `<a class="btn" href="#/biz/deal/${esc(ls?.venue_id || "")}">${s.meals.length ? "Change your deal, step by step" : "Set your deal in 3 minutes"}</a>
     <p class="small muted">We ask a few quick questions (your quiet times, your menu, your food cost), suggest a deal and estimate what you'd keep.</p>
@@ -523,20 +556,20 @@ function dealHtml(s, ls) {
     <button class="btn pale" type="button" id="d-add">Add a time window</button>
     <div class="field" style="margin-top:14px">Closed on<div class="daychips" id="d-closed" role="group" aria-label="Closed days">${DAY1.map((d, k) => `<button type="button" class="daychip closed ${s.closed_days.includes(k) ? "on" : ""}" data-k="${k}" aria-pressed="${s.closed_days.includes(k)}" aria-label="Closed on ${DAYS[k]}">${d}</button>`).join("")}</div></div>
     <p class="small" id="d-days"></p>
-    <h3 class="bizh3">What each diner orders</h3><p class="small muted">Optional, up to 4. For example, one drink per diner.</p>
-    <div id="d-reqs">${s.requirements.map(reqRow).join("")}</div><button class="btn pale" type="button" id="d-addreq">Add an order rule</button>
-    <h3 class="bizh3">Conditions</h3><p class="small muted">Optional, one per line, up to 8. For example: Not on public holidays.</p>
-    <textarea id="d-cond" rows="3" maxlength="1400">${esc(s.conditions.join("\n"))}</textarea>
+    <h3 class="bizh3">What each diner orders at full price</h3><p class="small muted">Up to two: a drink, and if you like one side, starter or dessert. The 50% covers the rest of their food.</p>
+    <div class="itempick">${itemPickHtml(pickFromReqs(s.requirements), "d")}</div>
+    <div class="itimpact small" id="d-impact" aria-live="polite"></div>
+    <h3 class="bizh3">Conditions</h3><ul class="small muted">${STD_CONDITIONS.map((c) => `<li>${esc(c)}</li>`).join("")}</ul>
     <div id="d-msg"></div><button class="btn" type="button" id="d-save">Save your tables</button></details>`;
 }
 function readDeal(S) {
   const s = S.setup;
   s.meals = [...document.querySelectorAll("#d-meals .dealrow")].map((row) => ({ meal: row.querySelector(".d-meal").value, start: row.querySelector(".d-start").value, end: row.querySelector(".d-end").value,
-    tables: Math.min(Math.max(parseInt(row.querySelector(".d-tables").value, 10) || 1, 1), 20), weekdays: [...row.querySelectorAll(".daychip.on")].map((b) => +b.dataset.k) }));
+    tables: Math.min(Math.max(parseInt(row.querySelector(".d-tables").value, 10) || 1, 1), 5), weekdays: [...row.querySelectorAll(".daychip.on")].map((b) => +b.dataset.k) }));
   s.closed_days = [...document.querySelectorAll("#d-closed .daychip.on")].map((b) => +b.dataset.k);
   const list = (v) => v.split(",").map((x) => x.trim()).filter(Boolean);
-  s.requirements = [...document.querySelectorAll("#d-reqs .reqrow")].map((r) => ({ label: r.querySelector(".r-label").value.trim(), per_person: +r.querySelector(".r-pp").value, counts_as: list(r.querySelector(".r-in").value), excludes: list(r.querySelector(".r-ex").value) })).filter((r) => r.label);
-  s.conditions = document.getElementById("d-cond").value.split("\n").map((x) => x.trim().slice(0, 160)).filter(Boolean).slice(0, 8);
+  if (document.getElementById("d-drink")) s.requirements = reqsFromPick(readPick("d"), S.reqsBefore ?? (S.reqsBefore = s.requirements));
+  s.conditions = STD_CONDITIONS.slice();
   return s;
 }
 function dealProblem(s) {
@@ -569,10 +602,22 @@ function wireDeal(venueId, S, ls) {
     box.insertAdjacentHTML("beforeend", mealRow({ meal: "dinner", start: "17:00", end: "18:30", tables: 2, weekdays: days.length ? days : [] }, box.children.length));
     wireRows(); refresh();
   };
-  const rq = document.getElementById("d-reqs");
-  const wireReqs = () => rq.querySelectorAll(".r-rm").forEach((b) => { b.onclick = () => b.closest(".reqrow").remove(); });
-  document.getElementById("d-addreq").onclick = () => { if (rq.children.length >= 4) return toast("Up to 4 order rules."); rq.insertAdjacentHTML("beforeend", reqRow({ label: "", per_person: 1, counts_as: [], excludes: [] }, rq.children.length)); wireReqs(); };
-  wireRows(); wireReqs(); refresh();
+  // the impact of the chosen items (api.offer_impact, 0275): against one drink, labelled an estimate
+  let seq = 0;
+  const impact = async () => {
+    const it = readPick("d"), items = [it.drink && "drink", it.extra].filter(Boolean), box2 = document.getElementById("d-impact"), mine = ++seq;
+    if (!box2) return;
+    const r = await rpc("offer_impact", { p_venue: venueId, p_items: items.length ? items : null }).catch(() => null);
+    if (mine !== seq || !r?.options?.length) { if (mine === seq) box2.innerHTML = ""; return; }
+    const same = (o) => JSON.stringify([...(o.items || [])].sort()) === JSON.stringify([...items].sort());
+    const o = r.options.find(same), base = r.options.find((x) => JSON.stringify(x.items) === '["drink"]');
+    if (!o) { box2.innerHTML = ""; return; }
+    const m = o.paid_per_month || {}, money0 = (n) => "$" + Math.round(n).toLocaleString("en-US");
+    const vs = base && o !== base ? `Compared with just a drink: ${o.vs_one_item?.tables_pct ? `about ${Math.abs(o.vs_one_item.tables_pct)}% ${o.vs_one_item.tables_pct < 0 ? "fewer" : "more"} bookings` : "about the same bookings"}, ${(o.per_guest_paid - base.per_guest_paid) >= 0 ? "+" : "−"}${money0(Math.abs(o.per_guest_paid - base.per_guest_paid))} per guest. ` : "";
+    box2.innerHTML = `<p><b>${esc(o.label || "")}</b>. ${vs}Guests would pay you about ${money0(m.low || 0)} to ${money0(m.high || 0)} a month (likely ${money0(m.likely || 0)}).</p><p class="muted">${esc(r.assumption || "An estimate, not a promise of bookings.")}</p>`;
+  };
+  ["d-drink", "d-extra"].forEach((id) => { const el = document.getElementById(id); if (el) el.onchange = impact; });
+  wireRows(); refresh(); impact();
   document.getElementById("d-save").onclick = async (e) => {
     const s = readDeal(S), msg = document.getElementById("d-msg"), p = dealProblem(s);
     if (p) { msg.innerHTML = note(p); return; }

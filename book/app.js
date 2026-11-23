@@ -778,12 +778,62 @@ async function viewArea(path, q) {
     };
   };
   wire(a.following);
+  if (a.kind === "city") return drawCityAreas(a);
   if (!n) return;
   const rows = (a.venues || []).filter((v) => v && v.deal);
   const avail = rows.length ? await loadAvail(rows.map((v) => v.id), H.meal, H.diners).catch(() => ({})) : {};
   rows.forEach((v) => (v._avail = avail[v.id]));
   const grid = document.getElementById("grid"); if (!grid) return;
   grid.innerHTML = rows.map(isDesk() ? resultHtmlDesk : resultHtml).join("");
+}
+
+/* A whole city (eatearlybird.com/a/la, /a/nyc: the city Instagram and TikTok accounts' bio links, owner 23 Nov 2026).
+   area_page lists 60 restaurants at most, so a city page fetches every deal in the city the way Home does (search_venues,
+   pages of 50) and shows them in sections by neighbourhood, biggest first, each linking to its own area page. */
+const CITY_SECTION = 6;
+async function drawCityAreas(a) {
+  const grid = document.getElementById("grid"); if (!grid) return;
+  const c = (S.cities || []).find((x) => x.slug === a.city.slug) || {};
+  const lat = c.lat ?? a.lat, lng = c.lng ?? a.lng, radius = c.radius_km || 25;
+  let rows = [];
+  try {
+    for (let off = 0; off < 1000; off += 50) {
+      const page = await rpc("search_venues", { p_lat: lat, p_lng: lng, p_radius_km: radius, p_limit: 50, p_offset: off, p_sort: "featured" });
+      rows = rows.concat(page);
+      if (page.length < 50) break;
+    }
+  } catch { rows = (a.venues || []).slice(); }
+  rows = rows.filter((v) => v && v.deal);
+  if (!document.getElementById("grid")) return;
+  if (!rows.length) { grid.innerHTML = ""; return; }
+  const by = new Map();
+  rows.forEach((v) => { const k = v.area || "More in " + a.name; if (!by.has(k)) by.set(k, []); by.get(k).push(v); });
+  const secs = [...by.entries()].sort((x, y) => y[1].length - x[1].length || x[0].localeCompare(y[0]));
+  const head = grid.closest(".areaview")?.querySelector(".posthead .muted");
+  if (head) head.textContent = `${a.name} · ${rows.length} restaurant${rows.length === 1 ? "" : "s"} with a deal in ${secs.length} neighbourhood${secs.length === 1 ? "" : "s"}`;
+  const card = isDesk() ? resultHtmlDesk : resultHtml;
+  const avail = {};
+  const draw = () => {
+    grid.innerHTML = `<nav class="cityjump" aria-label="Neighbourhoods">${secs.map(([name, vs], i) => `<a href="#cs-${i}" data-jump="${i}">${esc(name)} <span>${vs.length}</span></a>`).join("")}</nav>`
+      + secs.map(([name, vs], i) => {
+        const real = !name.startsWith("More in ");
+        return `<section class="citysec" id="cs-${i}"><div class="sechead"><h2>${esc(name)}</h2>${real ? `<a href="#/a/${esc(slugify(name))}">See ${esc(name)}</a>` : ""}</div>
+          <div class="citygrid">${vs.map((v, j) => { v._avail = avail[v.id]; return `<div${j >= CITY_SECTION ? " data-more hidden" : ""}>${card(v)}</div>`; }).join("")}</div>
+          ${vs.length > CITY_SECTION ? `<button class="btn pale citymore" type="button" data-sec="${i}">Show all ${vs.length} in ${esc(name)}</button>` : ""}</section>`;
+      }).join("");
+    grid.querySelectorAll("[data-jump]").forEach((l) => (l.onclick = (e) => { e.preventDefault(); document.getElementById("cs-" + l.dataset.jump)?.scrollIntoView({ behavior: "smooth", block: "start" }); }));
+    grid.querySelectorAll(".citymore").forEach((b) => (b.onclick = () => { b.closest(".citysec").querySelectorAll("[data-more]").forEach((x) => (x.hidden = false)); b.remove(); }));
+  };
+  draw();
+  // times: in batches, so a city of 100+ restaurants doesn't wait on one big call; redraw keeps any opened sections open
+  for (let i = 0; i < rows.length; i += 40) {
+    const got = await loadAvail(rows.slice(i, i + 40).map((v) => v.id), H.meal, H.diners).catch(() => ({}));
+    Object.assign(avail, got);
+  }
+  if (!document.getElementById("grid")) return;
+  const open = [...grid.querySelectorAll(".citysec")].filter((s) => !s.querySelector(".citymore")).map((s) => s.id);
+  draw();
+  open.forEach((id) => { const s = document.getElementById(id); s?.querySelectorAll("[data-more]").forEach((x) => (x.hidden = false)); s?.querySelector(".citymore")?.remove(); });
 }
 
 /* ───────────────────────────── desktop list (the First Table-style region page) ───────────────────────────── */

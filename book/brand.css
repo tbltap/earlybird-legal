@@ -1,89 +1,79 @@
-/* Early Bird brand layer for the booking site: "Paper & candlelight" (~/earlybird/brand/kit/tokens.css, 22 Nov 2026).
+/* Early Bird brand layer for the booking site. 23 Nov 2026: re-skinned to the iPhone app (cyan, navy, gold, white cards, heavy serif), was "Paper & candlelight" (~/earlybird/brand/kit/tokens.css, 22 Nov 2026).
    Loaded after book.css. It only restyles: no layout or behaviour changes, so removing this one <link> restores the old look. */
-@font-face{font-family:"Instrument Serif";font-style:normal;font-weight:400;font-display:swap;src:url(../fonts/InstrumentSerif-Regular.woff2) format("woff2")}
-@font-face{font-family:"Instrument Serif";font-style:italic;font-weight:400;font-display:swap;src:url(../fonts/InstrumentSerif-Italic.woff2) format("woff2")}
-@font-face{font-family:"Inter Tight";font-style:normal;font-weight:100 900;font-display:swap;src:url(../fonts/InterTight-var.woff2) format("woff2")}
 
 :root{
-  /* brand */
-  --paper:#F3EEE5; --card:#FBF8F2; --espresso:#1C1A17; --ember:#A8401C; --ember-soft:#E9A27B; --sage:#4F7350;
-  --line:#E2DACE; --well:#EEE8DE;
-  /* the old names, remapped */
-  --accent:#1C1A17; --on-accent:#F3EEE5;
-  --slot:#1C1A17; --slot-pale:#E6DFD3;
-  --page:#F3EEE5; --ink:#1C1A17; --muted:#6B645A;
-  --navy:#1C1A17; --navy-dark:#1C1A17;
-  --deal:#F1DCCB; --deal-text:#8A3416; --deal-head:#A8401C;
-  --green:#4F7350; --card-fill:#EEE8DE; --chip:#E6DFD3; --pale-blue:#EFE5DA; --hairline:rgba(60,45,30,.10);
-  --hero-top:#EFE5DA; --red:#A8401C;
-  --serif:"Instrument Serif",ui-serif,"New York",Georgia,serif;
-  --sans:"Inter Tight",-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",Helvetica,Arial,sans-serif;
-  --grain:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .35 0 0 0 0 .3 0 0 0 0 .25 0 0 0 .5 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  /* the iPhone app's palette (EarlyBird/Theme/Theme.swift), owner 23 Nov 2026: "match the iOS app", not brown */
+  --paper:#F5F6F9; --card:#FFFFFF; --espresso:#14171F; --ember:#00779E; --ember-soft:#8FE5FF; --sage:#3E8E41;
+  --line:#E3E6EC; --well:#ECEEF3;
+  --accent:#00CCFF; --on-accent:#14171F;
+  --slot:#34548A; --slot-pale:#DFE6F3;
+  --page:#F5F6F9; --ink:#14171F; --muted:#5F6673;
+  --navy:#00779E; --navy-dark:#0B3247;
+  --deal:#EDC457; --deal-text:#3D2E0A; --deal-head:#9C7412;
+  --green:#3E8E41; --card-fill:#ECEEF3; --chip:#E5E8EE; --pale-blue:#D6F4FF; --hairline:rgba(0,0,0,.08);
+  --hero-top:#8FE5FF; --red:#C8402F;
+  --serif:ui-serif,"New York","Iowan Old Style","Apple Garamond",Georgia,"Times New Roman",serif;
+  --sans:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,Helvetica,Arial,sans-serif;
 }
 body{-webkit-font-smoothing:antialiased;letter-spacing:-.005em}
 /* paper grain, never blocks clicks */
-body::after{content:"";position:fixed;inset:0;z-index:60;pointer-events:none;background-image:var(--grain);mix-blend-mode:multiply;opacity:.45}
+body::after{content:none;position:fixed;inset:0;z-index:60;pointer-events:none;background-image:var(--grain);mix-blend-mode:multiply;opacity:.45}
 a{color:var(--espresso)}
 button:focus-visible,a:focus-visible,summary:focus-visible{outline-color:var(--ember)}
 
-/* Instrument Serif has one weight: every heavy serif heading becomes the regular cut, a touch larger */
+/* headings: the app's heavy serif (Theme.display) */
 .brand,.display,.thumb,.vtitle,.balance,body.desk .serif,.dlogo,.df-cols h3,.dhero h1,.teaser b,.nph,.dthumb,.howband h2,.howband li::before,
 .areas h2,.vhead h1,.gbig span,.cohead,.cowhen,.pickcity b,.eh,.ecol strong,.eresult .big b,.gtile b,.p-hero h1,.p-big b,.p-h2,.p-who b,.r-big,.p-final h2{
-  font-weight:400!important;letter-spacing:-.01em}
-.display{font-size:clamp(36px,9vw,48px)}
-.vtitle{font-size:clamp(36px,9vw,46px)}
-.vhead h1{font-size:54px}
-.dhero h1{font-size:62px}
-.pickcity b{font-size:30px}
-.display .gold{color:var(--ember);font-style:italic}
-.r-big,.eresult .big b{color:var(--ember)!important}
+  font-weight:900!important;letter-spacing:-.01em}
+.display .gold{color:var(--deal-head);font-style:normal}
+.r-big,.eresult .big b{color:var(--deal-head)!important}
 
 /* surfaces: warm cards on paper, warm wells instead of blue-grey */
 .card,.res,.ncard,.vbook,.coright,#co .grp,details.disc,.howband,.teaser,.fbar,.opt,.brow,.quick button,.hs-list,.qchip,.qchips .pill,
 .textsearch input,.sortrow select,.fgroup input[type=search],.searchbar,.btn.outline,.btn.danger{background:var(--card)}
 @media (max-width:1023px){.drow{background:var(--card)}}
-body.desk .dhead{background:rgba(243,238,229,.86);-webkit-backdrop-filter:saturate(160%) blur(18px);backdrop-filter:saturate(160%) blur(18px);border-bottom:1px solid var(--line)}
+body.desk .dhead{background:rgba(245,246,249,.86);-webkit-backdrop-filter:saturate(160%) blur(18px);backdrop-filter:saturate(160%) blur(18px);border-bottom:1px solid var(--line)}
 input[type=text],input[type=email],input[type=password],input[type=tel],input[type=search],select,textarea{background:var(--well)}
 input:focus,select:focus,textarea:focus{border-color:var(--espresso);background:var(--card)}
 .dcol.alt,.lines,.policy,.holdbar,.hs-list a:hover,.hs-list a:focus,.hpill:hover{background:var(--well)}
 .hsearch,.hs-list,.sortrow select,.qchip,.fgroup input[type=search],.vsel,.vsel label+label,.qchips .pill{border-color:var(--line)}
 .drow,.fgroup,.spc,.drev{border-top-color:var(--line)}
-.thumb,.nph,.dthumb,.gbig,.gtile,.gmore{background:#E6DFD3}
-.nph,.gbig span{color:#A89E90}
+.thumb,.nph,.dthumb,.gbig,.gtile,.gmore{background:#E5E8EE}
+.nph,.gbig span{color:#9AA1AD}
 .searchbar{border-color:var(--espresso)}
-.hs-list mark{background:#F1DCCB}
+.hs-list mark{background:#FBF0CC}
 .stars{color:var(--ember)}
-.code{background:#FBF1E6;border-color:var(--ember-soft)}
+.code{background:#F0FBFF;border-color:var(--ember-soft)}
 
 /* buttons: espresso pills */
 .btn{border-radius:999px;font-weight:500;letter-spacing:0}
 .btn:hover{filter:none;background:#000}
-.btn.pale{background:#E6DFD3;color:var(--espresso)}
-.btn.pale:hover,.btn.grey:hover{background:#DCD3C6}
+.btn.pale{background:#E5E8EE;color:var(--espresso)}
+.btn.pale:hover,.btn.grey:hover{background:#D8DCE4}
 .btn.outline,.btn.danger{border-radius:999px}
 .btn.outline:hover{background:var(--espresso);color:var(--paper)}
-.btn.danger:hover{background:var(--ember);color:#fff}
+.btn.danger:hover{background:var(--red);color:#fff}
 
 /* time slots: espresso, with the discount tag in ember-soft */
-.slot{color:var(--paper);font-weight:500}
+.slot{color:#fff;font-weight:500}
 .slot small{color:var(--ember-soft)}
-.slot:hover{background:#000}
+.slot:hover{background:#2A4572}
 .slot.more{background:var(--slot-pale);color:var(--espresso)}
-.ddays .slot.off,.ddays .none{background:var(--well);color:#B3A999}
+.ddays .slot.off,.ddays .none{background:var(--well);color:#A9AFBA}
 .badge{font-weight:600;letter-spacing:.02em}
 
 /* the phone tab bar */
-.tabs{background:rgba(251,248,242,.94);box-shadow:0 6px 28px rgba(60,45,30,.18)}
-.tabs a.on{background:#E6DFD3;color:var(--espresso)}
+.tabs{background:rgba(255,255,255,.94);box-shadow:0 6px 28px rgba(20,23,31,.18)}
+.tabs a.on{background:#E5E8EE;color:var(--espresso)}
 
 /* desktop hero band and footer */
-.dhero:not(.hasphoto){background:radial-gradient(520px 300px at 82% 20%,rgba(233,162,123,.22),transparent 70%),linear-gradient(180deg,#24201C,#1C1A17)}
+.dhero:not(.hasphoto){background:radial-gradient(520px 300px at 82% 20%,rgba(0,204,255,.22),transparent 70%),linear-gradient(180deg,#0B3247,#14171F)}
 /* area and city photos: a warm scrim instead of the old blue one */
-.hasphoto{background-image:linear-gradient(180deg,rgba(28,26,23,.38),rgba(28,26,23,.74)),var(--areaimg)!important}
-.dhero p{color:#D9CFC1}
-body.desk .dfoot{background:var(--espresso);color:#BFB5A7}
-.df-cols>div+div,.df-legal{border-color:rgba(243,238,229,.14)}
-.df-legal a{color:#E6DCCD}
+.hasphoto{background-image:linear-gradient(180deg,rgba(11,30,45,.38),rgba(11,30,45,.74)),var(--areaimg)!important}
+.dhero p{color:#C9D6E2}
+body.desk .dfoot{background:var(--espresso);color:#AFC4D3}
+.df-cols>div+div,.df-legal{border-color:rgba(245,246,249,.14)}
+.df-legal a{color:#E1EAF1}
 .dfoot .dbtn{border-radius:999px}
 
 /* city picker cards keep their photos; warmer scrim */
@@ -92,8 +82,8 @@ body.desk .dfoot{background:var(--espresso);color:#BFB5A7}
 @media (prefers-reduced-motion:reduce){body::after{opacity:.35}}
 
 /* restaurant names in the serif, like the landing page */
-.dname{font-family:var(--serif)!important;font-weight:400!important;font-size:30px!important;letter-spacing:-.01em;line-height:1.1}
-.nm{font-family:var(--serif);font-weight:400;font-size:22px;letter-spacing:-.005em}
+.dname{font-family:var(--sans)!important;font-weight:600!important;font-size:24px!important;letter-spacing:-.01em;line-height:1.15}
+.nm{font-family:var(--sans);font-weight:600;font-size:20px;letter-spacing:-.005em}
 
 /* ===================== Sleeker pass (22 Nov): closer to the landing page ===================== */
 
@@ -107,13 +97,13 @@ body.desk .dhead .hsearch{background:var(--card);border-color:var(--line);border
 
 /* section headings in the serif; small labels as spaced caps */
 .sechead{align-items:center;margin:4px 0 16px}
-.sechead h2{font:400 30px/1.1 var(--serif);letter-spacing:-.01em}
+.sechead h2{font:800 30px/1.1 var(--serif);letter-spacing:-.01em}
 .sechead a{font:500 11px var(--sans);letter-spacing:.2em;text-transform:uppercase;color:var(--espresso);text-decoration:none;border-bottom:1px solid var(--espresso);padding-bottom:2px}
 .fgroup h3{font:500 11px var(--sans);letter-spacing:.24em;text-transform:uppercase;color:var(--muted);margin:0 0 12px}
 .fgroup,.fgroup+.fgroup{border-top-color:var(--line)}
 .ck input[type=checkbox],.check input{accent-color:var(--espresso)}
 .howband{background:transparent;border:0;border-top:1px solid var(--line);border-radius:0;padding:36px 0 0}
-.howband h2{font:400 36px/1.1 var(--serif)!important}
+.howband h2{font:800 36px/1.1 var(--serif)!important}
 .howband li::before{color:var(--espresso)}
 
 /* filter chips: thin outlines, filled when on */
@@ -124,7 +114,7 @@ body.desk .dhead .hsearch{background:var(--card);border-color:var(--line);border
 .chiprow .pill svg{width:14px;height:14px}
 
 /* the search bar under the city header: flat, hairlines */
-.fbar{border-radius:14px;box-shadow:0 1px 2px rgba(60,45,30,.05),0 18px 44px rgba(60,45,30,.10)}
+.fbar{border-radius:14px;box-shadow:0 1px 2px rgba(20,23,31,.05),0 18px 44px rgba(20,23,31,.10)}
 
 /* results: no boxes, hairlines between, photo with a soft radius */
 .drow{border-top:1px solid var(--line)}
@@ -137,12 +127,12 @@ body.desk .dhead .hsearch{background:var(--card);border-color:var(--line);border
 /* day columns: caps day names, discount as small ember text, light outline time pills */
 .ddays{gap:10px}
 .ddays .dh{font:500 10.5px/1.5 var(--sans);letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
-.ddays .dh b{display:block;font:400 18px/1.1 var(--serif);letter-spacing:0;text-transform:none;color:var(--espresso)}
+.ddays .dh b{display:block;font:800 18px/1.1 var(--serif);letter-spacing:0;text-transform:none;color:var(--espresso)}
 .ddays .badge{background:transparent;color:var(--ember);font:600 10px var(--sans);letter-spacing:.14em;text-transform:uppercase;padding:0}
 .ddays .slot{background:transparent;color:var(--espresso);box-shadow:inset 0 0 0 1px var(--espresso);border-radius:999px;height:34px;line-height:34px;font-size:13px;font-weight:500;transition:background .2s ease,color .2s ease}
 .ddays .slot:hover{background:var(--espresso);color:var(--paper)}
 .ddays .slot.more{box-shadow:none;background:transparent;color:var(--muted);text-decoration:underline;text-underline-offset:3px;height:auto;line-height:1.4;font-size:12px}
-.ddays .slot.off,.ddays .none{background:transparent;box-shadow:inset 0 0 0 1px var(--line);color:#B3A999;border-radius:999px;height:34px;line-height:34px}
+.ddays .slot.off,.ddays .none{background:transparent;box-shadow:inset 0 0 0 1px var(--line);color:#A9AFBA;border-radius:999px;height:34px;line-height:34px}
 .slot[aria-pressed=true]{background:var(--espresso);color:var(--paper);box-shadow:none}
 
 /* "New on Early Bird" cards */
@@ -151,7 +141,7 @@ body.desk .dhead .hsearch{background:var(--card);border-color:var(--line);border
 
 /* restaurant page: serif headings, quieter booking card */
 body.desk .serif{font-size:36px}
-.vbook{background:var(--card);border:1px solid var(--line);border-radius:18px;box-shadow:0 1px 2px rgba(60,45,30,.05),0 24px 60px rgba(60,45,30,.13)}
+.vbook{background:var(--card);border:1px solid var(--line);border-radius:18px;box-shadow:0 1px 2px rgba(20,23,31,.05),0 24px 60px rgba(20,23,31,.13)}
 .vsel{border-radius:999px;overflow:hidden}
 .coright,#co .grp,details.disc{border-color:var(--line)}
 
@@ -161,9 +151,9 @@ body.desk .serif{font-size:36px}
 /* phone: app-style screens, same refinements */
 .res{border-left:0;border-right:0;border-radius:0;background:transparent}
 .thumb{border-radius:10px}
-.res .nm{font:400 24px/1.1 var(--serif)!important;letter-spacing:-.01em}
+.res .nm{font:600 20px/1.15 var(--sans)!important;letter-spacing:-.01em}
 .dcol .dh{font:500 11px var(--sans);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
-.dcol .dh b{display:block;font:400 17px var(--serif);letter-spacing:0;text-transform:none;color:var(--espresso)}
+.dcol .dh b{display:block;font:800 17px var(--serif);letter-spacing:0;text-transform:none;color:var(--espresso)}
 .dcol .badge{background:transparent;color:var(--ember);font:600 10px var(--sans);letter-spacing:.12em;text-transform:uppercase;padding:0}
 .dcol .slot{background:transparent;color:var(--espresso);box-shadow:inset 0 0 0 1px var(--espresso);border-radius:999px;font-size:14px;padding:9px 0}
 .dcol .slot.more{box-shadow:none;color:var(--muted);text-decoration:underline;font-size:12px}
@@ -183,33 +173,33 @@ body.desk .serif{font-size:36px}
 .vbook .ddays{-webkit-mask-image:linear-gradient(90deg,#000 86%,transparent);mask-image:linear-gradient(90deg,#000 86%,transparent);scrollbar-width:none}
 .vbook .ddays::-webkit-scrollbar{display:none}
 .vbook .serif{font-size:30px!important}
-.sec h2{font:400 32px/1.1 var(--serif)!important;letter-spacing:-.01em}
+.sec h2{font:800 32px/1.1 var(--serif)!important;letter-spacing:-.01em}
 .days{scrollbar-width:none;padding-left:18px;scroll-padding-left:18px;-webkit-mask-image:linear-gradient(90deg,#000 88%,transparent);mask-image:linear-gradient(90deg,#000 88%,transparent)}
 .days::-webkit-scrollbar{display:none}
 
 /* ===================== Floating top bar (owner, 22 Nov): blurred, rounded, a halo ring set apart from it, logo on the left ===================== */
 body.desk .dhead{position:sticky;top:14px;z-index:30;width:calc(100% - 40px);max-width:1240px;margin:14px auto 0;border-radius:999px;
-  background:rgba(251,248,242,.62);-webkit-backdrop-filter:saturate(170%) blur(22px);backdrop-filter:saturate(170%) blur(22px);
+  background:rgba(255,255,255,.62);-webkit-backdrop-filter:saturate(170%) blur(22px);backdrop-filter:saturate(170%) blur(22px);
   border:1px solid rgba(255,255,255,.55);border-bottom:1px solid rgba(255,255,255,.55);
-  box-shadow:0 1px 2px rgba(60,45,30,.06),0 14px 40px rgba(60,45,30,.12);
-  outline:1px solid rgba(28,26,23,.14);outline-offset:5px}
+  box-shadow:0 1px 2px rgba(20,23,31,.06),0 14px 40px rgba(20,23,31,.12);
+  outline:1px solid rgba(11,30,45,.14);outline-offset:5px}
 body.desk .dhead .dh-in{height:64px;padding:0 10px 0 22px;max-width:none}
-.dlogo{font:400 24px/1 var(--serif)!important;letter-spacing:-.01em;gap:9px}
+.dlogo{font:800 24px/1 var(--serif)!important;letter-spacing:-.01em;gap:9px}
 .dlogo img{border-radius:0;height:24px;width:auto}
-body.desk .dhead .hsearch{height:42px;background:rgba(243,238,229,.7)}
+body.desk .dhead .hsearch{height:42px;background:rgba(245,246,249,.7)}
 body.desk .dhead .hcity{border:0}
 /* the city photo band now sits under a floating bar: pull it up behind the bar */
 body.desk .dhero{margin-top:-92px;padding-top:120px}
 @media (max-width:1023px){body.desk .dhead{border-radius:28px}}
-body.desk .dhead{outline-color:rgba(150,136,118,.55)}
+body.desk .dhead{outline-color:rgba(120,128,140,.55)}
 
 /* ===================== Restaurant page: photos and menu easy to see (owner, 22 Nov) ===================== */
 /* gallery thumbnails share the .gtile name with the owner-stats tiles; undo that card styling inside the gallery */
-.gallery .gtile,.gallery .gbig{padding:0!important;border:0!important;border-radius:0!important;background:#E6DFD3!important;display:block}
+.gallery .gtile,.gallery .gbig{padding:0!important;border:0!important;border-radius:0!important;background:#E5E8EE!important;display:block}
 .gallery .gtile img,.gallery .gbig img{width:100%;height:100%;object-fit:cover;display:block}
 /* contained, rounded, a little taller, aligned with the page */
 .gallery{width:calc(100% - 48px);max-width:1192px;height:480px;border-radius:16px;overflow:hidden;margin:6px auto 0}
-.gallery .gmore{border-radius:999px;background:rgba(28,26,23,.78);font:500 12px var(--sans);letter-spacing:.14em;text-transform:uppercase;padding:10px 16px}
+.gallery .gmore{border-radius:999px;background:rgba(11,30,45,.78);font:500 12px var(--sans);letter-spacing:.14em;text-transform:uppercase;padding:10px 16px}
 /* the booking card no longer sits on top of the photos */
 .vbook{margin-top:28px!important}
 @media (max-width:1023px){.gallery{width:auto;height:260px;border-radius:0;margin:0}}
@@ -217,14 +207,14 @@ body.desk .dhead{outline-color:rgba(150,136,118,.55)}
 .menu summary{font:500 12px var(--sans)!important;letter-spacing:.2em;text-transform:uppercase;padding:18px 0}
 .menu details{border-top-color:var(--line)}
 .menu details[open]{padding-bottom:14px}
-.menu .item{padding:10px 0;border-top:1px solid var(--line-soft,#E6DFD3);align-items:baseline}
+.menu .item{padding:10px 0;border-top:1px solid var(--line-soft,#E5E8EE);align-items:baseline}
 .menu .item>div:first-child span{font-weight:500;font-size:15px;letter-spacing:.01em}
 .menu .item .d{font-size:13px;line-height:1.45;margin-top:2px}
 .menu .item .p{font-weight:500}
 /* the booking card stays in view while you read the page */
 body.desk .vbook{position:sticky;top:96px}
 /* phone restaurant page: serif section titles, photo strip that reads as swipeable */
-h2.title{font:400 28px/1.1 var(--serif)!important;letter-spacing:-.01em}
+h2.title{font:800 28px/1.1 var(--serif)!important;letter-spacing:-.01em}
 .photos{scrollbar-width:none;-webkit-mask-image:linear-gradient(90deg,#000 85%,transparent);mask-image:linear-gradient(90deg,#000 85%,transparent)}
 .photos::-webkit-scrollbar{display:none}
 .photos img{height:160px;border-radius:12px}
@@ -243,8 +233,8 @@ hr.rule{border:0;border-top:1px solid var(--line)}
 /* ===================== Search pill and offer note (owner, 22 Nov) ===================== */
 /* Meal / date / diners: one rounded, frosted pill with a halo ring like the top bar, caps labels over each value */
 body.desk .fbar{max-width:860px;margin:-38px auto 0;height:74px;border-radius:999px;top:96px;
-  background:rgba(251,248,242,.86);-webkit-backdrop-filter:saturate(170%) blur(20px);backdrop-filter:saturate(170%) blur(20px);
-  box-shadow:0 1px 2px rgba(60,45,30,.06),0 18px 44px rgba(60,45,30,.14);outline:1px solid rgba(150,136,118,.45);outline-offset:5px}
+  background:rgba(255,255,255,.86);-webkit-backdrop-filter:saturate(170%) blur(20px);backdrop-filter:saturate(170%) blur(20px);
+  box-shadow:0 1px 2px rgba(20,23,31,.06),0 18px 44px rgba(20,23,31,.14);outline:1px solid rgba(120,128,140,.45);outline-offset:5px}
 body.desk .fbar label{position:relative;padding:0 30px;gap:12px;color:var(--espresso)}
 body.desk .fbar label+label{border-left:1px solid var(--line)}
 body.desk .fbar label svg{width:18px;height:18px;stroke-width:1.6;color:var(--muted)}
@@ -253,30 +243,30 @@ body.desk .fbar label:nth-child(1)::before{content:"Meal"}
 body.desk .fbar label:nth-child(2)::before{content:"Date"}
 body.desk .fbar label:nth-child(3)::before{content:"Party"}
 body.desk .fbar select{padding:22px 0 4px;font:500 16px var(--sans);color:var(--espresso);width:100%}
-body.desk .fbar label:hover{background:rgba(230,223,211,.45)}
+body.desk .fbar label:hover{background:rgba(229,232,238,.45)}
 body.desk .fbar label:first-child{border-radius:999px 0 0 999px}
 body.desk .fbar label:last-child{border-radius:0 999px 999px 0}
 /* phones: same pill, no labels */
-body:not(.desk) .fbar{border-radius:999px;box-shadow:0 1px 2px rgba(60,45,30,.06),0 12px 30px rgba(60,45,30,.12)}
+body:not(.desk) .fbar{border-radius:999px;box-shadow:0 1px 2px rgba(20,23,31,.06),0 12px 30px rgba(20,23,31,.12)}
 
 /* "Diners get… / Restaurants list for free": no box, two quiet lines with caps labels */
-.offerbox{width:330px;background:transparent!important;border:0!important;-webkit-backdrop-filter:none;backdrop-filter:none;padding:0;border-left:1px solid rgba(243,238,229,.35)!important;padding-left:24px}
-.offerbox .offer{gap:16px;font-size:15px;line-height:1.45;color:#F3EEE5}
+.offerbox{width:330px;background:transparent!important;border:0!important;-webkit-backdrop-filter:none;backdrop-filter:none;padding:0;border-left:1px solid rgba(245,246,249,.35)!important;padding-left:24px}
+.offerbox .offer{gap:16px;font-size:15px;line-height:1.45;color:#F5F6F9}
 .offerbox .offer li svg{display:none}
 .offerbox .offer li span{display:block}
 .offerbox .offer b{display:block;font:500 10.5px var(--sans);letter-spacing:.24em;text-transform:uppercase;color:var(--ember-soft);margin-bottom:3px}
-.offerbox .offer a{color:#F3EEE5;text-decoration:none;border-bottom:1px solid rgba(243,238,229,.6);padding-bottom:1px;white-space:nowrap}
+.offerbox .offer a{color:#F5F6F9;text-decoration:none;border-bottom:1px solid rgba(245,246,249,.6);padding-bottom:1px;white-space:nowrap}
 .offerbox .offer a::after{content:" →"}
-.offerbox .offer a:hover{border-bottom-color:#F3EEE5}
+.offerbox .offer a:hover{border-bottom-color:#F5F6F9}
 /* phone header: same treatment */
 .mhero .offer b{display:block;font:500 10.5px var(--sans);letter-spacing:.22em;text-transform:uppercase;margin-bottom:2px}
 .mhero.hasphoto .offer b{color:var(--ember-soft)}
 .mhero .offer li svg{display:none}
 .mhero .offer li span{display:block}
-.mhero.hasphoto .offer a{color:#F3EEE5;text-decoration:none;border-bottom:1px solid rgba(243,238,229,.6)}
+.mhero.hasphoto .offer a{color:#F5F6F9;text-decoration:none;border-bottom:1px solid rgba(245,246,249,.6)}
 .mhero .offer a::after{content:" →"}
 /* phone meal/diners bar: rounded pill with the go button as a circle */
-.searchbar{border-radius:999px!important;border:1px solid var(--line)!important;background:rgba(251,248,242,.9)!important;box-shadow:0 1px 2px rgba(60,45,30,.06),0 12px 30px rgba(60,45,30,.10);outline:1px solid rgba(150,136,118,.4);outline-offset:4px;overflow:hidden}
+.searchbar{border-radius:999px!important;border:1px solid var(--line)!important;background:rgba(255,255,255,.9)!important;box-shadow:0 1px 2px rgba(20,23,31,.06),0 12px 30px rgba(20,23,31,.10);outline:1px solid rgba(120,128,140,.4);outline-offset:4px;overflow:hidden}
 .searchbar button:last-child,.searchbar .go{border-radius:999px!important;margin:5px;width:52px;height:52px;flex:none}
 .searchbar button{align-self:center!important;border-radius:999px!important;margin:5px!important;width:48px!important;height:48px!important}
 .searchbar button svg{width:22px;height:22px}
@@ -307,17 +297,17 @@ body.desk .vbook{top:24px}
 /* ===================== Search pill pickers (picker.js): blur behind, smooth panels ===================== */
 body.desk .fbar label{cursor:pointer;transition:background .25s ease}
 body.desk .fbar select{pointer-events:none}
-body.desk .fbar label.pk-on{background:rgba(230,223,211,.75)}
-.pk-backdrop{position:fixed;inset:0;z-index:40;background:rgba(243,238,229,.18);-webkit-backdrop-filter:blur(0px);backdrop-filter:blur(0px);opacity:0;
+body.desk .fbar label.pk-on{background:rgba(229,232,238,.75)}
+.pk-backdrop{position:fixed;inset:0;z-index:40;background:rgba(245,246,249,.18);-webkit-backdrop-filter:blur(0px);backdrop-filter:blur(0px);opacity:0;
   transition:opacity .3s ease,backdrop-filter .35s ease,-webkit-backdrop-filter .35s ease}
 .pk-backdrop.in{opacity:1;-webkit-backdrop-filter:blur(6px) saturate(110%);backdrop-filter:blur(6px) saturate(110%)}
 html.pk-open body.desk .fbar{z-index:45}
-.pk-pop{position:fixed;z-index:50;min-width:300px;max-width:min(560px,calc(100vw - 32px));background:rgba(251,248,242,.96);border:1px solid rgba(255,255,255,.7);
-  border-radius:24px;padding:20px 20px 18px;box-shadow:0 2px 4px rgba(60,45,30,.06),0 30px 80px rgba(60,45,30,.22);outline:1px solid rgba(150,136,118,.35);outline-offset:5px;
+.pk-pop{position:fixed;z-index:50;min-width:300px;max-width:min(560px,calc(100vw - 32px));background:rgba(255,255,255,.96);border:1px solid rgba(255,255,255,.7);
+  border-radius:24px;padding:20px 20px 18px;box-shadow:0 2px 4px rgba(20,23,31,.06),0 30px 80px rgba(20,23,31,.22);outline:1px solid rgba(120,128,140,.35);outline-offset:5px;
   -webkit-backdrop-filter:blur(24px) saturate(160%);backdrop-filter:blur(24px) saturate(160%);
   opacity:0;transform:translateY(-8px) scale(.97);transform-origin:var(--ox,50%) top;transition:opacity .28s cubic-bezier(.2,.7,.2,1),transform .38s cubic-bezier(.2,.7,.2,1)}
 .pk-pop.in{opacity:1;transform:none}
-.pk-h{margin:0 0 14px;font:400 24px/1.1 var(--serif);letter-spacing:-.01em;color:var(--espresso)}
+.pk-h{margin:0 0 14px;font:800 24px/1.1 var(--serif);letter-spacing:-.01em;color:var(--espresso)}
 .pk-opt{font:inherit;color:var(--espresso);background:transparent;border:0;cursor:pointer;transition:background .2s ease,color .2s ease,transform .2s ease,box-shadow .2s ease}
 .pk-opt:focus-visible{outline:2px solid var(--ember);outline-offset:2px}
 /* items arrive in a soft cascade */
@@ -328,10 +318,10 @@ html.pk-open body.desk .fbar{z-index:45}
 /* meal */
 .pk-meals{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;min-width:440px}
 .pk-meal{text-align:left;padding:16px;border-radius:18px;box-shadow:inset 0 0 0 1px var(--line)}
-.pk-meal b{display:block;font:400 24px/1.1 var(--serif)}
+.pk-meal b{display:block;font:800 24px/1.1 var(--serif)}
 .pk-meal span{display:block;margin-top:4px;font-size:12px;color:var(--muted)}
-.pk-meal:hover{background:rgba(230,223,211,.6)}
-.pk-meal.on{background:var(--espresso);color:var(--paper);box-shadow:none}.pk-meal.on span{color:#CFC6B8}
+.pk-meal:hover{background:rgba(229,232,238,.6)}
+.pk-meal.on{background:var(--espresso);color:var(--paper);box-shadow:none}.pk-meal.on span{color:#C9CED8}
 /* party */
 .pk-party{display:grid;grid-template-columns:repeat(6,48px);gap:10px}
 .pk-num{width:48px;height:48px;border-radius:999px;box-shadow:inset 0 0 0 1px var(--line);font:500 16px var(--sans)}
@@ -340,21 +330,21 @@ html.pk-open body.desk .fbar{z-index:45}
 /* discount */
 .pk-list{display:grid;gap:6px;min-width:300px}
 .pk-row{text-align:left;padding:12px 16px;border-radius:14px;font:500 15px var(--sans);display:flex;justify-content:space-between;align-items:center}
-.pk-row:hover{background:rgba(230,223,211,.6)}
+.pk-row:hover{background:rgba(229,232,238,.6)}
 .pk-row.on{background:var(--espresso);color:var(--paper)}
 .pk-gold{font-style:normal;font:700 9.5px var(--sans);letter-spacing:.14em;text-transform:uppercase;padding:3px 8px;border-radius:999px;color:#3B2A08;background:linear-gradient(180deg,#F1D896,#D9B05A)}
 /* date */
 .pk-kind-date{min-width:420px}
 .pk-all{display:flex;justify-content:space-between;align-items:center;width:100%;padding:12px 16px;border-radius:14px;margin-bottom:14px;box-shadow:inset 0 0 0 1px var(--line);font:500 15px var(--sans)}
 .pk-all span{font-size:12px;color:var(--muted)}
-.pk-all:hover{background:rgba(230,223,211,.6)}.pk-all.on{background:var(--espresso);color:var(--paper);box-shadow:none}.pk-all.on span{color:#CFC6B8}
+.pk-all:hover{background:rgba(229,232,238,.6)}.pk-all.on{background:var(--espresso);color:var(--paper);box-shadow:none}.pk-all.on span{color:#C9CED8}
 .pk-week,.pk-cal{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;text-align:center}
 .pk-week span{font:500 10px var(--sans);letter-spacing:.16em;text-transform:uppercase;color:var(--muted);padding-bottom:6px}
 .pk-day{display:flex;flex-direction:column;align-items:center;justify-content:center;height:62px;border-radius:16px}
 .pk-day small{font:500 9px var(--sans);letter-spacing:.14em;text-transform:uppercase;color:var(--muted);height:11px}
-.pk-day b{font:400 22px/1.1 var(--serif)}
+.pk-day b{font:800 22px/1.1 var(--serif)}
 .pk-day em{font-style:normal;font:500 9px var(--sans);letter-spacing:.1em;text-transform:uppercase;color:var(--ember);height:11px}
-.pk-day:hover{background:rgba(230,223,211,.7)}
+.pk-day:hover{background:rgba(229,232,238,.7)}
 .pk-day.on{background:var(--espresso);color:var(--paper)}.pk-day.on small,.pk-day.on em{color:var(--ember-soft)}
 @media (prefers-reduced-motion:reduce){.pk-pop,.pk-backdrop,.pk-opt{transition:none!important;animation:none!important}.pk-pop{transform:none}}
 .pk-backdrop.in{-webkit-backdrop-filter:blur(3px) saturate(105%);backdrop-filter:blur(3px) saturate(105%)}
@@ -362,7 +352,7 @@ html.pk-open body.desk .fbar{z-index:45}
 /* a tracked post (#/post/<code>): photo, title, its restaurants, and the app plug (owner, 22 Nov 2026) */
 .postview{padding-bottom:24px}
 .posthead{margin:6px 0 18px}
-.posthead .ph-img{border-radius:20px;overflow:hidden;aspect-ratio:4/3;background:#E6DFD3;margin:0 0 18px;box-shadow:0 18px 44px rgba(60,45,30,.12)}
+.posthead .ph-img{border-radius:20px;overflow:hidden;aspect-ratio:4/3;background:#E5E8EE;margin:0 0 18px;box-shadow:0 18px 44px rgba(20,23,31,.12)}
 .posthead .ph-img img{width:100%;height:100%;object-fit:cover;display:block}
 .posthead .ph-kicker{display:inline-flex;align-items:center;gap:6px;margin:0 0 8px;padding:4px 11px;border-radius:99px;background:linear-gradient(135deg,var(--gold-1,#F1D896),var(--gold-2,#D9B05A));color:var(--gold-ink,#3B2A08);font-size:12px;font-weight:600}
 .posthead .ph-kicker .i{width:14px;height:14px}
@@ -372,8 +362,8 @@ html.pk-open body.desk .fbar{z-index:45}
 .areafollow .btn{display:inline-flex;align-items:center;gap:8px}
 .areafollow .btn .i{width:18px;height:18px}
 .areafollow p{margin:0;flex:1 1 220px}
-.areafollow.lead{padding:14px 16px;border-radius:20px;background:var(--card);box-shadow:inset 0 0 0 2px var(--ember,#D9692E)}
-.appplug{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:22px 0 0;padding:16px 18px;border-radius:20px;background:var(--card);box-shadow:inset 0 0 0 1px var(--line),0 10px 30px rgba(60,45,30,.06)}
+.areafollow.lead{padding:14px 16px;border-radius:20px;background:var(--card);box-shadow:inset 0 0 0 2px var(--ember,#00779E)}
+.appplug{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:22px 0 0;padding:16px 18px;border-radius:20px;background:var(--card);box-shadow:inset 0 0 0 1px var(--line),0 10px 30px rgba(20,23,31,.06)}
 .appplug .ap-bird{flex:none;width:44px;height:44px;border-radius:50%;display:grid;place-items:center;background:var(--well);color:var(--ember)}
 .appplug .ap-bird .i{width:22px;height:22px}
 .appplug>div{flex:1;min-width:180px}
@@ -399,9 +389,9 @@ a.card.airow b{display:block;font-size:16px;font-weight:600}a.card.airow small{c
 .ai-ic .i{width:20px;height:20px}a.card.airow>.i{width:18px;height:18px;color:var(--muted)}
 .aiswitch{display:flex;align-items:center;gap:16px}
 .aiswitch>div{flex:1;min-width:0}.aiswitch b{display:block;font-size:16px;font-weight:600}.aiswitch small{display:block;color:var(--muted);font-size:14px;margin-top:2px}
-.sw{flex:none;width:52px;height:32px;border-radius:99px;border:0;padding:3px;background:#D6CEC2;cursor:pointer;transition:background .25s}
+.sw{flex:none;width:52px;height:32px;border-radius:99px;border:0;padding:3px;background:#D3D8E0;cursor:pointer;transition:background .25s}
 .sw i{display:block;width:26px;height:26px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.2);transition:transform .25s cubic-bezier(.2,.7,.2,1)}
-.sw[aria-checked=true]{background:var(--sage,#4F7350)}.sw[aria-checked=true] i{transform:translateX(20px)}
+.sw[aria-checked=true]{background:var(--sage,#3E8E41)}.sw[aria-checked=true] i{transform:translateX(20px)}
 .ai-lim{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;border-top:1px solid var(--line)}
 .ai-lim:first-of-type{border-top:0}.ai-lim label{font-size:15px}
 .ai-lim select{width:auto;margin:0;padding:8px 12px;border-radius:999px}
@@ -415,20 +405,20 @@ a.card.airow b{display:block;font-size:16px;font-weight:600}a.card.airow small{c
 .biohead .ph-kicker{display:inline-flex;align-items:center;gap:6px;margin:0 0 8px;padding:4px 11px;border-radius:99px;background:linear-gradient(135deg,var(--gold-1,#F1D896),var(--gold-2,#D9B05A));color:var(--gold-ink,#3B2A08);font-size:12px;font-weight:600}
 .biohead .ph-kicker .i{width:14px;height:14px}
 .biogrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.biotile{position:relative;display:block;aspect-ratio:4/5;border-radius:16px;overflow:hidden;background:#E6DFD3;text-decoration:none;color:#fff;box-shadow:0 8px 24px rgba(60,45,30,.10);transition:transform .25s cubic-bezier(.2,.7,.2,1)}
+.biotile{position:relative;display:block;aspect-ratio:4/5;border-radius:16px;overflow:hidden;background:#E5E8EE;text-decoration:none;color:#fff;box-shadow:0 8px 24px rgba(20,23,31,.10);transition:transform .25s cubic-bezier(.2,.7,.2,1)}
 .biotile:active{transform:scale(.98)}
 .biotile img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
-.biotile::after{content:"";position:absolute;inset:45% 0 0;background:linear-gradient(transparent,rgba(20,16,12,.78))}
+.biotile::after{content:"";position:absolute;inset:45% 0 0;background:linear-gradient(transparent,rgba(20,23,31,.78))}
 .biotile .bt-txt{position:absolute;left:12px;right:12px;bottom:11px;z-index:1;display:flex;flex-direction:column;gap:2px}
-.biotile b{font:400 19px/1.1 var(--serif);letter-spacing:-.01em}.biotile small{font-size:12px;opacity:.85}
+.biotile b{font:800 19px/1.1 var(--serif);letter-spacing:-.01em}.biotile small{font-size:12px;opacity:.85}
 @media (min-width:1024px){.bioview{max-width:880px;margin:0 auto}.biogrid{grid-template-columns:repeat(3,1fr);gap:14px}}
 @media (prefers-reduced-motion:reduce){.biotile{transition:none}}
 
 /* the post header as a photo mosaic (0221 post.mosaic, like the app's PhotoMosaic; owner, 22 Nov 2026) */
 .posthead .mosaic{display:grid;gap:2px;height:230px;margin:-8px calc(50% - 50vw) 16px;width:100vw;background:var(--paper);
   -webkit-mask-image:linear-gradient(#000 0,#000 55%,transparent);mask-image:linear-gradient(#000 0,#000 55%,transparent)}
-.posthead .mosaic .mt{position:relative;overflow:hidden;background:#E6DFD3}
-.posthead .mosaic .mt.none{background:#E6DFD3}
+.posthead .mosaic .mt{position:relative;overflow:hidden;background:#E5E8EE}
+.posthead .mosaic .mt.none{background:#E5E8EE}
 .posthead .mosaic img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
 .mosaic.m1{grid-template-columns:1fr}
 .mosaic.m2{grid-template-columns:1fr 1fr}
@@ -440,14 +430,14 @@ a.card.airow b{display:block;font-size:16px;font-weight:600}a.card.airow small{c
 .pnote{margin-top:3px;font-size:13px;font-weight:500;color:var(--ember)}
 
 /* not an Early Bird partner yet: the notice and the booking's Get help row (owner, 22 Nov 2026) */
-.npnote{display:flex;gap:10px;align-items:flex-start;margin:10px 0 12px;padding:11px 13px;border-radius:14px;background:#FBF1E6;box-shadow:inset 0 0 0 1px var(--ember-soft);font-size:14px;line-height:1.45;color:var(--espresso)}
+.npnote{display:flex;gap:10px;align-items:flex-start;margin:10px 0 12px;padding:11px 13px;border-radius:14px;background:#F0FBFF;box-shadow:inset 0 0 0 1px var(--ember-soft);font-size:14px;line-height:1.45;color:var(--espresso)}
 .npnote .i{flex:none;width:18px;height:18px;color:var(--ember);margin-top:1px}
 .npnote b{font-weight:600}.npnote a{color:var(--ember);white-space:nowrap}
 a.helprow{display:flex;align-items:center;gap:12px;padding:10px 0 4px;text-decoration:none;color:inherit}
 a.helprow>span{flex:1;min-width:0}a.helprow b{display:block;font-weight:600}a.helprow small{display:block;color:var(--muted);font-size:14px;margin-top:2px}
 a.helprow>.i{width:18px;height:18px;color:var(--muted)}
 /* terms update notice (22 Nov 2026), above every page until closed */
-.tnote{display:flex;gap:10px;align-items:flex-start;max-width:760px;margin:10px auto 0;padding:11px 13px;border-radius:14px;background:#FBF1E6;box-shadow:inset 0 0 0 1px var(--ember-soft);font-size:14px;line-height:1.45;color:var(--espresso)}
+.tnote{display:flex;gap:10px;align-items:flex-start;max-width:760px;margin:10px auto 0;padding:11px 13px;border-radius:14px;background:#F0FBFF;box-shadow:inset 0 0 0 1px var(--ember-soft);font-size:14px;line-height:1.45;color:var(--espresso)}
 body:not(.desk) .tnote{margin:10px 16px 0}
 .tnote>.i{flex:none;width:18px;height:18px;color:var(--ember);margin-top:1px}
 .tnote b{font-weight:600}.tnote a{color:var(--ember)}
@@ -455,20 +445,25 @@ body:not(.desk) .tnote{margin:10px 16px 0}
 .tnote button{flex:none;border:0;background:none;padding:2px;margin:-2px -4px 0 0;color:var(--espresso);cursor:pointer}
 .tnote button .i{width:18px;height:18px}
 /* preview listings (0263): a restaurant that isn't on Early Bird yet: no times, a Notify me (owner, 23 Nov 2026) */
-.pvnote{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:12px 18px 4px;padding:14px 16px;border-radius:16px;background:var(--well,#EEE8DE)}
+.pvnote{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:12px 18px 4px;padding:14px 16px;border-radius:16px;background:var(--well,#ECEEF3)}
 .pvnote .pvtxt{flex:1 1 200px;min-width:0}
-.pvnote b{display:block;font-size:15px;font-weight:600;color:var(--espresso,#1C1A17)}
-.pvnote span{color:var(--muted,#6B645A);font-size:14px;line-height:1.45}
+.pvnote b{display:block;font-size:15px;font-weight:600;color:var(--espresso,#14171F)}
+.pvnote span{color:var(--muted,#5F6673);font-size:14px;line-height:1.45}
 .pvnote .pvbtn{width:auto;flex:none;margin:0;padding:10px 16px;font-size:14px;display:inline-flex;align-items:center;gap:6px}
 .pvnote .pvbtn span{color:inherit;font-size:inherit}
 .pvnote .pvbtn .i{width:16px;height:16px}
-.pvnote .pvbtn[aria-pressed=true]{background:var(--espresso,#1C1A17);color:var(--paper,#F3EEE5)}
+.pvnote .pvbtn[aria-pressed=true]{background:var(--espresso,#14171F);color:var(--paper,#F5F6F9)}
 .drow .pvnote,.vbook .pvnote,.sheethead+.pvnote,.title+.pvnote{margin:12px 0 4px}
 /* full-price items picker (0275): restaurant pitch and deal editor (owner, 23 Nov 2026) */
 .itempick{display:flex;align-items:center;gap:10px 18px;flex-wrap:wrap;margin:10px 0 12px}
 .itempick .check{margin:0}
 .itempick .itextra{display:inline-flex;align-items:center;gap:8px;font-weight:500}
-.itempick select{font:inherit;padding:8px 10px;border-radius:10px;border:0;box-shadow:inset 0 0 0 1px var(--line,#E2DACE);background:var(--card,#FBF8F2)}
-.itimpact{margin:4px 0 14px;padding:12px 14px;border-radius:14px;background:var(--well,#EEE8DE)}
+.itempick select{font:inherit;padding:8px 10px;border-radius:10px;border:0;box-shadow:inset 0 0 0 1px var(--line,#E3E6EC);background:var(--card,#FFFFFF)}
+.itimpact{margin:4px 0 14px;padding:12px 14px;border-radius:14px;background:var(--well,#ECEEF3)}
 .itimpact:empty{display:none}
 .itimpact p{margin:0 0 4px}
+
+/* diet and allergy consent text in checkout (0281) */
+details.disc .hc-body{padding:0 0 14px;color:var(--muted)}
+details.disc .hc-body p{margin:0 0 8px}
+details.disc .hc-body ul{margin:0 0 8px;padding-left:18px}

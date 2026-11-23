@@ -67,6 +67,9 @@ const ICONS = {
 };
 const ic = (n, cls = "") => `<svg class="i ${cls}" viewBox="0 0 24 24" aria-hidden="true">${ICONS[n] || ""}</svg>`;
 
+// The card photo: the server's mosaic puts the best venue shot first (an exterior or view of quality 3+, labelled by the
+// photo-label read), else the best food (0250), the same order the app uses. Older fields are the fallback.
+const cardPhoto = (v) => (v && ((v.mosaic || []).find((m) => m && m.url)?.url || v.photo || (v.dish_photos || [])[0])) || "";
 const ERR = {
   sold_out: "That table was just taken. Please pick another time.",
   slot_in_past: "That time is too soon to book. Please pick a later one.",
@@ -86,6 +89,7 @@ const ERR = {
   code_busy: "Please try again in a moment.",
   payments_not_configured: "Card payments aren't switched on yet. Please try again later.",
   config_unavailable: "Payments are temporarily unavailable. Please try again.",
+  terms_required: "To book, please agree to the updated Terms first.",
   not_yet_bookable: "This restaurant isn't taking Early Bird bookings yet. Tap Notify me and we'll tell you in the app when it does.",
 };
 class ApiError extends Error { constructor(code, message, status) { super(message || code); this.code = code; this.status = status; } }
@@ -299,7 +303,7 @@ async function drawChrome(path) {
   const head = document.getElementById("dhead"), foot = document.getElementById("dfoot");
   head.hidden = foot.hidden = !desk;
   if (!desk) return;
-  const legal = `<div class="df-legal"><a href="../terms.html">Terms</a><a href="../privacy.html">Privacy</a><a href="../consumer-health-data.html">Health data</a><a href="../credit-terms.html">${esc(CREDIT)} terms</a><a href="../support.html">Support</a><span>© 2026 Early Bird</span></div>`;
+  const legal = `<div class="df-legal"><a href="../legal.html">Legal</a><a href="../privacy.html">Privacy</a><a href="../support.html">Support</a><span>© 2026 Ngassa Holdings LLC, doing business as Early Bird</span></div>`;
   if (minimal) {
     head.innerHTML = ""; head.hidden = true; // the booking page is a sheet, like the app: no header
     foot.innerHTML = `<div class="df-in df-min">${legal}</div>`;
@@ -354,7 +358,7 @@ async function drawChrome(path) {
 const SUPPORT = "support@eatearlybird.com";
 const isPartner = (v) => v?.is_partner === true;
 const npNote = (v) => (isPartner(v) ? "" : `<div class="npnote">${ic("info")}<span><b>Not an Early Bird partner yet</b> · If they don't honour 50% off, your fee comes back. <a href="../terms.html#6-the-discount-and-the-rules-for-it" target="_blank" rel="noopener">How it works</a></span></div>`);
-const legalLinks = `<div class="legal"><a href="../terms.html">Terms</a><a href="../privacy.html">Privacy</a><a href="../consumer-health-data.html">Health data</a><a href="../credit-terms.html">${esc(CREDIT)} terms</a><a href="../support.html">Support</a></div>`;
+const legalLinks = `<div class="legal"><a href="../legal.html">Legal</a><a href="../privacy.html">Privacy</a><a href="../support.html">Support</a></div>`;
 const topbar = (right = "") => `<div class="wash"><div class="col"><div class="topbar${right ? "" : " empty"}">${right}</div></div></div>`;
 const showPage = (inner, { wash = true, right = "", size = "" } = {}) => {
   if (isDesk()) { APP.innerHTML = `<div class="col ${size || (Auth.session() ? "" : "narrow")}">${inner}</div>`; return; }
@@ -615,7 +619,7 @@ async function loadResults(append) {
   } finally { H.loading = false; }
 }
 function thumbHtml(v) {
-  const img = v.photo || (v.dish_photos || [])[0];
+  const img = cardPhoto(v);
   return `<div class="thumb">${esc((v.name || "?").charAt(0))}${img ? `<img src="${esc(img)}" alt="" loading="lazy" onerror="this.remove()">` : ""}</div>`;
 }
 /* Preview listings (backend 0263, 23 Nov 2026): a listed restaurant that hasn't joined Early Bird (not a partner on the
@@ -739,7 +743,7 @@ async function viewPost(code, q) {
     || (order.get(a.slug) ?? 0) - (order.get(b.slug) ?? 0));
   // the post's own pick for each restaurant (0231: its best photo or dish, the cover only as a fallback)
   const picked = Object.fromEntries((p.venues || []).filter((x) => x.slug && /^https:\/\//.test(x.photo || "")).map((x) => [x.slug, x.photo]));
-  rows.forEach((v) => { if (picked[v.slug]) v.photo = picked[v.slug]; });
+  rows.forEach((v) => { if (picked[v.slug]) { v.photo = picked[v.slug]; v.mosaic = [{ url: picked[v.slug] }]; } });   // the post's own photo wins
   const grid = document.getElementById("grid"); if (!grid) return;
   grid.innerHTML = rows.length ? rows.map(isDesk() ? resultHtmlDesk : resultHtml).join("")
     : `<div class="card center muted">These restaurants aren't taking Early Bird bookings right now. <a href="#/">See other restaurants</a></div>`;
@@ -944,7 +948,7 @@ async function viewHomeDesk() {
   if (!H.map && !filterOn && !H.near) rpc("search_venues", { p_lat: city.lat, p_lng: city.lng, p_radius_km: city.radius_km || 25, p_sort: "new", p_limit: 4 }).then((rows) => {
     const el = document.getElementById("newarr"); if (!el || !rows.length) return;
     el.innerHTML = `<div class="sechead"><h2>New on Early Bird</h2><a href="#/?${new URLSearchParams(homeParams({ sort: "new" }))}">See all</a></div><div class="ncards">${rows.map((v) => `
-      <a class="ncard" href="#/r/${esc(v.slug)}?meal=${H.meal}&diners=${H.diners}"><div class="nph">${esc(v.name.charAt(0))}${(v.photo || v.dish_photos?.[0]) ? `<img src="${esc(v.photo || v.dish_photos[0])}" alt="" loading="lazy" onerror="this.remove()">` : ""}</div>
+      <a class="ncard" href="#/r/${esc(v.slug)}?meal=${H.meal}&diners=${H.diners}"><div class="nph">${esc(v.name.charAt(0))}${cardPhoto(v) ? `<img src="${esc(cardPhoto(v))}" alt="" loading="lazy" onerror="this.remove()">` : ""}</div>
         <b>${esc(v.name)}</b><span>${esc([v.area, (v.cuisines || [])[0]].filter(Boolean).join(" • "))}</span>${v.rating != null ? `<span>${stars5(v.rating)} ${Number(v.rating).toFixed(1)} (${v.review_count})</span>` : `<span class="muted">New</span>`}</a>`).join("")}</div>`;
   }).catch(() => {});
   await loadResults(false);
@@ -973,7 +977,7 @@ function resultHtmlDesk(v) {
     }).join("");
   }
   const where = [distTxt(v) && `<b class="dist">${distTxt(v)}</b>`, v.area && `${ic("pin")}${esc(v.area)}`, cuisineText(v) && `${ic("fork")}${esc(cuisineText(v))}`, priceTxt(v)].filter(Boolean).join("");
-  return `<article class="drow"><a class="dthumb" href="${href}">${esc((v.name || "?").charAt(0))}${(v.photo || v.dish_photos?.[0]) ? `<img src="${esc(v.photo || v.dish_photos[0])}" alt="" loading="lazy" onerror="this.remove()">` : ""}${v.rating >= 4.7 && v.review_count >= 20 ? '<span class="ribbon">Top rated</span>' : ""}</a>
+  return `<article class="drow"><a class="dthumb" href="${href}">${esc((v.name || "?").charAt(0))}${cardPhoto(v) ? `<img src="${esc(cardPhoto(v))}" alt="" loading="lazy" onerror="this.remove()">` : ""}${v.rating >= 4.7 && v.review_count >= 20 ? '<span class="ribbon">Top rated</span>' : ""}</a>
     <div class="dbody"><div class="dtop"><a class="dname" href="${href}">${esc(v.name)} <span aria-hidden="true">›</span></a>${v.rating != null ? `<span class="drate">${Number(v.rating).toFixed(1)} ${stars5(v.rating)} <span class="muted">(${v.review_count})</span></span>` : isPreview(v) ? "" : '<span class="drate muted">New on Early Bird</span>'}</div>
       <div class="dwhere">${where}</div>${isPreview(v) ? previewHtml(v) + "</div></article>" : `${v._note ? `<div class="pnote">${esc(v._note)}</div>` : ""}
       ${d ? `<div class="dfacts"><span>${ic("card")}${m0(d.fee_per_diner_cents)} booking fee per diner</span>${S.config.reward_per_booking_cents > 0 ? `<span>${ic("bird")}+${m0(S.config.reward_per_booking_cents)} ${esc(CREDIT)}</span>` : ""}</div>` : ""}
@@ -1017,7 +1021,7 @@ async function viewVenue(slug, q) {
   const meals = deal?.meals?.length ? deal.meals : ["dinner"];
   const maxD = Math.min(deal?.max_diners || 6, S.config.max_party || 12);
   const B = { diners: Math.min(Number(q.diners) || 2, maxD), meal: meals.includes(q.meal) ? q.meal : meals.includes("dinner") ? "dinner" : meals[0], date: q.date || null, time: null, avail: null, loading: true };
-  const img = v.photo || (v.dish_photos || [])[0];
+  const img = cardPhoto(v);
   const today = todayAt(v.timezone), dow = dateObj(today).getUTCDay();
   const hoursRows = [1, 2, 3, 4, 5, 6, 0].map((d) => {
     const h = (v.hours || []).filter((x) => x.d === d);
@@ -1100,7 +1104,7 @@ async function viewVenueDesk(v, q) {
   const meals = deal?.meals?.length ? deal.meals : ["dinner"];
   const maxD = Math.min(deal?.max_diners || 6, S.config.max_party || 12);
   const B = { diners: Math.min(Number(q.diners) || 2, maxD), meal: meals.includes(q.meal) ? q.meal : meals.includes("dinner") ? "dinner" : meals[0], avail: null, loading: true };
-  const photos = [...new Set([v.photo, ...(v.dish_photos || []), ...(v.photos || [])].filter(Boolean))];
+  const photos = [...new Set([...(v.mosaic || []).map((m) => m && m.url), v.photo, ...(v.dish_photos || []), ...(v.photos || [])].filter(Boolean))];
   const today = todayAt(v.timezone), dow = dateObj(today).getUTCDay();
   const hoursRows = [1, 2, 3, 4, 5, 6, 0].map((d) => {
     const h = (v.hours || []).filter((x) => x.d === d);
@@ -1163,7 +1167,7 @@ async function viewVenueDesk(v, q) {
     rows = rows.filter((r) => r.id !== v.id).slice(0, 8);
     const el = document.getElementById("nearby"); if (!el || !rows.length) return;
     el.innerHTML = `<h2 class="serif">Nearby${v.area ? ` ${esc(v.area)}` : ""} restaurants</h2><div class="ncards scroll">${rows.map((r) => `
-      <a class="ncard" href="#/r/${esc(r.slug)}?meal=${B.meal}&diners=${B.diners}"><div class="nph">${esc(r.name.charAt(0))}${(r.photo || r.dish_photos?.[0]) ? `<img src="${esc(r.photo || r.dish_photos[0])}" alt="" loading="lazy" onerror="this.remove()">` : ""}</div>
+      <a class="ncard" href="#/r/${esc(r.slug)}?meal=${B.meal}&diners=${B.diners}"><div class="nph">${esc(r.name.charAt(0))}${cardPhoto(r) ? `<img src="${esc(cardPhoto(r))}" alt="" loading="lazy" onerror="this.remove()">` : ""}</div>
         <b>${esc(r.name)}</b><span>${esc([r.area, (r.cuisines || [])[0]].filter(Boolean).join(" • "))}</span>${r.rating != null ? `<span>${stars5(r.rating)} ${Number(r.rating).toFixed(1)}</span>` : ""}</a>`).join("")}</div>`;
   }).catch(() => {});
   if (!deal || isPreview(v)) return;
@@ -1198,6 +1202,29 @@ function photoDialog(photos, start) {
     d.querySelector("#ph-x").onclick = () => d.close(); };
   d.onclose = () => d.classList.remove("wide-dlg");
   draw(); d.showModal();
+}
+// 0286: signed-in diners must accept the current Terms (which cover the AI checks) before a new hold. The server's
+// guest.terms_summary is the canonical line; this copy is only used if it can't be read. Resolves true once accepted.
+const TERMS_SUMMARY_FALLBACK = "By continuing you agree to the Terms and Privacy Policy. Receipts you scan and the reviews and photos you post are read by our AI provider, Anthropic, to check them.";
+async function termsDialog() {
+  const st = await rpc("guest_terms_status").catch(() => null);
+  const summary = st?.summary || TERMS_SUMMARY_FALLBACK;
+  const d = document.getElementById("dlg");
+  return new Promise((resolve) => {
+    let ok = false;
+    d.innerHTML = `<h2>We've updated our Terms</h2><p>${esc(summary)}</p>
+      <p class="small"><a href="../terms.html" target="_blank" rel="noopener">Terms</a> · <a href="../privacy.html" target="_blank" rel="noopener">Privacy Policy</a></p>
+      <div class="ferr" id="e-tg" role="alert" hidden></div>
+      <div class="actions"><button class="btn" type="button" id="tg-ok">Agree and continue</button><button class="btn grey" type="button" id="tg-no">Not now</button></div>`;
+    d.querySelector("#tg-no").onclick = () => d.close();
+    d.querySelector("#tg-ok").onclick = async (ev) => {
+      const b = ev.currentTarget; b.disabled = true; b.textContent = "Saving…";
+      try { await rpc("accept_guest_terms", { p_version: null, p_source: "web" }); ok = true; d.close(); }
+      catch (e) { b.disabled = false; b.textContent = "Agree and continue"; const er = d.querySelector("#e-tg"); er.textContent = friendly(e); er.hidden = false; }
+    };
+    d.onclose = () => resolve(ok);
+    d.showModal();
+  });
 }
 async function mapDialog(v) {
   const d = document.getElementById("dlg");
@@ -1335,6 +1362,8 @@ async function viewSignIn(q) {
 }
 
 /* ───────────────────────────── checkout: "Make a booking" ───────────────────────────── */
+// Diets and allergies: no separate consent prompt (owner, 23 Nov 2026: "Privacy Policy only"). The Privacy Policy and the
+// Consumer Health Data Privacy Policy cover a diet or allergy written in the request.
 const HEALTH_WORDS = /\b(allerg\w*|intoleran\w*|anaphyla\w*|epi-?pen|coeliac|celiac|gluten\w*|dairy|lactose|(tree )?nuts?|peanuts?|shellfish|sesame|soy|eggs?|vegan|vegetarian|pescatarian|halal|kosher|diets?|dietary|diabet\w*|pregnan\w*)\b/i;
 function normalisePhone(raw) {
   const t = String(raw || "").trim(), digits = t.replace(/\D/g, "");
@@ -1359,7 +1388,11 @@ async function viewCheckout(q) {
   const out = (msg, e) => { const other = e?.code === "overlapping_booking" && e.hint;
     if (e?.code === "not_yet_bookable") return showPage(`<div class="sheethead"><h1>${esc(v.name)}</h1><a class="x" href="#/r/${esc(v.slug)}" aria-label="Close">${ic("x")}</a></div>${previewHtml(v)}<a class="btn pale" href="#/r/${esc(v.slug)}" style="margin-top:12px">See ${esc(v.name)}</a>`, { wash: false });
     showPage(`<div class="sheethead"><h1>${other ? "You already have a table then" : "Couldn't hold that table"}</h1><a class="x" href="#/r/${esc(v.slug)}" aria-label="Close">${ic("x")}</a></div><div class="msg err">${esc(msg)}</div>${other ? `<a class="btn" href="#/booking/${esc(other)}">View booking</a><a class="btn pale" href="#/r/${esc(v.slug)}" style="margin-top:10px">Choose another time</a>` : `<a class="btn" href="#/r/${esc(v.slug)}">Choose another time</a>`}`, { wash: false }); };
-  const makeHold = async () => { C.hold = await rpc("hold", { p_device: deviceId, p_deal: wanted.deal, p_date: wanted.date, p_time: wanted.time, p_diners: wanted.diners, p_meal: wanted.meal, p_option: wanted.option }); };
+  const holdOnce = () => rpc("hold", { p_device: deviceId, p_deal: wanted.deal, p_date: wanted.date, p_time: wanted.time, p_diners: wanted.diners, p_meal: wanted.meal, p_option: wanted.option });
+  const makeHold = async () => {
+    try { C.hold = await holdOnce(); }
+    catch (e) { if (e.code !== "terms_required" || !(await termsDialog())) throw e; C.hold = await holdOnce(); }   // 0286
+  };
   const hd = () => C.hold;
   const payNeeded = () => hd().payment_mode === "stripe" && hd().amount_due_cents > 0;
   const prepPayment = async () => { C.intent = payNeeded() && !guest ? await pay("intent", { claim_id: hd().booking_id }) : null; };
@@ -1442,9 +1475,7 @@ async function viewCheckout(q) {
       <section class="grp"><h2 class="grp-h">Your details</h2>
         ${field("c-name", "Name", `<input id="c-name" type="text" autocomplete="name" maxlength="80" value="${esc(d.name)}" placeholder="First and last name">`)}
         ${field("c-phone", "Mobile", `<input id="c-phone" type="tel" autocomplete="tel" inputmode="tel" maxlength="32" placeholder="(310) 555-0101" value="${esc(d.phone)}">`, "Only for this booking, if the restaurant needs to reach you.")}
-        ${field("c-req", "Request <span class=\"optl\">optional</span>", `<input id="c-req" type="text" maxlength="500" value="${esc(d.request)}" placeholder="Allergies, a high chair, a window seat…">`)}
-        <label class="check small" id="w-c-hd"><input type="checkbox" id="c-hd" ${d.healthOk ? "checked" : ""}><span>If my request mentions an allergy or a diet, I agree Early Bird shares it with ${esc(v.name)} for this booking only. Your request is deleted 30 days after the booking (<a href="../consumer-health-data.html" target="_blank" rel="noopener">Consumer Health Data Privacy Policy</a>).</span></label>
-        <div class="ferr" id="e-c-hd" role="alert" hidden></div>
+        ${field("c-req", "Request <span class=\"optl\">optional</span>", `<input id="c-req" type="text" maxlength="500" value="${esc(d.request)}" placeholder="Allergies, a high chair, a window seat…">`, `Goes to ${esc(v.name)} for this booking and is deleted 30 days after it. Diets and allergies: <a href="../consumer-health-data.html" target="_blank" rel="noopener">Consumer Health Data Privacy Policy</a>.`)}
       </section>
       ${payNeeded() && guest ? `<section class="grp"><h2 class="grp-h">Payment</h2><p class="small muted" style="margin:0">Next, sign in or create a free account, then pay ${money(due())} with Apple Pay, Google Pay or a card. Your table stays held.</p></section>`
         : payNeeded() ? `<section class="grp"><h2 class="grp-h">Payment</h2><div id="express-element"></div><div id="pay-element"></div><div class="ferr" id="e-card" role="alert" hidden></div></section>` : ""}
@@ -1475,7 +1506,7 @@ async function viewCheckout(q) {
   }
   const capture = () => {
     const d = C.details;
-    d.name = val("c-name"); d.phone = val("c-phone"); d.request = val("c-req"); d.healthOk = !!document.getElementById("c-hd")?.checked;
+    d.name = val("c-name"); d.phone = val("c-phone"); d.request = val("c-req");
     d.share = !!document.getElementById("c-sh")?.checked; d.marketing = !!document.getElementById("c-mk")?.checked; d.accepted = !!document.getElementById("c-ok")?.checked;
     const fv = document.querySelector('input[name="c-fv"]:checked'); d.firstVisit = fv ? fv.value === "true" : null; // optional; tells the restaurant (0200)
     if (document.getElementById("c-ref")) { d.venueRef = val("c-ref"); d.bookedWithVenue = document.getElementById("c-bv").checked; }
@@ -1500,8 +1531,6 @@ async function viewCheckout(q) {
     const d = C.details, h = hd();
     if (d.name.trim().length < 2) return ["c-name", "Add your name for the booking."];
     if (!normalisePhone(d.phone)) return ["c-phone", d.phone ? "That doesn't look like a mobile number. Use 10 digits, or + and your country code." : "Add your mobile number."];
-    // consumer health data (Washington MHMDA, 0277): an allergy or diet in the request needs the diner's consent to share it
-    if (HEALTH_WORDS.test(d.request || "") && !d.healthOk) return ["c-hd", "Tick this to share the allergy or diet with the restaurant, or take it out of your request."];
     if (h.reservation_url && !d.bookedWithVenue) return ["c-bv", `Book with ${v.name} first, then tick this.`];
     if (!skipCard && payNeeded() && !C.cardComplete) return ["card", "Add your card details, or use Apple Pay / Google Pay above."];
     if (!d.accepted) return ["c-ok", "Tick to agree to the conditions."];
@@ -1864,7 +1893,7 @@ async function viewAiBookings() {
     try {
       const r = await pay("card_setup");
       stripe = Stripe(r.publishable_key);
-      elements = stripe.elements({ clientSecret: r.client_secret, appearance: { theme: "stripe", variables: { colorPrimary: "#1C1A17", colorText: "#1C1A17", colorDanger: "#A8401C", fontFamily: "-apple-system, BlinkMacSystemFont, system-ui, sans-serif", borderRadius: "12px", fontSizeBase: "16px" } } });
+      elements = stripe.elements({ clientSecret: r.client_secret, appearance: { theme: "stripe", variables: { colorPrimary: "#14171F", colorText: "#14171F", colorDanger: "#C8402F", fontFamily: "-apple-system, BlinkMacSystemFont, system-ui, sans-serif", borderRadius: "12px", fontSizeBase: "16px" } } });
       elements.create("payment", { layout: "tabs", paymentMethodOrder: ["card"], wallets: { applePay: "never", googlePay: "never" } }).mount("#ai-pe");
     } catch (e) { fail(e); }
   }

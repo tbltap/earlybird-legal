@@ -358,3 +358,20 @@ html.pk-open body.desk .fbar{z-index:45}
 .pk-day.on{background:var(--espresso);color:var(--paper)}.pk-day.on small,.pk-day.on em{color:var(--ember-soft)}
 @media (prefers-reduced-motion:reduce){.pk-pop,.pk-backdrop,.pk-opt{transition:none!important;animation:none!important}.pk-pop{transform:none}}
 .pk-backdrop.in{-webkit-backdrop-filter:blur(3px) saturate(105%);backdrop-filter:blur(3px) saturate(105%)}
+
+/* a tracked post (#/post/<code>): photo, title, its restaurants, and the app plug (owner, 22 Nov 2026) */
+.postview{padding-bottom:24px}
+.posthead{margin:6px 0 18px}
+.posthead .ph-img{border-radius:20px;overflow:hidden;aspect-ratio:4/3;background:#E6DFD3;margin:0 0 18px;box-shadow:0 18px 44px rgba(60,45,30,.12)}
+.posthead .ph-img img{width:100%;height:100%;object-fit:cover;display:block}
+.posthead .ph-kicker{display:inline-flex;align-items:center;gap:6px;margin:0 0 8px;padding:4px 11px;border-radius:99px;background:linear-gradient(135deg,var(--gold-1,#F1D896),var(--gold-2,#D9B05A));color:var(--gold-ink,#3B2A08);font-size:12px;font-weight:600}
+.posthead .ph-kicker .i{width:14px;height:14px}
+.posthead h1{margin:0 0 6px}
+.posthead .muted{margin:0;font-size:16px}
+.appplug{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:22px 0 0;padding:16px 18px;border-radius:20px;background:var(--card);box-shadow:inset 0 0 0 1px var(--line),0 10px 30px rgba(60,45,30,.06)}
+.appplug .ap-bird{flex:none;width:44px;height:44px;border-radius:50%;display:grid;place-items:center;background:var(--well);color:var(--ember)}
+.appplug .ap-bird .i{width:22px;height:22px}
+.appplug>div{flex:1;min-width:180px}
+.appplug b{display:block;font-size:16px;font-weight:600}.appplug span{color:var(--muted);font-size:14px}
+.appplug .btn{width:auto;flex:none;padding:12px 20px;font-size:15px;margin:0}
+@media (min-width:1024px){.postview{max-width:880px;margin:0 auto}.posthead .ph-img{aspect-ratio:16/7}}

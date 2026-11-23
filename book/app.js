@@ -415,6 +415,7 @@ async function route() {
     if (sq.get("pay")) return await viewReturn(Object.fromEntries(sq)); // Stripe's redirect back (?pay=<booking id>)
     if (path === "/") return await viewHome(q);
     if (path.startsWith("/r/")) return await viewVenue(decodeURIComponent(path.slice(3)), q);
+    if (path.startsWith("/post/")) return await viewPost(decodeURIComponent(path.slice(6)), q);
     if (path === "/book") return await viewCheckout(q);
     if (path === "/signin") return await viewSignIn(q);
     if (path === "/bookings") return await viewBookings();
@@ -610,6 +611,38 @@ function resultHtml(v) {
     ${cols ? `<div class="days">${cols}</div>` : d ? `<p class="muted small" style="padding:12px 18px 0">No ${H.meal} tables listed.</p>` : ""}</article>`;
 }
 
+
+/* ───────────────────────────── a tracked post (eatearlybird.com/go/<code> → #/post/<code>, 0204 link_post) ─────────────────────────────
+   Owner, 22 Nov 2026: "just show in the booking thing on web but plug the app download". The post's photo and title, its
+   restaurants as the usual result cards with times (same booking flow), and a slim "Get the app" card. The tap itself is
+   counted by 404.html before it sends the visitor here. */
+const APP_BETA = "https://xopcdblqmmrvyocqomqz.supabase.co/functions/v1/beta-join";   // TestFlight until the App Store listing is live
+async function viewPost(code, q) {
+  const r = await rpc("link_post", { p_code: code }).catch(() => null);
+  if (!r || !r.ok || !r.post) return go("/");
+  const p = r.post;
+  await Promise.all([loadConfig(), loadCities()]);
+  H.meal = ["breakfast", "lunch", "dinner"].includes(q.meal) ? q.meal : H.meal;
+  H.diners = Math.min(Math.max(Number(q.diners) || H.diners, 1), S.config.max_party || 12);
+  const title = p.title || String(p.caption || "").split("\n")[0].trim() || "Early Bird picks";
+  setTitle(title);
+  const photo = (p.media || [])[0];
+  const caption = p.title && p.caption ? String(p.caption).split("\n").find((l) => l.trim() && l.trim() !== p.title) : "";
+  const plug = `<aside class="appplug"><span class="ap-bird">${ic("bird")}</span><div><b>Get the Early Bird app</b><span>Book in two taps and keep your codes and ${esc(CREDIT)} in one place.</span></div>
+    <a class="btn" href="${APP_BETA}" target="_blank" rel="noopener">Download for iPhone</a></aside>`;
+  const head = `<header class="posthead">${photo ? `<div class="ph-img"><img src="${esc(photo)}" alt="" onerror="this.parentNode.remove()"></div>` : ""}
+    <p class="ph-kicker">${ic("tag")}50% off food at ${(p.venues || []).length === 1 ? "this restaurant" : `these ${(p.venues || []).length} restaurants`}</p>
+    <h1 class="display">${esc(title)}</h1>${caption ? `<p class="muted">${esc(caption.trim())}</p>` : ""}</header>`;
+  showPage(`<div class="postview">${head}<div id="grid"><p class="loading">Finding tables…</p></div>${plug}</div>`, { size: "wide" });
+  // the same cards as Home: full venue rows (deal, fee, timezone) and their open times, in the post's order
+  const pages = await Promise.all((p.venues || []).map((v) => rpc("venue_page", { p_slug: v.slug }).then((x) => x && x.venue).catch(() => null)));
+  const rows = pages.filter((v) => v && v.deal);
+  const avail = rows.length ? await loadAvail(rows.map((v) => v.id), H.meal, H.diners).catch(() => ({})) : {};
+  rows.forEach((v) => (v._avail = avail[v.id]));
+  const grid = document.getElementById("grid"); if (!grid) return;
+  grid.innerHTML = rows.length ? rows.map(isDesk() ? resultHtmlDesk : resultHtml).join("")
+    : `<div class="card center muted">These restaurants aren't taking Early Bird bookings right now. <a href="#/">See other restaurants</a></div>`;
+}
 
 /* ───────────────────────────── desktop list (the First Table-style region page) ───────────────────────────── */
 // Ratings (0105_ratings): v.rating / v.review_count count verified visits only, one per person; the reviews list can be

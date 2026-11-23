@@ -24,6 +24,10 @@ a.btn{display:inline-block;background:#265682;color:#fff;border-radius:3px;paddi
   // Invite links (https://eatearlybird.com/r/<code>, what a diner shares from the app) open the invite page.
   var r = location.pathname.match(/^\/r\/([A-Za-z0-9-]{3,40})\/?$/);
   if (r) location.replace("/book/#/invite/" + r[1]);
+  // Booking links from AI assistants (https://eatearlybird.com/b/<slug>?deal=…&date=…&time=…&meal=…&diners=…, AI_BOOKINGS.md):
+  // the app opens them at the booking step; without the app, the web booking step for that table.
+  var b = location.pathname.match(/^\/b\/([a-z0-9-]+)\/?$/);
+  if (b) location.replace("/book/#/book?v=" + b[1] + (location.search ? "&" + location.search.slice(1) : ""));
 })();
 </script>
 <script src="/book/config.js"></script>

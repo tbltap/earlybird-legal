@@ -503,6 +503,7 @@ async function viewHome(q) {
   setTitle("");
   await Promise.all([loadCities(), loadConfig()]);
   if (q.city) { const c = S.cities.find((x) => x.slug === q.city); if (c) setCity(c); }
+  if (S.city) setTitle(`Restaurant deals in ${S.city.name}: 50% off food`);   // the title search shows (owner, 22 Nov 2026)
   const nm = /^(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)$/.exec(q.near || ""); H.near = nm ? { lat: +nm[1], lng: +nm[2] } : null;
   if (!S.city && H.near) setCity(nearestCity(H.near.lat, H.near.lng));
   if (!S.city) return viewPickArea();
@@ -759,7 +760,7 @@ async function viewVenue(slug, q) {
     return;
   }
   const v = page.venue, deal = v.deal;
-  setTitle(v.name);
+  setTitle(`${v.name}: ${deal?.discount || 50}% off food${v.area ? " in " + v.area : ""}`);   // the title search shows (owner, 22 Nov 2026)
   if (isDesk()) return viewVenueDesk(v, q);
   const meals = deal?.meals?.length ? deal.meals : ["dinner"];
   const maxD = Math.min(deal?.max_diners || 6, S.config.max_party || 12);

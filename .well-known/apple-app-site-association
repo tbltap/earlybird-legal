@@ -13,6 +13,10 @@
           {
             "/": "/b/*",
             "comment": "Booking links from AI assistants (AI_BOOKINGS.md): open the app at the booking step"
+          },
+          {
+            "/": "/a/*",
+            "comment": "Area links for stories (0230): open the app on the area's deals"
           }
         ]
       }

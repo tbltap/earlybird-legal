@@ -277,6 +277,20 @@ function drawTabs(path) {
 const DESK_MQ = matchMedia("(min-width: 1024px)");
 const isDesk = () => DESK_MQ.matches;
 DESK_MQ.addEventListener?.("change", () => route());
+// Terms update notice (owner, 22 Nov 2026: deal rules, restaurant charges, arbitration). Shown on every page until the
+// visitor closes it, for the 30 days in which existing users can still opt out under the update clause (terms §16).
+const TERMS_NOTICE = { key: "eb.terms.2026-11-22.seen", until: Date.parse("2026-12-23T00:00:00-08:00") };
+function termsNotice() {
+  let seen = false; try { seen = !!localStorage.getItem(TERMS_NOTICE.key); } catch { /* private mode: show it */ }
+  const old = document.getElementById("tnote");
+  if (seen || Date.now() > TERMS_NOTICE.until) { old?.remove(); return; }
+  if (old) return;
+  const el = document.createElement("div"); el.id = "tnote"; el.className = "tnote"; el.setAttribute("role", "status");
+  el.innerHTML = `${ic("info")}<span><b>We've updated our terms</b> · deal rules and arbitration. <a href="../terms.html#16-changes-to-early-bird-and-to-these-terms" target="_blank" rel="noopener">Read the changes</a>. You can opt out of arbitration within 30 days at <a href="mailto:${SUPPORT}?subject=Arbitration%20opt-out">${SUPPORT}</a>.</span><button type="button" aria-label="Close">${ic("x")}</button>`;
+  el.querySelector("button").addEventListener("click", () => { try { localStorage.setItem(TERMS_NOTICE.key, "1"); } catch { /* ignore */ } el.remove(); });
+  APP.parentNode.insertBefore(el, APP);
+}
+
 async function drawChrome(path) {
   const desk = isDesk(), signedIn = !!Auth.session(), minimal = path === "/book";
   document.body.classList.toggle("desk", desk);
@@ -404,6 +418,7 @@ async function route() {
   window.scrollTo(0, 0);
   drawTabs(path);
   drawChrome(path);
+  termsNotice();
   APP.innerHTML = '<div class="col"><p class="loading">Loading…</p></div>';
   try {
     // Visitors can browse, open restaurant pages and fill in the booking form without an account (owner, 22 Nov 2026:
@@ -1285,7 +1300,7 @@ async function viewCheckout(q) {
     tick(); C.timer = setInterval(tick, 1000);
   }
   const reqText = () => (hd().requirements || []).map((r) => `${r.per_person} ${r.label.toLowerCase()} per person`).join(", ");
-  const rules = () => { const r = [...(v.deal?.conditions || [])]; if (reqText() && hd().option !== "nodrink") r.unshift(`Order ${reqText()}`); return r; };
+  const rules = () => { const r = [...(v.deal?.conditions || [])]; if (reqText() && hd().option !== "nodrink") r.unshift(`Order ${reqText()}`); if (!r.some((c) => /15 ?min/i.test(c))) r.unshift("Arrive within 15 minutes of your time"); return r; };
   const cfg = S.config;
   const testBadge = (mode) => (mode === "test" ? '<span class="testbadge">TEST MODE · card 4242 4242 4242 4242</span>' : "");
   const due = () => (C.intent ? C.intent.amount_cents : hd().amount_due_cents);
@@ -1349,7 +1364,7 @@ async function viewCheckout(q) {
         <table><tr><td>Within ${cfg.cancel_full_credit_minutes} minutes of booking</td><td>The whole fee</td></tr><tr><td>Later, before the day</td><td>${cfg.cancel_before_day_percent}% of the fee</td></tr><tr><td>On the day, or no-show</td><td>Nothing</td></tr></table></div></details>
       <div class="lines-m">${linesHtml()}</div>
       ${npNote(v)}
-      <div class="grow-f agree" id="w-c-ok"><label class="check"><input type="checkbox" id="c-ok" ${d.accepted ? "checked" : ""}><span>I agree to the Early Bird conditions, the cancellation policy and the <a href="../terms.html" target="_blank" rel="noopener">booking terms</a></span></label><div class="ferr" id="e-c-ok" role="alert" hidden></div></div>
+      <div class="grow-f agree" id="w-c-ok"><label class="check"><input type="checkbox" id="c-ok" ${d.accepted ? "checked" : ""}><span>I agree to the <a href="../terms.html" target="_blank" rel="noopener">Terms of Service</a>, including the deal rules (arrive within 15 minutes; if you don't follow them the restaurant may charge full prices and the booking fee isn't refunded), the cancellation policy and binding individual arbitration (<a href="../terms.html#19-disputes-and-arbitration" target="_blank" rel="noopener">section 19</a>)</span></label><div class="ferr" id="e-c-ok" role="alert" hidden></div></div>
       <fieldset class="fv"><legend>Been to ${esc(v.name)} before? <em>Optional</em></legend>
         <label><input type="radio" name="c-fv" value="true" ${d.firstVisit === true ? "checked" : ""}><span>First time here</span></label>
         <label><input type="radio" name="c-fv" value="false" ${d.firstVisit === false ? "checked" : ""}><span>Been before</span></label></fieldset>

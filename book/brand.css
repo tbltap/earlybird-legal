@@ -436,3 +436,11 @@ a.card.airow b{display:block;font-size:16px;font-weight:600}a.card.airow small{c
 a.helprow{display:flex;align-items:center;gap:12px;padding:10px 0 4px;text-decoration:none;color:inherit}
 a.helprow>span{flex:1;min-width:0}a.helprow b{display:block;font-weight:600}a.helprow small{display:block;color:var(--muted);font-size:14px;margin-top:2px}
 a.helprow>.i{width:18px;height:18px;color:var(--muted)}
+/* terms update notice (22 Nov 2026), above every page until closed */
+.tnote{display:flex;gap:10px;align-items:flex-start;max-width:760px;margin:10px auto 0;padding:11px 13px;border-radius:14px;background:#FBF1E6;box-shadow:inset 0 0 0 1px var(--ember-soft);font-size:14px;line-height:1.45;color:var(--espresso)}
+body:not(.desk) .tnote{margin:10px 16px 0}
+.tnote>.i{flex:none;width:18px;height:18px;color:var(--ember);margin-top:1px}
+.tnote b{font-weight:600}.tnote a{color:var(--ember)}
+.tnote span{flex:1;min-width:0;overflow-wrap:anywhere}
+.tnote button{flex:none;border:0;background:none;padding:2px;margin:-2px -4px 0 0;color:var(--espresso);cursor:pointer}
+.tnote button .i{width:18px;height:18px}

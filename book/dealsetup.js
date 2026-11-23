@@ -353,22 +353,35 @@ export default async function dealSetup(venueId, q, h) {
   function recBody() {
     const r = S.rec;
     if (!r) return `<h1 class="q">Here's what we'd do</h1>${foot("Try again")}`;
-    const o = option(), range = (x) => `${usd(x.kept_per_month_half_full)}–${usd(x.kept_per_month)}/mo`;
+    const o = option();
+    // 0224: a low–likely range from demand near the restaurant; older backends: half the tables to every table
+    const range = (x) => (x.estimate ? `${usd(x.estimate.kept_per_month.low)}–${usd(x.estimate.kept_per_month.likely)}/mo` : `${usd(x.kept_per_month_half_full)}–${usd(x.kept_per_month)}/mo`);
+    const pct = (f) => `${Math.round(f * 100)}%`;
+    const est = o?.estimate;
+    // the restaurants page talks about up to 5 early tables: never suggest more than that
+    const offerLine = (e) => (e.offer_for_break_even <= 5
+      ? `To cover your staff at a likely ${pct(e.fill.likely)} of tables booked, offer about ${e.offer_for_break_even} tables each time.`
+      : `At a likely ${pct(e.fill.likely)} of tables booked, even 5 tables won't cover your staff on their own. Every table that books still brings in money those quiet hours aren't making.`);
     const list = r.dishes.filter((d) => d.kind === "main" || d.kind === "starter");
     const whole = o?.whole_menu && S.plan.deal_items == null, chosen = new Set(items());
     return `<h1 class="q">Here's what we'd do</h1><p class="sub">Pick one. You can change anything after.</p><span class="est">${esc(r.label)}</span>
+      ${(r.based_on || []).length ? `<div class="crd"><b>Based on</b><ul class="sub small" style="margin:6px 0 0;padding-left:18px">${r.based_on.map((l) => `<li>${esc(l)}</li>`).join("")}</ul></div>` : ""}
       ${r.options.map((x) => `<button type="button" class="opt" data-o="${x.key}" aria-pressed="${(S.plan.option || "balanced") === x.key}"><div class="t"><b>${esc(x.title)}${x.recommended ? '<span class="tag">Our pick</span>' : ""}</b><span class="n">${range(x)}</span></div><p>${esc(x.line)}</p></button>`).join("")}
       ${o ? `<div class="crd"><b>${esc(o.title)}, in detail</b>
         <div class="kv"><span>Deal times</span><span>${(windows().length ? windows() : o.windows).map(winLabel).join(", ") || "5:00–6:30PM"}</span></div>
         <div class="kv"><span>Tables each time</span><span>${tables()}</span></div>
-        <div class="kv"><span>Guests a month, if every table books</span><span>${Math.round(o.guests_per_month)}</span></div>
+        ${est ? `<div class="kv"><span>Tables that book, likely</span><span>${pct(est.fill.likely)} (${pct(est.fill.low)}–${pct(est.fill.high)})</span></div>
+          <div class="kv"><span>Guests a month, likely</span><span>${Math.round(est.guests_per_month.likely)} (${Math.round(est.guests_per_month.low)}–${Math.round(est.guests_per_month.high)})</span></div>
+          <div class="kv"><span>Party size</span><span>${est.party_size}</span></div>`
+          : `<div class="kv"><span>Guests a month, if every table books</span><span>${Math.round(o.guests_per_month)}</span></div>`}
         <div class="kv"><span>You keep per guest, after food cost</span><span>${usd(o.guest.keep, true)}</span></div>
-        <div class="kv"><span>Kept per deal time</span><span>${usd(o.kept_per_window)}</span></div>
-        <div class="kv"><span>Guests who come back at full price</span><span>+${usd(o.come_back_per_month)}/mo</span></div>
-        ${o.break_even_tables != null ? `<div class="kv"><span>Staff on each deal time</span><span>${usd(staffWin())}</span></div><div class="kv"><span>Tables that cover your staff</span><span>${o.break_even_tables}</span></div>` : ""}
+        <div class="kv"><span>Kept per deal time${est ? ", likely" : ""}</span><span>${usd(est ? est.kept_per_month.likely / Math.max(1, o.windows_per_week * 52 / 12) : o.kept_per_window)}</span></div>
+        <div class="kv"><span>Guests who come back at full price</span><span>+${usd(est ? est.come_back_per_month : o.come_back_per_month)}/mo</span></div>
+        ${o.break_even_tables != null ? `<div class="kv"><span>Staff on each deal time</span><span>${usd(staffWin())}</span></div><div class="kv"><span>Tables that cover your staff, if every table books</span><span>${o.break_even_tables}</span></div>` : ""}
         <div class="kv tot"><b>Kept a month, after ingredients</b><b>${range(o)}</b></div>
-        ${o.net_per_month != null ? `<div class="kv"><span>Quiet hours now (staff, empty tables)</span><span>${signed(-o.staff_cost_per_month)}/mo</span></div><div class="kv tot"><b>With Early Bird, after staff</b><b>${signed(o.net_per_month_half_full)} to ${signed(o.net_per_month)}/mo</b></div>` : ""}
-        <p class="sub small">Estimate: half the tables booked to every table booked. Not a promise of bookings.</p></div>` : ""}
+        ${o.net_per_month != null ? `<div class="kv"><span>Quiet hours now (staff, empty tables)</span><span>${signed(-o.staff_cost_per_month)}/mo</span></div><div class="kv tot"><b>With Early Bird, after staff</b><b>${est ? `${signed(est.net_per_month.low)} to ${signed(est.net_per_month.likely)}` : `${signed(o.net_per_month_half_full)} to ${signed(o.net_per_month)}`}/mo</b></div>` : ""}
+        ${est && est.offer_for_break_even ? `<p class="sub small">${offerLine(est)}</p>` : ""}
+        <p class="sub small">${est ? "Estimate: a likely range from demand near you, not a promise of bookings." : "Estimate: half the tables booked to every table booked. Not a promise of bookings."}</p></div>` : ""}
       <div class="crd"><b>Each guest also orders, at full price</b><div class="pills">${[["drink", "A drink"], ["starter", "A starter"], ["dessert", "A dessert"], ["none", "Nothing"]].map(([k, l]) => `<button type="button" class="pill ri" data-k="${k}" aria-pressed="${(S.plan.required_item || "drink") === k}">${l}</button>`).join("")}</div>
         <p class="sub small">That's where most of your margin is. A drink is the usual choice.</p></div>
       <div class="crd"><b>On the deal menu</b><p class="sub small">${whole ? "Your whole food menu. Untick dishes to keep them off the deal." : "Best margin at 50% off, and your best sellers. Drinks and desserts stay off the deal."}</p>

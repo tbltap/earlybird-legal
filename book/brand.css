@@ -467,3 +467,12 @@ body:not(.desk) .tnote{margin:10px 16px 0}
 details.disc .hc-body{padding:0 0 14px;color:var(--muted)}
 details.disc .hc-body p{margin:0 0 8px}
 details.disc .hc-body ul{margin:0 0 8px;padding-left:18px}
+/* restaurants with no active deal (owner, 23 Nov 2026: "make the no active less pronounced"): one small grey line, and on
+   the list a food photo (as the app's cards) */
+.pvline{display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin:8px 18px 2px;font-size:13px;line-height:1.4;color:var(--muted,#5F6673)}
+.drow .pvline,.vbook .pvline,.vleft .pvline,.rule+.pvline{margin:8px 0 2px}
+.pvlink{display:inline-flex;align-items:center;gap:4px;padding:0;border:0;background:none;font:inherit;color:var(--espresso,#14171F);text-decoration:underline;text-underline-offset:2px;cursor:pointer}
+.pvlink .i{width:13px;height:13px}
+.pvlink[aria-pressed=true]{text-decoration:none;color:var(--muted,#5F6673)}
+.pvph{position:relative;display:block;margin:0 18px 12px;aspect-ratio:16/10;border-radius:16px;overflow:hidden;background:#d9dde6}
+.pvph img{width:100%;height:100%;object-fit:cover;display:block}

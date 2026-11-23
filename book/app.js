@@ -42,6 +42,7 @@ const val = (id) => (document.getElementById(id)?.value || "").trim();
 
 const ICONS = {
   pin: '<path d="M12 21s-6.5-6.2-6.5-11a6.5 6.5 0 0 1 13 0c0 4.8-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.3"/>',
+  bell: '<path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20.5a2 2 0 0 0 4 0"/>',   // area follow (0230)
   search: '<circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/>',
   fork: '<path d="M7 3v8M4.5 3v5a2.5 2.5 0 0 0 5 0V3M7 11v10M17 21V3c-2.3 1-3.5 3.6-3.5 7 0 1.6 1.2 2.5 3.5 2.5"/>',
   person: '<circle cx="12" cy="8" r="3.8"/><path d="M4.5 20.5c1-4 4-5.5 7.5-5.5s6.5 1.5 7.5 5.5"/>',
@@ -87,7 +88,7 @@ const ERR = {
   config_unavailable: "Payments are temporarily unavailable. Please try again.",
 };
 class ApiError extends Error { constructor(code, message, status) { super(message || code); this.code = code; this.status = status; } }
-const friendly = (e) => ERR[e?.code] || (e?.code && !/^http_|^\d+$|^PGRST|^\d{5}$/.test(e.code) && /\s/.test(e.message) ? e.message : null) || "Something went wrong. Please try again.";
+const friendly = (e) => (e?.code === "overlapping_booking" && e.details) || ERR[e?.code] || (e?.code && !/^http_|^\d+$|^PGRST|^\d{5}$/.test(e.code) && /\s/.test(e.message) ? e.message : null) || "Something went wrong. Please try again.";
 
 /* ───────────────────────────── auth (Supabase Auth, same as the app) ───────────────────────────── */
 const SKEY = "eb.web.session";
@@ -200,7 +201,9 @@ async function rpc(fn, params = {}) {
     const j = await res.json().catch(() => ({}));
     const code = String(j.message || "").split(":")[0].trim();
     if (res.status === 401 || (res.status === 403 && j.code === "42501")) throw new ApiError("not_signed_in", "Please sign in to continue.", res.status);
-    throw new ApiError(code || `http_${res.status}`, j.message, res.status);
+    const err = new ApiError(code || `http_${res.status}`, j.message, res.status);
+    err.details = j.details || null; err.hint = j.hint || null;   // e.g. overlapping_booking: details = the line to show, hint = the other booking (0220)
+    throw err;
   }
   return res.status === 204 ? null : res.json();
 }
@@ -416,6 +419,7 @@ async function route() {
     if (path === "/") return await viewHome(q);
     if (path.startsWith("/r/")) return await viewVenue(decodeURIComponent(path.slice(3)), q);
     if (path.startsWith("/post/")) return await viewPost(decodeURIComponent(path.slice(6)), q);
+    if (path.startsWith("/posts/")) return await viewBio();
     if (path === "/book") return await viewCheckout(q);
     if (path === "/signin") return await viewSignIn(q);
     if (path === "/bookings") return await viewBookings();
@@ -618,6 +622,21 @@ function resultHtml(v) {
    restaurants as the usual result cards with times (same booking flow), and a slim "Get the app" card. The tap itself is
    counted by 404.html before it sends the visitor here. */
 const APP_BETA = "https://xopcdblqmmrvyocqomqz.supabase.co/functions/v1/beta-join";   // TestFlight until the App Store listing is live
+const appPlug = () => `<aside class="appplug"><span class="ap-bird">${ic("bird")}</span><div><b>Get the Early Bird app</b><span>Book in two taps and keep your codes and ${esc(CREDIT)} in one place.</span></div>
+    <a class="btn" href="${APP_BETA}" target="_blank" rel="noopener">Download for iPhone</a></aside>`;
+// The link in the Instagram bio (eatearlybird.com/go/<bio code> → #/posts/<bio code>, 0221 link_bio): the recent posts as
+// tiles. Each tile opens the post's own tracked link, so that tap counts for the post too and the app opens it if installed.
+async function viewBio() {
+  const r = await rpc("link_bio", {}).catch(() => null);
+  const posts = (r && r.ok && r.posts) || [];
+  if (!posts.length) return go("/");
+  await loadConfig();
+  setTitle("From our Instagram");
+  const n = (p) => (p.venues || []).length;
+  showPage(`<div class="bioview"><header class="biohead"><p class="ph-kicker">${ic("tag")}50% off food, early tables</p><h1 class="display">From our Instagram</h1><p class="muted">Tap a post to see its restaurants and book.</p></header>
+    <div class="biogrid">${posts.map((p) => `<a class="biotile" href="${esc(p.url)}">${p.photo ? `<img src="${esc(p.photo)}" alt="" loading="lazy" onerror="this.remove()">` : ""}<span class="bt-txt"><b>${esc(p.title || "Early tables")}</b>${n(p) ? `<small>${n(p)} restaurant${n(p) === 1 ? "" : "s"}</small>` : ""}</span></a>`).join("")}</div>
+    ${appPlug()}</div>`, { size: "wide" });
+}
 async function viewPost(code, q) {
   const r = await rpc("link_post", { p_code: code }).catch(() => null);
   if (!r || !r.ok || !r.post) return go("/");
@@ -627,11 +646,11 @@ async function viewPost(code, q) {
   H.diners = Math.min(Math.max(Number(q.diners) || H.diners, 1), S.config.max_party || 12);
   const title = p.title || String(p.caption || "").split("\n")[0].trim() || "Early Bird picks";
   setTitle(title);
-  const photo = (p.media || [])[0];
+  // the header: a photo mosaic (0221 post.mosaic: up to 5, best first), else the post's own photos (owner: "make a mosaic")
+  const pics = ((p.mosaic && p.mosaic.length ? p.mosaic : p.media) || []).filter((u) => /^https:\/\//.test(u)).slice(0, 5);
   const caption = p.title && p.caption ? String(p.caption).split("\n").find((l) => l.trim() && l.trim() !== p.title) : "";
-  const plug = `<aside class="appplug"><span class="ap-bird">${ic("bird")}</span><div><b>Get the Early Bird app</b><span>Book in two taps and keep your codes and ${esc(CREDIT)} in one place.</span></div>
-    <a class="btn" href="${APP_BETA}" target="_blank" rel="noopener">Download for iPhone</a></aside>`;
-  const head = `<header class="posthead">${photo ? `<div class="ph-img"><img src="${esc(photo)}" alt="" onerror="this.parentNode.remove()"></div>` : ""}
+  const plug = appPlug();
+  const head = `<header class="posthead">${pics.length ? `<div class="mosaic m${pics.length}">${pics.map((u, i) => `<span class="mt t${i}"><img src="${esc(u)}" alt="" ${i ? 'loading="lazy"' : ""} onerror="this.parentNode.classList.add('none');this.remove()"></span>`).join("")}</div>` : ""}
     <p class="ph-kicker">${ic("tag")}50% off food at ${(p.venues || []).length === 1 ? "this restaurant" : `these ${(p.venues || []).length} restaurants`}</p>
     <h1 class="display">${esc(title)}</h1>${caption ? `<p class="muted">${esc(caption.trim())}</p>` : ""}</header>`;
   showPage(`<div class="postview">${head}<div id="grid"><p class="loading">Finding tables…</p></div>${plug}</div>`, { size: "wide" });
@@ -1129,12 +1148,14 @@ async function viewCheckout(q) {
   if (!page?.venue) return go("/");
   C.venue = page.venue; C.profile = profile;
   const v = C.venue;
-  const out = (msg) => showPage(`<div class="sheethead"><h1>Couldn't hold that table</h1><a class="x" href="#/r/${esc(v.slug)}" aria-label="Close">${ic("x")}</a></div><div class="msg err">${esc(msg)}</div><a class="btn" href="#/r/${esc(v.slug)}">Choose another time</a>`, { wash: false });
+  // overlapping_booking (0220): one table per 90 minutes, any restaurant; the server's line says which one, with a link to it
+  const out = (msg, e) => { const other = e?.code === "overlapping_booking" && e.hint;
+    showPage(`<div class="sheethead"><h1>${other ? "You already have a table then" : "Couldn't hold that table"}</h1><a class="x" href="#/r/${esc(v.slug)}" aria-label="Close">${ic("x")}</a></div><div class="msg err">${esc(msg)}</div>${other ? `<a class="btn" href="#/booking/${esc(other)}">View booking</a><a class="btn pale" href="#/r/${esc(v.slug)}" style="margin-top:10px">Choose another time</a>` : `<a class="btn" href="#/r/${esc(v.slug)}">Choose another time</a>`}`, { wash: false }); };
   const makeHold = async () => { C.hold = await rpc("hold", { p_device: deviceId, p_deal: wanted.deal, p_date: wanted.date, p_time: wanted.time, p_diners: wanted.diners, p_meal: wanted.meal, p_option: wanted.option }); };
   const hd = () => C.hold;
   const payNeeded = () => hd().payment_mode === "stripe" && hd().amount_due_cents > 0;
   const prepPayment = async () => { C.intent = payNeeded() && !guest ? await pay("intent", { claim_id: hd().booking_id }) : null; };
-  try { await makeHold(); await prepPayment(); } catch (e) { if (e.code === "not_signed_in") throw e; return out(friendly(e)); }
+  try { await makeHold(); await prepPayment(); } catch (e) { if (e.code === "not_signed_in") throw e; return out(friendly(e), e); }
   C.details = { name: [profile.first_name, profile.last_name].filter(Boolean).join(" ").replace(/^Early Bird diner$/, ""), phone: profile.phone || "", request: "", share: true, marketing: false, accepted: false, venueRef: "", bookedWithVenue: false, firstVisit: null };
   // Back from signing in: put back what the visitor had typed (same table only), then they pay.
   const DRAFT = "eb.web.draft", draftKey = [slug, wanted.deal, wanted.date, wanted.time].join("|");
@@ -1251,7 +1272,7 @@ async function viewCheckout(q) {
     if (C.busy) return; C.busy = true;
     capture(); Object.assign(wanted, change);
     try { await makeHold(); await prepPayment(); C.busy = false; draw(); }
-    catch (e) { C.busy = false; if (e.code === "not_signed_in") throw e; draw(friendly(e)); }
+    catch (e) { C.busy = false; if (e.code === "not_signed_in") throw e; if (e.code === "overlapping_booking") return out(friendly(e), e); draw(friendly(e)); }
   }
   const clearErr = (id) => { document.getElementById("w-" + id)?.classList.remove("bad"); const e = document.getElementById("e-" + id); if (e) e.hidden = true; };
   const showErr = (id, text) => {
@@ -1298,7 +1319,7 @@ async function viewCheckout(q) {
     if (!payNeeded()) {
       btn.disabled = true; btn.textContent = "Booking…";
       try { const b = await rpc("confirm", confirmParams(hd().booking_id)); C.done = true; after(b); }
-      catch (e) { if (e.code === "hold_expired") { clearInterval(C.timer); C.done = true; return out(friendly(e)); } btn.disabled = false; btn.textContent = goLabel(); draw(friendly(e)); }
+      catch (e) { if (e.code === "hold_expired" || e.code === "overlapping_booking") { clearInterval(C.timer); C.done = true; return out(friendly(e), e); } btn.disabled = false; btn.textContent = goLabel(); draw(friendly(e)); }
       return;
     }
     btn.disabled = true; btn.textContent = "Paying…"; C.paying = true; clearErr("card");
@@ -1370,7 +1391,18 @@ async function settleBooking(id, d) {
     showPage(`<div class="gate"><h1 class="display">That table was taken</h1></div><div class="msg info">Your payment arrived after your hold ran out and the table had gone, so we've kept your fee as ${esc(CREDIT)}. You can use it on your next booking.</div><a class="btn" href="#/">Find another table</a>`, { wash: false });
     return null;
   }
-  return rpc("confirm", { p_device: deviceId, p_claim: id, p_name: d.name.trim(), p_phone: d.phone, p_request: d.request || null, p_external_ref: d.venueRef || null, p_share_contact: d.share ? true : null, p_marketing: d.marketing ? true : null, p_first_visit: d.firstVisit ?? null });
+  try {
+    return await rpc("confirm", { p_device: deviceId, p_claim: id, p_name: d.name.trim(), p_phone: d.phone, p_request: d.request || null, p_external_ref: d.venueRef || null, p_share_contact: d.share ? true : null, p_marketing: d.marketing ? true : null, p_first_visit: d.firstVisit ?? null });
+  } catch (e) {
+    // Paid already: the payment path confirms the booking itself (verify/webhook → finalize), so a confirm error here
+    // (e.g. overlapping_booking or payment_required while the webhook is a moment behind) means "check the booking".
+    for (let i = 0; i < 6; i++) {
+      const bk = await rpc("booking", { p_device: deviceId, p_booking: id }).catch(() => null);
+      if (bk && bk.status === "confirmed") return { ...bk, id: bk.id || id };
+      await sleep(1500);
+    }
+    throw e;
+  }
 }
 // Stripe sends the diner back here after a redirect-based payment method (?pay=<booking id>).
 async function viewReturn(q) {

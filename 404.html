@@ -47,6 +47,8 @@ a.btn{display:inline-block;background:#265682;color:#fff;border-radius:3px;paddi
     if (r && r.destination === "venue" && r.venue_slug) return "/book/#/r/" + encodeURIComponent(r.venue_slug);
     // A post link (0215): the post's restaurants inside the booking site (viewPost in book/app.js), with the app plug.
     if (r && r.destination === "post") return "/book/#/post/" + encodeURIComponent(g[1].toLowerCase());
+    // A link-in-bio link (0221): the grid of recent posts (viewPosts in book/app.js); each tile goes to its own /go/ link.
+    if (r && r.destination === "bio") return "/book/#/posts/" + encodeURIComponent(g[1].toLowerCase());
     if (r && r.destination === "restaurants") return "/restaurants/";
     if (r && r.destination === "app") return CFG.url + "/functions/v1/beta-join";
     return "/book/";

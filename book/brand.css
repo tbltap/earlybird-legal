@@ -368,6 +368,11 @@ html.pk-open body.desk .fbar{z-index:45}
 .posthead .ph-kicker .i{width:14px;height:14px}
 .posthead h1{margin:0 0 6px}
 .posthead .muted{margin:0;font-size:16px}
+.areafollow{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:14px 0 0}
+.areafollow .btn{display:inline-flex;align-items:center;gap:8px}
+.areafollow .btn .i{width:18px;height:18px}
+.areafollow p{margin:0;flex:1 1 220px}
+.areafollow.lead{padding:14px 16px;border-radius:20px;background:var(--card);box-shadow:inset 0 0 0 2px var(--ember,#D9692E)}
 .appplug{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:22px 0 0;padding:16px 18px;border-radius:20px;background:var(--card);box-shadow:inset 0 0 0 1px var(--line),0 10px 30px rgba(60,45,30,.06)}
 .appplug .ap-bird{flex:none;width:44px;height:44px;border-radius:50%;display:grid;place-items:center;background:var(--well);color:var(--ember)}
 .appplug .ap-bird .i{width:22px;height:22px}
@@ -393,3 +398,31 @@ a.card.airow b{display:block;font-size:16px;font-weight:600}a.card.airow small{c
 .ai-money{display:inline-flex;align-items:center;gap:4px;color:var(--muted)}.ai-money input{width:78px;margin:0;text-align:center;padding:8px 10px;border-radius:12px}
 .card .item .btn{width:auto;padding:8px 14px;font-size:14px;margin:0}
 @media (prefers-reduced-motion:reduce){.sw,.sw i{transition:none}}
+
+/* the link in the Instagram bio (#/posts/<code>): recent posts as 4:5 tiles (owner, 22 Nov 2026) */
+.bioview{padding-bottom:24px}
+.biohead{margin:8px 0 16px}.biohead h1{margin:0 0 4px}.biohead .muted{margin:0;font-size:16px}
+.biohead .ph-kicker{display:inline-flex;align-items:center;gap:6px;margin:0 0 8px;padding:4px 11px;border-radius:99px;background:linear-gradient(135deg,var(--gold-1,#F1D896),var(--gold-2,#D9B05A));color:var(--gold-ink,#3B2A08);font-size:12px;font-weight:600}
+.biohead .ph-kicker .i{width:14px;height:14px}
+.biogrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.biotile{position:relative;display:block;aspect-ratio:4/5;border-radius:16px;overflow:hidden;background:#E6DFD3;text-decoration:none;color:#fff;box-shadow:0 8px 24px rgba(60,45,30,.10);transition:transform .25s cubic-bezier(.2,.7,.2,1)}
+.biotile:active{transform:scale(.98)}
+.biotile img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.biotile::after{content:"";position:absolute;inset:45% 0 0;background:linear-gradient(transparent,rgba(20,16,12,.78))}
+.biotile .bt-txt{position:absolute;left:12px;right:12px;bottom:11px;z-index:1;display:flex;flex-direction:column;gap:2px}
+.biotile b{font:400 19px/1.1 var(--serif);letter-spacing:-.01em}.biotile small{font-size:12px;opacity:.85}
+@media (min-width:1024px){.bioview{max-width:880px;margin:0 auto}.biogrid{grid-template-columns:repeat(3,1fr);gap:14px}}
+@media (prefers-reduced-motion:reduce){.biotile{transition:none}}
+
+/* the post header as a photo mosaic (0221 post.mosaic, like the app's PhotoMosaic; owner, 22 Nov 2026) */
+.posthead .mosaic{display:grid;gap:2px;height:230px;margin:-8px calc(50% - 50vw) 16px;width:100vw;background:var(--paper);
+  -webkit-mask-image:linear-gradient(#000 0,#000 55%,transparent);mask-image:linear-gradient(#000 0,#000 55%,transparent)}
+.posthead .mosaic .mt{position:relative;overflow:hidden;background:#E6DFD3}
+.posthead .mosaic .mt.none{background:#E6DFD3}
+.posthead .mosaic img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.mosaic.m1{grid-template-columns:1fr}
+.mosaic.m2{grid-template-columns:1fr 1fr}
+.mosaic.m3{grid-template-columns:62fr 38fr;grid-template-rows:1fr 1fr}.mosaic.m3 .t0{grid-row:1/3}
+.mosaic.m4{grid-template-columns:60fr 40fr;grid-template-rows:repeat(3,1fr)}.mosaic.m4 .t0{grid-row:1/4}
+.mosaic.m5{grid-template-columns:2fr 1fr 1fr;grid-template-rows:1fr 1fr}.mosaic.m5 .t0{grid-row:1/3}
+@media (min-width:1024px){.posthead .mosaic{width:auto;margin:0 0 18px;height:360px;border-radius:20px;overflow:hidden}}

@@ -634,8 +634,18 @@ const notifyBtn = (v) => `<button type="button" class="pvlink" data-notify="${es
 const previewHtml = (v) => `<p class="pvline"><span>No active deals right now</span><span aria-hidden="true">·</span>${notifyBtn(v)}</p>`;
 // The list card's photo for a restaurant with no deal: its best food shot (mosaic food first, 0250), like the app's
 // cards, with the grey line under the name (owner's pick, 23 Nov 2026: no tag on the photo).
-const foodPhoto = (v) => (v.mosaic || []).find((m) => m && m.url && m.kind === "food")?.url || (v.dish_photos || [])[0] || cardPhoto(v);
-const pvPhoto = (v) => { const u = foodPhoto(v); return u ? `<img src="${esc(u)}" alt="" loading="lazy" onerror="this.remove()">` : ""; };
+// Food photos with their dish (0292: mosaic food tiles carry dish_name + price_minor, dish_photo_items lines up with
+// dish_photos): [{url, name, price}], mosaic first, no repeats. The price is the menu's full price, never a deal price.
+const foodShots = (v) => {
+  const out = [], seen = new Set(), add = (url, it) => { if (!url || seen.has(url) || !/^https:\/\//.test(url)) return; seen.add(url); out.push({ url, name: String(it?.dish_name || "").replace(/\*+/g, "").trim() || null, price: it?.dish_name && it.price_minor > 0 && (it.currency || "USD") === "USD" ? it.price_minor : null }); };
+  (v.mosaic || []).forEach((m) => { if (m && m.kind === "food") add(m.url, m); });
+  (v.dish_photos || []).forEach((u, i) => add(u, (v.dish_photo_items || [])[i]));
+  return out;
+};
+// "Spicy Rigatoni · $24" (owner, 23 Nov 2026: "where is the name of the item and price?"); nothing when the dish is unknown.
+const dishCap = (f, cls) => (f && f.name ? `<span class="${cls}"><span>${esc(f.name)}</span>${f.price ? `<b>${m0(f.price)}</b>` : ""}</span>` : "");
+const foodPhoto = (v) => foodShots(v)[0]?.url || cardPhoto(v);
+const pvPhoto = (v) => { const f = foodShots(v)[0]; const u = f?.url || cardPhoto(v); return u ? `<img src="${esc(u)}" alt="" loading="lazy" onerror="this.remove()">${dishCap(f, "dcap")}` : ""; };
 document.addEventListener("click", async (e) => {
   const b = e.target.closest && e.target.closest("[data-notify]"); if (!b) return;
   e.preventDefault(); e.stopPropagation();
@@ -1029,8 +1039,7 @@ async function viewVenue(slug, q) {
   const img = cardPhoto(v);
   // A strip of the restaurant's food under the name (owner, 23 Nov 2026): the mosaic's food shots (0250, best first),
   // else its dish photos; not the hero again. Shown when there are 2 or more; it replaces the lower Photos row.
-  const foods = [...new Set([...(v.mosaic || []).filter((m) => m && m.url && m.kind === "food").map((m) => m.url), ...(v.dish_photos || [])])]
-    .filter((u) => u !== img && /^https:\/\//.test(u)).slice(0, 8);
+  const foods = foodShots(v).filter((f) => f.url !== img).slice(0, 8);
   const today = todayAt(v.timezone), dow = dateObj(today).getUTCDay();
   const hoursRows = [1, 2, 3, 4, 5, 6, 0].map((d) => {
     const h = (v.hours || []).filter((x) => x.d === d);
@@ -1044,7 +1053,7 @@ async function viewVenue(slug, q) {
     ${v.address ? `<div class="info">${ic("pin")}<a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(v.name + " " + v.address)}" target="_blank" rel="noopener" style="color:inherit">${esc(v.address)}</a></div>` : ""}
     ${cuisineText(v) ? `<div class="info">${ic("fork")}<span>${esc(cuisineText(v))}</span></div>` : ""}
     ${v.description ? `<p style="margin:10px 0">${esc(v.description)}</p>` : ""}
-    ${foods.length > 1 ? `<div class="photos foodstrip" style="margin:14px -18px 4px;padding:0 18px">${foods.map((p, i) => `<img src="${esc(p)}" alt="" ${i > 2 ? 'loading="lazy" ' : ""}style="height:112px;width:112px;object-fit:cover" onerror="this.remove()">`).join("")}</div>` : ""}
+    ${foods.length > 1 ? `<div class="photos foodstrip" style="margin:14px -18px 4px;padding:0 18px">${foods.map((f, i) => `<figure class="fdish"><img src="${esc(f.url)}" alt="${esc(f.name || "")}" ${i > 2 ? 'loading="lazy" ' : ""}onerror="this.parentNode.remove()">${dishCap(f, "fcap")}</figure>`).join("")}</div>` : ""}
     ${menu.length ? `<a class="btn pale" href="#menu" id="menu-btn" style="margin:14px 0">${ic("book")}&nbsp; Menu</a>` : ""}
     <hr class="rule">
     ${isPreview(v) ? previewHtml(v)

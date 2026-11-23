@@ -6,7 +6,7 @@
 const EB = window.EB;
 const { CFG, Auth, rpc, esc, ic, showPage, toast, go, navigate, setTitle, friendly, viewSignIn, time12 } = EB;
 
-const TERMS_VERSION = "2026-11-21.earlybird-restaurant-v4"; // setting restaurant.terms_version (API.md, Shape: Venue claim)
+const TERMS_VERSION = "2026-11-22.earlybird-restaurant-v5"; // setting restaurant.terms_version (API.md, Shape: Venue claim)
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const DAY1 = ["S", "M", "T", "W", "T", "F", "S"];
 const MEALS = { breakfast: "Breakfast", lunch: "Lunch", dinner: "Dinner" };
@@ -465,8 +465,9 @@ function termsHtml(c) {
   if (c.terms_accepted && c.terms_current) return `<p class="small">Accepted. <a href="../restaurant-terms.html" target="_blank" rel="noopener">Read the Restaurant Terms</a></p>`;
   if (c.role === "manager") return `<p class="small">The restaurant's owner needs to accept the <a href="../restaurant-terms.html" target="_blank" rel="noopener">Restaurant Terms</a>. Ask them to sign in to Early Bird and accept them.</p>`;
   return `<p class="small">${c.terms_accepted ? "The Restaurant Terms have changed. Read the new version and accept it." : "Listing on Early Bird is free. Read how it works for your restaurant: the deal, cancellations and how you honour bookings."}</p>
+    <p class="small"><b>We market you.</b> By listing, you let Early Bird use your restaurant's name, logo, photos, menu and public social posts to promote your tables and offers in the app, on our website and social accounts, in ads and with partners, without asking each time. Only share what you have the rights to. Ask us any time to take something down.</p>
     <p class="small"><a href="../restaurant-terms.html" target="_blank" rel="noopener">Read the Restaurant Terms</a></p>
-    <label class="check"><input type="checkbox" id="t-ok"><span>I've read the Restaurant Terms and accept them for this restaurant</span></label>
+    <label class="check"><input type="checkbox" id="t-ok"><span>I've read the Restaurant Terms, including the marketing licence in section 2, and accept them for this restaurant</span></label>
     <div id="t-msg"></div><button class="btn" type="button" id="t-go">Accept the terms</button>`;
 }
 function wireTerms(venueId, c, after) {

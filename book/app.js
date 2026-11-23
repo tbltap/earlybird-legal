@@ -659,7 +659,7 @@ function resultHtml(v) {
   if (isPreview(v)) return `<article class="res pv"><a class="head" href="${href}">${thumbHtml(v)}<div><div class="nm">${esc(v.name)}</div><div class="meta">${esc(sub)}</div></div></a>
     ${previewHtml(v)}</article>`;
   return `<article class="res"><a class="head" href="${href}">${thumbHtml(v)}<div><div class="nm">${esc(v.name)}</div><div class="meta">${esc(sub)}</div>${v._note ? `<div class="pnote">${esc(v._note)}</div>` : ""}</div></a>
-    ${d ? `<div class="chips chiprow"><span class="pill">${ic("card")}${m0(d.fee_per_diner_cents)} booking fee</span><span class="pill">${ic("bird")}+${m0(S.config.reward_per_booking_cents || 0)} credit</span></div>` : ""}
+    ${d ? `<div class="chips chiprow"><span class="pill">${ic("card")}${m0(d.fee_per_diner_cents)} booking fee</span>${S.config.reward_per_booking_cents > 0 ? `<span class="pill">${ic("bird")}+${m0(S.config.reward_per_booking_cents)} credit</span>` : ""}</div>` : ""}
     ${cols ? `<div class="days">${cols}</div>` : d ? `<p class="muted small" style="padding:12px 18px 0">No ${H.meal} tables listed.</p>` : ""}</article>`;
 }
 
@@ -975,7 +975,7 @@ function resultHtmlDesk(v) {
   return `<article class="drow"><a class="dthumb" href="${href}">${esc((v.name || "?").charAt(0))}${(v.photo || v.dish_photos?.[0]) ? `<img src="${esc(v.photo || v.dish_photos[0])}" alt="" loading="lazy" onerror="this.remove()">` : ""}${v.rating >= 4.7 && v.review_count >= 20 ? '<span class="ribbon">Top rated</span>' : ""}</a>
     <div class="dbody"><div class="dtop"><a class="dname" href="${href}">${esc(v.name)} <span aria-hidden="true">›</span></a>${v.rating != null ? `<span class="drate">${Number(v.rating).toFixed(1)} ${stars5(v.rating)} <span class="muted">(${v.review_count})</span></span>` : isPreview(v) ? "" : '<span class="drate muted">New on Early Bird</span>'}</div>
       <div class="dwhere">${where}</div>${isPreview(v) ? previewHtml(v) + "</div></article>" : `${v._note ? `<div class="pnote">${esc(v._note)}</div>` : ""}
-      ${d ? `<div class="dfacts"><span>${ic("card")}${m0(d.fee_per_diner_cents)} booking fee per diner</span><span>${ic("bird")}+${m0(S.config.reward_per_booking_cents || 0)} ${esc(CREDIT)}</span></div>` : ""}
+      ${d ? `<div class="dfacts"><span>${ic("card")}${m0(d.fee_per_diner_cents)} booking fee per diner</span>${S.config.reward_per_booking_cents > 0 ? `<span>${ic("bird")}+${m0(S.config.reward_per_booking_cents)} ${esc(CREDIT)}</span>` : ""}</div>` : ""}
       ${cols ? `<div class="ddays">${cols}</div>` : d ? `<p class="muted small">No ${H.meal} tables in these days.</p>` : ""}</div></article>`}`;
 }
 const priceTxt = (v) => (v.price_tier ? `<span class="price">${"$".repeat(v.price_tier)}</span>` : "");
@@ -1043,7 +1043,7 @@ async function viewVenue(slug, q) {
         <label>${ic("fork")}<select id="b-meal" aria-label="Meal">${meals.map((m) => `<option value="${m}" ${m === B.meal ? "selected" : ""}>${m[0].toUpperCase() + m.slice(1)}</option>`).join("")}</select></label>
         <label>${ic("person")}<select id="b-diners" aria-label="Diners">${Array.from({ length: maxD }, (_, i) => i + 1).map((n) => `<option ${n === B.diners ? "selected" : ""} value="${n}">${n} ${n === 1 ? "diner" : "diners"}</option>`).join("")}</select></label>
       </div>
-      <div class="chiprow"><span class="pill">${ic("card")}${m0(deal.fee_per_diner_cents)} booking fee</span><span class="pill">${ic("bird")}+${m0(S.config.reward_per_booking_cents || 0)} credit</span></div>
+      <div class="chiprow"><span class="pill">${ic("card")}${m0(deal.fee_per_diner_cents)} booking fee</span>${S.config.reward_per_booking_cents > 0 ? `<span class="pill">${ic("bird")}+${m0(S.config.reward_per_booking_cents)} credit</span>` : ""}</div>
       <div id="slots"></div>
       <p class="tiny muted" style="margin-top:10px">${deal.booking_type === "walk_in" ? "Walk-in deal: arrive at your time and show your code." : `Your table is held for ${S.config.hold_minutes || 7} minutes while you check out.`}</p>
       <hr class="rule">
@@ -1143,7 +1143,7 @@ async function viewVenueDesk(v, q) {
         <div class="assure"><span>${ic("check")}Guaranteed booking</span><span>${ic("cancel")}Flexible cancellation</span></div>
         <div class="vsel"><label>${ic("fork")}<select id="b-meal" aria-label="Meal">${meals.map((m) => `<option value="${m}" ${m === B.meal ? "selected" : ""}>${cap(m)}</option>`).join("")}</select></label>
           <label>${ic("person")}<select id="b-diners" aria-label="Diners">${Array.from({ length: maxD }, (_, i) => i + 1).map((n) => `<option ${n === B.diners ? "selected" : ""} value="${n}">${n} ${n === 1 ? "diner" : "diners"}</option>`).join("")}</select></label></div>
-        <div class="dfacts"><span>${ic("card")}${m0(deal.fee_per_diner_cents)} booking fee per diner</span><span>${ic("bird")}+${m0(S.config.reward_per_booking_cents || 0)} ${esc(CREDIT)}</span></div>
+        <div class="dfacts"><span>${ic("card")}${m0(deal.fee_per_diner_cents)} booking fee per diner</span>${S.config.reward_per_booking_cents > 0 ? `<span>${ic("bird")}+${m0(S.config.reward_per_booking_cents)} ${esc(CREDIT)}</span>` : ""}</div>
         <div id="slots"></div>
         <div class="spc"><span>${ic("info")}Special conditions</span><button type="button" class="linklike" id="spc-btn">View</button></div>
         <ul class="rules" id="spc" hidden>${rules.map((c) => `<li>${ic("check")}<span>${esc(c)}</span></li>`).join("")}</ul>

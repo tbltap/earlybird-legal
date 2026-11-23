@@ -11,12 +11,12 @@
             "comment": "Tagged post and ad links (backend 0204): open the app when it is installed"
           },
           {
-            "/": "/b/*",
-            "comment": "Booking links from AI assistants (AI_BOOKINGS.md): open the app at the booking step"
+            "/": "/a/*",
+            "comment": "Area links from stories (backend 0230): open the app on the area's deals with Follow"
           },
           {
-            "/": "/a/*",
-            "comment": "Area links for stories (0230): open the app on the area's deals"
+            "/": "/b/*",
+            "comment": "Booking links from AI assistants (AI_BOOKINGS.md): open the app at the booking step"
           }
         ]
       }

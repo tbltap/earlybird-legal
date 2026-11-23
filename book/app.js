@@ -999,7 +999,8 @@ async function viewVenue(slug, q) {
         ? `<button type="button" class="slot" data-date="${day.date}" data-time="${s.time}" aria-pressed="${B.date === day.date && B.time === s.time}">${time12(s.time)}${s.discount !== deal.discount ? `<small>${s.discount}% off</small>` : ""}</button>`
         : `<button class="slot" disabled>${time12(s.time)}</button>`).join("")}</div>`;
     }).join("")}</div>`;
-    slotsEl.querySelectorAll("[data-time]").forEach((b) => (b.onclick = () => { B.date = b.dataset.date; B.time = b.dataset.time; drawSlots(); }));
+    // a tap on a time goes straight to the booking step, as on desktop and in the app (owner: picking a time "doesnt do anything until u click book")
+    slotsEl.querySelectorAll("[data-time]").forEach((b) => (b.onclick = () => { B.date = b.dataset.date; B.time = b.dataset.time; drawSlots(); goBtn.click(); }));
   }
   document.getElementById("b-meal").onchange = (e) => { B.meal = e.target.value; B.date = null; fetchAvail(); };
   document.getElementById("b-diners").onchange = (e) => { B.diners = +e.target.value; B.date = null; fetchAvail(); };

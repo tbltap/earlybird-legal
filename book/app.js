@@ -280,14 +280,15 @@ const isDesk = () => DESK_MQ.matches;
 DESK_MQ.addEventListener?.("change", () => route());
 // Terms update notice (owner, 22 Nov 2026: deal rules, restaurant charges, arbitration). Shown on every page until the
 // visitor closes it, for the 30 days in which existing users can still opt out under the update clause (terms §16).
-const TERMS_NOTICE = { key: "eb.terms.2026-11-22.seen", until: Date.parse("2026-12-23T00:00:00-08:00") };
+// 23 Nov 2026: a new key, so people who closed the 22 Nov notice see the 15-minute change once
+const TERMS_NOTICE = { key: "eb.terms.2026-11-23.seen", until: Date.parse("2026-12-24T00:00:00-08:00") };
 function termsNotice() {
   let seen = false; try { seen = !!localStorage.getItem(TERMS_NOTICE.key); } catch { /* private mode: show it */ }
   const old = document.getElementById("tnote");
   if (seen || Date.now() > TERMS_NOTICE.until) { old?.remove(); return; }
   if (old) return;
   const el = document.createElement("div"); el.id = "tnote"; el.className = "tnote"; el.setAttribute("role", "status");
-  el.innerHTML = `${ic("info")}<span><b>We've updated our terms</b> · deal rules and arbitration. <a href="../terms.html#16-changes-to-early-bird-and-to-these-terms" target="_blank" rel="noopener">Read the changes</a>. You can opt out of arbitration within 30 days at <a href="mailto:${SUPPORT}?subject=Arbitration%20opt-out">${SUPPORT}</a>.</span><button type="button" aria-label="Close">${ic("x")}</button>`;
+  el.innerHTML = `${ic("info")}<span><b>We've updated our terms</b> · more than 15 minutes late and the deal is void, plus deal rules and arbitration. <a href="../terms.html#16-changes-to-early-bird-and-to-these-terms" target="_blank" rel="noopener">Read the changes</a>. You can opt out of arbitration within 30 days at <a href="mailto:${SUPPORT}?subject=Arbitration%20opt-out">${SUPPORT}</a>.</span><button type="button" aria-label="Close">${ic("x")}</button>`;
   el.querySelector("button").addEventListener("click", () => { try { localStorage.setItem(TERMS_NOTICE.key, "1"); } catch { /* ignore */ } el.remove(); });
   APP.parentNode.insertBefore(el, APP);
 }

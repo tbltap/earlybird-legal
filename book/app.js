@@ -299,7 +299,7 @@ async function drawChrome(path) {
   const head = document.getElementById("dhead"), foot = document.getElementById("dfoot");
   head.hidden = foot.hidden = !desk;
   if (!desk) return;
-  const legal = `<div class="df-legal"><a href="../terms.html">Terms</a><a href="../privacy.html">Privacy</a><a href="../credit-terms.html">${esc(CREDIT)} terms</a><a href="../support.html">Support</a><span>© 2026 Early Bird</span></div>`;
+  const legal = `<div class="df-legal"><a href="../terms.html">Terms</a><a href="../privacy.html">Privacy</a><a href="../consumer-health-data.html">Health data</a><a href="../credit-terms.html">${esc(CREDIT)} terms</a><a href="../support.html">Support</a><span>© 2026 Early Bird</span></div>`;
   if (minimal) {
     head.innerHTML = ""; head.hidden = true; // the booking page is a sheet, like the app: no header
     foot.innerHTML = `<div class="df-in df-min">${legal}</div>`;
@@ -354,7 +354,7 @@ async function drawChrome(path) {
 const SUPPORT = "support@eatearlybird.com";
 const isPartner = (v) => v?.is_partner === true;
 const npNote = (v) => (isPartner(v) ? "" : `<div class="npnote">${ic("info")}<span><b>Not an Early Bird partner yet</b> · If they don't honour 50% off, your fee comes back. <a href="../terms.html#6-the-discount-and-the-rules-for-it" target="_blank" rel="noopener">How it works</a></span></div>`);
-const legalLinks = `<div class="legal"><a href="../terms.html">Terms</a><a href="../privacy.html">Privacy</a><a href="../credit-terms.html">${esc(CREDIT)} terms</a><a href="../support.html">Support</a></div>`;
+const legalLinks = `<div class="legal"><a href="../terms.html">Terms</a><a href="../privacy.html">Privacy</a><a href="../consumer-health-data.html">Health data</a><a href="../credit-terms.html">${esc(CREDIT)} terms</a><a href="../support.html">Support</a></div>`;
 const topbar = (right = "") => `<div class="wash"><div class="col"><div class="topbar${right ? "" : " empty"}">${right}</div></div></div>`;
 const showPage = (inner, { wash = true, right = "", size = "" } = {}) => {
   if (isDesk()) { APP.innerHTML = `<div class="col ${size || (Auth.session() ? "" : "narrow")}">${inner}</div>`; return; }
@@ -1335,6 +1335,7 @@ async function viewSignIn(q) {
 }
 
 /* ───────────────────────────── checkout: "Make a booking" ───────────────────────────── */
+const HEALTH_WORDS = /\b(allerg\w*|intoleran\w*|anaphyla\w*|epi-?pen|coeliac|celiac|gluten\w*|dairy|lactose|(tree )?nuts?|peanuts?|shellfish|sesame|soy|eggs?|vegan|vegetarian|pescatarian|halal|kosher|diets?|dietary|diabet\w*|pregnan\w*)\b/i;
 function normalisePhone(raw) {
   const t = String(raw || "").trim(), digits = t.replace(/\D/g, "");
   if (t.startsWith("+")) return digits.length >= 8 && digits.length <= 15 ? "+" + digits : null;
@@ -1442,6 +1443,8 @@ async function viewCheckout(q) {
         ${field("c-name", "Name", `<input id="c-name" type="text" autocomplete="name" maxlength="80" value="${esc(d.name)}" placeholder="First and last name">`)}
         ${field("c-phone", "Mobile", `<input id="c-phone" type="tel" autocomplete="tel" inputmode="tel" maxlength="32" placeholder="(310) 555-0101" value="${esc(d.phone)}">`, "Only for this booking, if the restaurant needs to reach you.")}
         ${field("c-req", "Request <span class=\"optl\">optional</span>", `<input id="c-req" type="text" maxlength="500" value="${esc(d.request)}" placeholder="Allergies, a high chair, a window seat…">`)}
+        <label class="check small" id="w-c-hd"><input type="checkbox" id="c-hd" ${d.healthOk ? "checked" : ""}><span>If my request mentions an allergy or a diet, I agree Early Bird shares it with ${esc(v.name)} for this booking only. It's deleted 30 days after the booking (<a href="../consumer-health-data.html" target="_blank" rel="noopener">Consumer Health Data Privacy Policy</a>).</span></label>
+        <div class="ferr" id="e-c-hd" role="alert" hidden></div>
       </section>
       ${payNeeded() && guest ? `<section class="grp"><h2 class="grp-h">Payment</h2><p class="small muted" style="margin:0">Next, sign in or create a free account, then pay ${money(due())} with Apple Pay, Google Pay or a card. Your table stays held.</p></section>`
         : payNeeded() ? `<section class="grp"><h2 class="grp-h">Payment</h2><div id="express-element"></div><div id="pay-element"></div><div class="ferr" id="e-card" role="alert" hidden></div></section>` : ""}
@@ -1472,7 +1475,7 @@ async function viewCheckout(q) {
   }
   const capture = () => {
     const d = C.details;
-    d.name = val("c-name"); d.phone = val("c-phone"); d.request = val("c-req");
+    d.name = val("c-name"); d.phone = val("c-phone"); d.request = val("c-req"); d.healthOk = !!document.getElementById("c-hd")?.checked;
     d.share = !!document.getElementById("c-sh")?.checked; d.marketing = !!document.getElementById("c-mk")?.checked; d.accepted = !!document.getElementById("c-ok")?.checked;
     const fv = document.querySelector('input[name="c-fv"]:checked'); d.firstVisit = fv ? fv.value === "true" : null; // optional; tells the restaurant (0200)
     if (document.getElementById("c-ref")) { d.venueRef = val("c-ref"); d.bookedWithVenue = document.getElementById("c-bv").checked; }
@@ -1497,6 +1500,8 @@ async function viewCheckout(q) {
     const d = C.details, h = hd();
     if (d.name.trim().length < 2) return ["c-name", "Add your name for the booking."];
     if (!normalisePhone(d.phone)) return ["c-phone", d.phone ? "That doesn't look like a mobile number. Use 10 digits, or + and your country code." : "Add your mobile number."];
+    // consumer health data (Washington MHMDA, 0277): an allergy or diet in the request needs the diner's consent to share it
+    if (HEALTH_WORDS.test(d.request || "") && !d.healthOk) return ["c-hd", "Tick this to share the allergy or diet with the restaurant, or take it out of your request."];
     if (h.reservation_url && !d.bookedWithVenue) return ["c-bv", `Book with ${v.name} first, then tick this.`];
     if (!skipCard && payNeeded() && !C.cardComplete) return ["card", "Add your card details, or use Apple Pay / Google Pay above."];
     if (!d.accepted) return ["c-ok", "Tick to agree to the conditions."];

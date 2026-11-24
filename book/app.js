@@ -276,7 +276,7 @@ async function refreshTestBar() {
 function drawTabs(path) {
   const el = document.getElementById("tabs");
   const signedIn = !!Auth.session();
-  el.hidden = path === "/book" || path === "/signin" || path.startsWith("/r/"); // the booking sheet and the restaurant page are pushed screens in the app: no tab bar
+  el.hidden = path === "/book" || path === "/signin" || path.startsWith("/r/") || path.startsWith("/biz"); // booking and restaurant-owner setup are focused flows: no diner tab bar
   const on = path === "/" || path.startsWith("/r/") || path === "/book" ? "home" : path.startsWith("/booking") ? "bookings" : path === "/account" ? "account" : "";
   const tab = (k, href, icon, label) => `<a href="${href}" class="${on === k ? "on" : ""}" ${on === k ? 'aria-current="page"' : ""}>${ic(icon)}${label}</a>`;
   el.innerHTML = tab("home", "#/", "home", "Home") + tab("bookings", "#/bookings", "cal", "Bookings") + (signedIn ? tab("account", "#/account", "person", "Profile") : tab("account", "#/signin", "person", "Sign in"));
@@ -1298,7 +1298,8 @@ function bindCodeBoxes(onFull) {
 }
 
 async function viewSignIn(q) {
-  setTitle("Sign in");
+  const ownerSetup = (q.next || "").startsWith("#/biz");
+  setTitle(ownerSetup ? "Create your restaurant account" : "Sign in");
   funnel("signin_shown");
   const next = q.next || "#/";
   const toLinked = /^#\/(r|book|booking)\b/.test(next);
@@ -1312,8 +1313,8 @@ async function viewSignIn(q) {
   let tick = null;
   view.cleanup = () => clearInterval(tick);
   const booking = next.startsWith("#/book?");   // the last step of a booking: the table is already held
-  const head = () => `<div class="gate">${booking ? '<p style="margin:0 0 6px;font-size:12px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--ember)">Last step</p>' : ""}<h1 class="display">${next.startsWith("#/biz") ? "Sign in to list your restaurant" : booking ? "Sign in to book" : toLinked ? "Sign in to book your table" : "Sign in to book"}</h1>
-    <p class="muted" style="font-size:18px">${booking ? "Your table is held. " : ""}${st.method === "phone" ? "We'll text you a code. New here? An account is made for you." : st.mode === "in" ? "Use the email and password you use in the Early Bird app." : "Create a free account. It works in the Early Bird app too."}</p>${booking ? `<p class="small" style="margin:8px 0 0"><a href="${esc(next)}">‹ Back to your booking</a></p>` : ""}</div>`;
+  const head = () => `<div class="gate">${booking ? '<p style="margin:0 0 6px;font-size:12px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--ember)">Last step</p>' : ""}<h1 class="display">${ownerSetup ? "Create your restaurant account" : booking ? "Sign in to book" : toLinked ? "Sign in to book your table" : "Sign in to book"}</h1>
+    <p class="muted" style="font-size:18px">${booking ? "Your table is held. " : ""}${ownerSetup && st.method === "phone" ? "Enter your mobile number. We'll text a code—no password needed." : st.method === "phone" ? "We'll text you a code. New here? An account is made for you." : st.mode === "in" ? "Use the email and password you use in the Early Bird app." : "Create a free account. It works in the Early Bird app too."}</p>${booking ? `<p class="small" style="margin:8px 0 0"><a href="${esc(next)}">‹ Back to your booking</a></p>` : ""}</div>`;
   const legal = `<p class="tiny muted center" style="margin:12px 0 0">By continuing you accept the <a href="../terms.html" target="_blank" rel="noopener">Terms</a> and <a href="../privacy.html" target="_blank" rel="noopener">Privacy Policy</a>.</p>`;
   // phone sign-in only (Twilio toll-free verification, 23 Nov 2026): the SMS consent line, same words as iOS 4bb5615
   const legalSms = `<p class="tiny muted center" style="margin:12px 0 0">Early Bird texts 1 sign-in code per request. Msg &amp; data rates may apply. Reply STOP to opt out, HELP for help. By continuing you agree to the <a href="../terms.html" target="_blank" rel="noopener">Terms</a> and <a href="../privacy.html" target="_blank" rel="noopener">Privacy Policy</a>.</p>`;
@@ -1326,7 +1327,7 @@ async function viewSignIn(q) {
         <label class="field">Phone number</label>
         <div style="display:flex;gap:8px;margin-top:-6px"><select id="p-dial" aria-label="Country code" style="width:96px;margin:0;flex:none">${DIALS.map(([f, d]) => `<option value="${d}" ${d === st.dial ? "selected" : ""}>${f} ${d}</option>`).join("")}</select>
           <input id="p-num" type="tel" inputmode="tel" autocomplete="tel-national" placeholder="Phone number" style="margin:0" value="${esc(st.phone)}"></div>
-        <button class="btn" id="p-go" type="submit" style="margin-top:14px">Next</button>
+        <button class="btn" id="p-go" type="submit" style="margin-top:14px">${ownerSetup ? "Text me a code" : "Next"}</button>
         ${legalSms}</form>
       <p class="center"><button class="linklike" type="button" id="use-email">Use email instead</button></p>`);
     document.getElementById("use-email").onclick = () => { st.method = "email"; drawEmail(); };

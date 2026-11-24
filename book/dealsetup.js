@@ -313,10 +313,10 @@ export default async function dealSetup(venueId, q, h) {
       <textarea id="ds-typed" rows="10" aria-label="Your menu"></textarea>${foot("Check it", "Back")}`;
     if ((data.dishes || []).length && S.sub !== "replace") return `<h1 class="q">We have your menu</h1><p class="sub">${data.dishes.length} dishes are on your Early Bird page. We'll use them to suggest your deal.</p>
       <div class="crd">${data.dishes.slice(0, 6).map((d) => `<div class="kv"><span>${esc(d.name)}</span><span>${usd(d.price)}</span></div>`).join("")}${data.dishes.length > 6 ? `<p class="sub small">and ${data.dishes.length - 6} more</p>` : ""}</div>${foot("Use this menu", "Replace it with my latest menu")}`;
-    return `<h1 class="q">Add your menu</h1><p class="sub">So we can suggest which dishes go on the deal. You can skip this.</p>
+    return `<h1 class="q">Add your menu</h1><p class="sub">We need your current menu and prices so we can price the listing properly and suggest deal rules.</p>
       ${big("link", "link", "Import it from your website", "Your website's menu page, Toast, Square…")}
       <label class="big"><span class="ic">${IC.photo}</span><span><b>Upload a photo, screenshot or PDF</b><small>A paper menu, your DoorDash page as a screenshot, or a PDF</small></span><input type="file" id="ds-menu" accept="image/*,.pdf" hidden></label>
-      ${big("type", "type", "Type it", "One dish per line, with its price")}${foot(null, "Do this later")}`;
+      ${big("type", "type", "Type it", "One dish per line, with its price")}<p class="sub small">Your listing cannot go live until a menu with prices is saved.</p>`;
   }
   function typedMenu(text) {
     const out = []; let cur = { name: "Menu", items: [] };
@@ -492,6 +492,7 @@ export default async function dealSetup(venueId, q, h) {
           // read the ticks before the "Saving…" screen replaces them
           const keep = S.menu.sections.map((s, si) => ({ name: s.name, items: s.items.filter((_, ii) => document.querySelector(`.mi[data-s="${si}"][data-i="${ii}"]`)?.checked !== false).map((i) => ({ name: i.name, description: i.description || "", price: i.price ?? 0 })) })).filter((s) => s.items.length);
           if (!keep.length) { S.msg = "Keep at least one dish, or go back."; return draw(); }
+          if (keep.some((s) => s.items.some((i) => !(Number(i.price) > 0)))) { S.msg = "Every dish you keep needs a price. Untick items without prices, or go back and add them."; return draw(); }
           busy("Saving your menu…", async () => {
           await rpc("save_menu", { p_venue: venueId, p_sections: keep });
           data = await rpc("deal_setup", { p_venue: venueId }); S.plan.deal_items = null; S.menu = null; S.sub = null;

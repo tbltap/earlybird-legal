@@ -60,6 +60,7 @@ const ERRS = {
   bad_setup: "Something in the deal didn't look right. Check it and try again.",
   not_allowed: "Only the restaurant's owner or manager can do this.",
   too_many_checks: "That's a lot of documents in a short time. Try again later.",
+  menu_needed: "Add and confirm your menu with prices before you send the listing.",
 };
 function errText(e) {
   const raw = `${e?.code || ""} ${e?.message || ""}`;
@@ -101,6 +102,7 @@ export default async function bizRoute(path, q) {
   if (path === "/biz") return viewBizHome();
   if (path === "/biz/why") return viewWhy();
   if (!Auth.session()) return viewSignIn({ next: location.hash });
+  if (path === "/biz/start") return viewFind(q, true);
   if (path === "/biz/find") return viewFind(q);
   if (path === "/biz/new") return viewNew();
   if (path.startsWith("/biz/claim/")) return viewClaim(path.slice(11));
@@ -129,9 +131,9 @@ async function viewBizHome() {
     return `<a class="bizrow" href="${href}"><div><b>${esc(c.venue_name || "Your restaurant")}</b><span>${esc(c.venue_address || "")}</span></div><span class="bizpill ${st === "Live" ? "ok" : st === "Not approved" ? "bad" : ""}">${esc(st)}</span></a>`;
   };
   page(`<h1 class="display bizt">Your restaurants</h1>
-    ${claims.length ? `<div class="bizlist">${claims.map(row).join("")}</div>` : `<div class="bc-empty"><h2>We can build it for you.</h2><p>Send us your restaurant and contact details. We'll add the menu, photos and listing, then call you to approve it.</p><a class="btn" href="../restaurants/contact/">Start my free setup</a></div>`}
-    ${claims.length ? `<a class="btn" href="../restaurants/contact/">Add another restaurant</a>` : ""}
-    <p class="center small"><a href="#/biz/find">I'd rather set it up myself</a> · <a href="#/biz/why">How Early Bird works</a></p>`);
+    ${claims.length ? `<div class="bizlist">${claims.map(row).join("")}</div>` : `<div class="bc-empty"><h2>Set up your restaurant.</h2><p>Find or add it, upload your menu, then choose the quiet times and deal rules you want. We do the pricing and listing work around those answers.</p><a class="btn" href="#/biz/start">Start my free setup</a></div>`}
+    ${claims.length ? `<a class="btn" href="#/biz/start">Add another restaurant</a>` : ""}
+    <p class="center small"><a href="#/biz/why">How Early Bird works</a></p>`);
 }
 function conciergeHomeHtml() {
   return `<div class="bizconcierge">
@@ -139,8 +141,8 @@ function conciergeHomeHtml() {
       <span class="p-eyebrow">Early Bird for restaurants</span>
       <h1>Tell us your restaurant.<br>We'll do the rest.</h1>
       <p>We'll build your page, add your menu and photos, and set up your offer with you. Nothing goes live until you approve it.</p>
-      <a class="btn bc-primary" href="../restaurants/contact/">Start my free setup</a>
-      <span class="bc-time">Takes about 2 minutes · Free to list</span>
+      <a class="btn bc-primary" href="#/biz/start">Start my restaurant setup</a>
+      <span class="bc-time">Create your account with a text code · Free to list</span>
     </section>
     <section class="bc-proof" aria-label="What you control">
       <div><b>$0</b><span>to list</span></div>
@@ -152,9 +154,10 @@ function conciergeHomeHtml() {
       <div class="bc-worklist">
         <div>${ic("store")}<p><b>Your page</b><span>We add the restaurant details, links and location.</span></p></div>
         <div>${ic("book")}<p><b>Your menu and photos</b><span>Send a link or file. We organize and upload everything.</span></p></div>
-        <div>${ic("tag")}<p><b>Your Early Bird offer</b><span>We call to confirm the quiet times and rules you want.</span></p></div>
+        <div>${ic("tag")}<p><b>Your Early Bird offer</b><span>We suggest the pricing. You choose the quiet times and deal rules.</span></p></div>
       </div>
     </section>
+    <div class="bc-disclosure"><b>Before anything goes live</b><span>You'll confirm you can list the restaurant, accept the Restaurant Terms, upload proof and a menu, and agree to honour the deal you choose. We review every signup and restaurant for fit and will reach out if we need anything. After approval, your listing is live and can accept bookings.</span></div>
     <div class="bc-links"><a href="#/biz/why">See how Early Bird works</a><a href="#/signin?next=${encodeURIComponent("#/biz")}">Already started? Sign in</a></div>
   </div>`;
 }
@@ -183,7 +186,7 @@ function guestMaths(x, it = PITCH) {
   const guests = Math.round(x.tables * x.perTable * x.nights * x.full / 100 * (n > 1 ? SECOND_ITEM_FACTOR : 1));
   return { pays, ingredients, fees, keep, guests, sales: guests * pays, cost: guests * (ingredients + fees), net: guests * keep };
 }
-const startHref = () => (Auth.session() ? "#/biz/find" : "../restaurants/contact/");
+const startHref = () => "#/biz/start";
 // Owner, 21 Nov: "listing is free no fees guests pay a small booking fee to cover our charges and you get incremental
 // revenue and guest contacts and own the guest relationship ... frame it as how much its costing you to not take
 // advantage of early bird", laid out cleanly, the way Apple would.
@@ -314,14 +317,15 @@ function wireEcon() {
 }
 
 /* ───────────────────────────── find and claim ───────────────────────────── */
-async function viewFind(q) {
+async function viewFind(q, onboarding = false) {
   setTitle("Find your restaurant");
   const p = await rpc("profile").catch(() => ({}));
   const myName = [p.first_name, p.last_name].filter(Boolean).join(" ").replace(/^Early Bird diner$/, "");
-  page(`${back("#/biz", "Your restaurants")}<h1 class="display bizt">Find your restaurant</h1>
+  page(`${back("#/biz", onboarding ? "About setup" : "Your restaurants")}<div class="bizflow-head"><span>STEP 1 OF 4</span><h1 class="display bizt">Find your restaurant</h1><p>Start typing its name. If it isn't here, you can add it with just the basics.</p></div>
     <div class="textsearch">${ic("search")}<input id="bf-q" type="search" placeholder="Restaurant name" aria-label="Restaurant name" autocomplete="off" value="${esc(q.q || "")}"></div>
     <div id="bf-res" class="bizlist"></div>
-    <p class="center" style="margin-top:18px"><a class="btn pale" href="#/biz/new">My restaurant isn't here</a></p>`);
+    <p class="center" style="margin-top:18px"><a class="btn pale" href="#/biz/new">My restaurant isn't here</a></p>
+    <div class="biz-assure"><b>What happens next</b><span>You'll verify that you run the restaurant, upload its menu, choose your deal, and send it for review. We review every signup and restaurant for fit and will reach out if we need anything. Once approved, the listing goes live and can accept bookings.</span></div>`);
   const inp = document.getElementById("bf-q"), out = document.getElementById("bf-res");
   let t = null, seq = 0;
   const search = async () => {
@@ -342,6 +346,7 @@ async function viewFind(q) {
       <label class="field">Your name<input id="bc-name" autocomplete="name" value="${esc(myName)}" maxlength="120" required></label>
       <fieldset class="bizseg"><legend>You are the</legend><label><input type="radio" name="bc-role" value="owner" checked> Owner</label><label><input type="radio" name="bc-role" value="manager"> Manager</label></fieldset>
       ${r.phone_hint ? `<p class="small muted">Signed in with the restaurant's own phone number (ending ${esc(r.phone_hint)})? You can start setting up straight away.</p>` : ""}
+      ${setupAcknowledgements("bc")}
       <div id="bc-msg"></div><button class="btn" type="submit">Claim ${esc(r.name)}</button>
       <button class="btn grey" type="button" id="bc-cancel">Back to the search</button></form>`;
     document.getElementById("bc-cancel").onclick = search;
@@ -349,10 +354,12 @@ async function viewFind(q) {
       e.preventDefault();
       const name = document.getElementById("bc-name").value.trim(), role = document.querySelector('input[name="bc-role"]:checked').value, msg = document.getElementById("bc-msg");
       if (!name) { msg.innerHTML = note("Add your name."); return; }
+      if (!document.getElementById("bc-rights").checked || !document.getElementById("bc-deal").checked) { msg.innerHTML = note("Confirm both statements to continue."); return; }
       e.target.querySelector('button[type="submit"]').disabled = true;
       try {
         const c = await rpc("start_venue_claim", { p_venue: r.id, p_name: name, p_role: role });
-        go(c.status === "approved" && c.venue_id ? `/biz/v/${c.venue_id}` : `/biz/claim/${c.id}`);
+        if (c.status === "approved" && c.venue_id && role === "owner") await rpc("accept_restaurant_terms", { p_venue: c.venue_id, p_version: c.terms_current_version || TERMS_VERSION });
+        go(c.status === "approved" && c.venue_id ? `/biz/deal/${c.venue_id}` : `/biz/claim/${c.id}`);
       } catch (err) { msg.innerHTML = note(errText(err)); e.target.querySelector('button[type="submit"]').disabled = false; }
     };
   }
@@ -370,28 +377,40 @@ async function viewNew() {
   setTitle("Add your restaurant");
   const p = await rpc("profile").catch(() => ({}));
   const myName = [p.first_name, p.last_name].filter(Boolean).join(" ").replace(/^Early Bird diner$/, "");
-  page(`${back("#/biz/find", "Search")}<h1 class="display bizt">Add your restaurant</h1>
+  page(`${back("#/biz/start", "Search")}<div class="bizflow-head"><span>STEP 2 OF 4</span><h1 class="display bizt">Add your restaurant</h1><p>Only the details we need to create the draft. You can finish the page after the menu is added.</p></div>
     <form class="card bizform" id="bn" novalidate>
       <label class="field">Restaurant name<input id="bn-v" maxlength="160" autocomplete="organization" required></label>
       <label class="field">Address<input id="bn-a" maxlength="400" autocomplete="street-address" placeholder="Street, city, state, ZIP" required></label>
-      <label class="field">Restaurant phone<input id="bn-p" type="tel" maxlength="32" autocomplete="tel"></label>
-      <label class="field">Website<input id="bn-w" type="url" maxlength="300" placeholder="https://"></label>
       <label class="field">Your name<input id="bn-n" maxlength="120" autocomplete="name" value="${esc(myName)}" required></label>
       <fieldset class="bizseg"><legend>You are the</legend><label><input type="radio" name="bn-role" value="owner" checked> Owner</label><label><input type="radio" name="bn-role" value="manager"> Manager</label></fieldset>
+      <details class="biz-optional"><summary>Phone and website (optional)</summary><label class="field">Restaurant phone<input id="bn-p" type="tel" maxlength="32" autocomplete="tel"></label><label class="field">Website<input id="bn-w" type="url" maxlength="300" placeholder="https://"></label></details>
+      ${setupAcknowledgements("bn")}
       <div id="bn-msg"></div><button class="btn" type="submit">Add the restaurant</button></form>`);
   document.getElementById("bn").onsubmit = async (e) => {
     e.preventDefault();
     const v = (id) => document.getElementById(id).value.trim(), msg = document.getElementById("bn-msg"), btn = e.target.querySelector("button");
     const miss = !v("bn-v") ? ["bn-v", "Add the restaurant's name."] : !v("bn-a") ? ["bn-a", "Add the restaurant's address."] : !v("bn-n") ? ["bn-n", "Add your name."] : null;
     if (miss) { msg.innerHTML = note(miss[1]); document.getElementById(miss[0]).focus(); return; }
+    if (!document.getElementById("bn-rights").checked || !document.getElementById("bn-deal").checked) { msg.innerHTML = note("Confirm both statements to continue."); return; }
     btn.disabled = true; msg.innerHTML = note("Adding it…", "info");
     const pos = await geocode(v("bn-a"));
     try {
+      const role = document.querySelector('input[name="bn-role"]:checked').value;
       const c = await rpc("request_new_venue", { p_venue_name: v("bn-v"), p_address: v("bn-a"), p_phone: v("bn-p"), p_website: v("bn-w"), p_name: v("bn-n"),
-        p_role: document.querySelector('input[name="bn-role"]:checked').value, p_lat: pos?.lat ?? null, p_lng: pos?.lng ?? null });
-      go(c.venue_id ? `/biz/v/${c.venue_id}` : `/biz/claim/${c.id}`);
+        p_role: role, p_lat: pos?.lat ?? null, p_lng: pos?.lng ?? null });
+      if (c.venue_id && role === "owner") await rpc("accept_restaurant_terms", { p_venue: c.venue_id, p_version: c.terms_current_version || TERMS_VERSION });
+      go(c.venue_id ? `/biz/deal/${c.venue_id}` : `/biz/claim/${c.id}`);
     } catch (err) { msg.innerHTML = note(errText(err)); btn.disabled = false; }
   };
+}
+
+function setupAcknowledgements(pre) {
+  return `<div class="setup-ack">
+    <label class="check"><input type="checkbox" id="${pre}-rights"><span>I own or manage this restaurant, can create its listing, and will upload only menus and photos I have the right to use.</span></label>
+    <label class="check"><input type="checkbox" id="${pre}-deal"><span>I have read the <a href="../restaurant-terms.html" target="_blank" rel="noopener">Restaurant Terms</a>. If I am the owner, I accept them. I will honour every deal and confirmed booking exactly as it is set.</span></label>
+    <p>No long-term commitment. You can stop listing at any time; confirmed bookings must still be honoured. Results vary, and Early Bird does not guarantee bookings.</p>
+    <p class="manager-note">Managers can start setup, but the restaurant owner must accept the Terms before launch.</p>
+  </div>`;
 }
 
 /* ───────────────────────────── proof: ownership documents ───────────────────────────── */
@@ -789,7 +808,7 @@ async function wireMenu(venueId) {
 }
 
 /* ── the fair-deal promise and sending ── */
-const BLOCK = { terms_required: "Accept the Restaurant Terms.", setup_needed: "Set your days, times and tables.", page_needed: "Add a photo and a short description on your page.",
+const BLOCK = { terms_required: "Accept the Restaurant Terms.", setup_needed: "Set your days, times and tables.", menu_needed: "Add and confirm your menu with prices.", page_needed: "Add a photo and a short description on your page.",
   location_needed: ERRS.location_needed, document_needed: "Add a photo of your ownership document.", verified_needed: "Show that you run the restaurant." };
 function sendHtml(ls) {
   const pl = ls.pledge || {};
@@ -799,7 +818,7 @@ function sendHtml(ls) {
   return `${pledgeBox(pl, ls.venue_name)}
     ${blockers.length ? `<div class="msg info"><b>Before you send it:</b><ul class="bizblock">${blockers.map((b) => `<li>${esc(b)}</li>`).join("")}</ul></div>` : ""}
     <div id="p-msg"></div><button class="btn" type="button" id="p-go" ${blockers.length ? "disabled" : ""}>Send to Early Bird</button>
-    <p class="small muted">It goes live once your ownership document checks out, usually within a few minutes. We'll then give you a call.</p>`;
+    <p class="small muted">We review every signup and restaurant for fit. We'll reach out if we need anything. After approval, your listing is live and can accept bookings.</p>`;
 }
 const pledgeBox = (pl, name) => (pl.version ? `<div class="pledge"><div class="title">${esc(pl.title || "Our fair-deal promise")}</div><ul>${(pl.statements || []).map((s) => `<li>${esc(s)}</li>`).join("")}</ul>
   <label class="check"><input type="checkbox" id="p-ok"><span>${esc((pl.checkbox || "We agree to all three, for <restaurant name>.").replace(/<restaurant name>/i, name || "our restaurant"))}</span></label>

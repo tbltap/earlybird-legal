@@ -14,7 +14,7 @@
 <link rel="apple-touch-icon" href="../../img/apple-touch-icon.png?v=20261122d">
 <link rel="preload" href="../../fonts/InstrumentSerif-Regular.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="../../fonts/InterTight-var.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="style.css?v=20261124">
+<link rel="stylesheet" href="style.css?v=20261124steps1">
 </head>
 <body>
 <header class="bar">
@@ -36,7 +36,7 @@
         <p class="lede">Share the details you know. A real person from Early Bird will review them and contact you about setting up your restaurant.</p>
         <ol class="steps" aria-label="What happens next">
           <li><span>1</span><div><b>We review your restaurant</b><small>We'll look at your website, menu, and the kind of help you want.</small></div></li>
-          <li><span>2</span><div><b>We contact you directly</b><small>Choose phone, text, or email and tell us the best time.</small></div></li>
+          <li><span>2</span><div><b>We contact you right away</b><small>Choose phone, text, or email. We'll reach out as soon as your request arrives.</small></div></li>
           <li><span>3</span><div><b>We help build the listing</b><small>You approve the details and stay in control of your offer.</small></div></li>
         </ol>
       </div>
@@ -48,7 +48,18 @@
             <input id="company-website" name="website" type="text" tabindex="-1" autocomplete="off">
           </div>
 
-          <fieldset>
+          <div class="flow-progress">
+            <div class="progress-copy">
+              <p class="caps">Step <span id="step-number">1</span> of 3</p>
+              <p id="step-name">Your restaurant</p>
+            </div>
+            <div class="progress-track" role="progressbar" aria-label="Inquiry progress" aria-valuemin="1" aria-valuemax="3" aria-valuenow="1">
+              <span id="progress-fill"></span>
+            </div>
+          </div>
+
+          <div class="step-viewport" id="step-viewport">
+          <fieldset class="form-step" data-step="0" data-title="Your restaurant">
             <legend><span>01</span>Your restaurant</legend>
             <div class="field full">
               <label for="restaurant-name">Restaurant or business name <i>Required</i></label>
@@ -73,7 +84,7 @@
             </div>
           </fieldset>
 
-          <fieldset>
+          <fieldset class="form-step" data-step="1" data-title="How to reach you" hidden>
             <legend><span>02</span>How to reach you</legend>
             <div class="field">
               <label for="submitter-name">Your name <i>Required</i></label>
@@ -110,13 +121,9 @@
                 <label><input type="radio" name="preferred_contact_method" value="either" required><span>Whatever is easiest</span></label>
               </div>
             </div>
-            <div class="field full">
-              <label for="preferred-time">Best time to reach you <i>Required</i></label>
-              <input id="preferred-time" name="preferred_contact_time" type="text" maxlength="100" placeholder="For example, weekdays 2–4pm Pacific" required>
-            </div>
           </fieldset>
 
-          <fieldset>
+          <fieldset class="form-step" data-step="2" data-title="What can we help with?" hidden>
             <legend><span>03</span>What can we help with?</legend>
             <div class="field full">
               <span class="label">Choose all that apply <i>Required</i></span>
@@ -136,17 +143,21 @@
               <textarea id="notes" name="notes" rows="5" maxlength="1200" placeholder="Slow hours, goals, current booking tools, or any questions"></textarea>
               <p class="hint"><span id="notes-count">0</span>/1,200 characters</p>
             </div>
+            <div class="consent field full">
+              <label>
+                <input type="checkbox" id="consent" name="consent" value="true" required>
+                <span>I agree that Early Bird may use the information above to respond to this inquiry by my selected method. If I choose text, message and data rates may apply. This is not consent to recurring marketing messages. <i>Required</i></span>
+              </label>
+            </div>
           </fieldset>
-
-          <div class="consent">
-            <label>
-              <input type="checkbox" id="consent" name="consent" value="true" required>
-              <span>I agree that Early Bird may use the information above to respond to this inquiry by my selected method. If I choose text, message and data rates may apply. This is not consent to recurring marketing messages. <i>Required</i></span>
-            </label>
           </div>
 
           <div id="form-status" class="status" role="status" aria-live="polite" tabindex="-1"></div>
-          <button class="submit" id="submit-button" type="submit"><span>Send my request</span><i aria-hidden="true">→</i></button>
+          <div class="step-actions" id="step-actions">
+            <button class="back-button" id="back-button" type="button" hidden><span aria-hidden="true">←</span> Back</button>
+            <button class="submit" id="next-button" type="button"><span>Continue</span><i aria-hidden="true">→</i></button>
+            <button class="submit" id="submit-button" type="submit" hidden><span>Send my request</span><i aria-hidden="true">→</i></button>
+          </div>
           <p class="fine">We only use these details to evaluate and respond to your request. Read our <a href="../../privacy.html">Privacy Policy</a> and <a href="../../restaurant-terms.html">Restaurant Terms</a>.</p>
         </form>
 
@@ -175,6 +186,6 @@
   </div>
 </footer>
 
-<script src="app.js?v=20261124" defer></script>
+<script src="app.js?v=20261124steps1" defer></script>
 </body>
 </html>

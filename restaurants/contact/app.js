@@ -12,6 +12,11 @@
   var PUBLIC_KEY = "sb_publishable_TW9FPHv3ijsOZx4QPTIsdA_hSWFafW4";
   var HELP = ["listing", "menu", "offers", "bookings", "photos", "owner_setup", "other"];
   var METHODS = ["phone", "sms", "email", "either"];
+  var STEP_FIELDS = [
+    ["restaurant_name", "city", "website_social"],
+    ["submitter_name", "submitter_role", "phone", "email", "preferred_contact_method"],
+    ["help_wanted", "consent", "website", "elapsed_ms", "idempotency_key"]
+  ];
   var startedAt = Date.now();
   var idempotencyKey = "";
 
@@ -70,7 +75,7 @@
       phone: normalizePhone(values.phone),
       email: text(values.email, 254).toLowerCase(),
       preferred_contact_method: method,
-      preferred_contact_time: text(values.preferred_contact_time, 100),
+      preferred_contact_time: "",
       help_wanted: help,
       notes: text(values.notes, 1200),
       consent: values.consent === true || values.consent === "true" || values.consent === "on",
@@ -90,12 +95,19 @@
     if (!payload.phone) errors.phone = "Enter a valid phone number, including country code outside the U.S. or Canada.";
     if (!validEmail(payload.email)) errors.email = "Enter a valid email address.";
     if (METHODS.indexOf(payload.preferred_contact_method) < 0) errors.preferred_contact_method = "Choose how you would like us to contact you.";
-    if (payload.preferred_contact_time.length < 2) errors.preferred_contact_time = "Tell us the best time to reach you.";
     if (!payload.help_wanted.length) errors.help_wanted = "Choose at least one way we can help.";
     if (!payload.consent) errors.consent = "Please agree so we can respond to your request.";
     if (payload.website) errors.website = "Invalid submission.";
     if (!Number.isFinite(payload.elapsed_ms) || payload.elapsed_ms < 3000 || payload.elapsed_ms > 24 * 60 * 60 * 1000) errors.elapsed_ms = "Please reload the page and try again.";
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(payload.idempotency_key)) errors.idempotency_key = "Please reload the page and try again.";
+    return errors;
+  }
+
+  function validateStep(payload, step) {
+    var all = validate(payload);
+    var allowed = STEP_FIELDS[step] || [];
+    var errors = {};
+    allowed.forEach(function (field) { if (all[field]) errors[field] = all[field]; });
     return errors;
   }
 
@@ -109,7 +121,7 @@
   }
 
   function firstError(errors) {
-    var order = ["restaurant_name", "city", "website_social", "submitter_name", "submitter_role", "phone", "email", "preferred_contact_method", "preferred_contact_time", "help_wanted", "consent", "elapsed_ms", "idempotency_key"];
+    var order = ["restaurant_name", "city", "website_social", "submitter_name", "submitter_role", "phone", "email", "preferred_contact_method", "help_wanted", "consent", "elapsed_ms", "idempotency_key"];
     for (var i = 0; i < order.length; i++) if (errors[order[i]]) return { field: order[i], message: errors[order[i]] };
     return null;
   }
@@ -120,26 +132,101 @@
     if (!form) return;
     var status = document.getElementById("form-status");
     var button = document.getElementById("submit-button");
+    var nextButton = document.getElementById("next-button");
+    var backButton = document.getElementById("back-button");
+    var actions = document.getElementById("step-actions");
+    var viewport = document.getElementById("step-viewport");
+    var steps = Array.prototype.slice.call(form.querySelectorAll(".form-step"));
+    var progress = form.querySelector("[role=progressbar]");
     var notes = document.getElementById("notes");
     var helpError = document.getElementById("help-error");
+    var currentStep = 0;
     startedAt = Date.now();
     idempotencyKey = makeIdempotencyKey(window.crypto);
 
+    function clearStatus() {
+      status.className = "status";
+      status.textContent = "";
+      helpError.textContent = "";
+    }
+
+    function focusProblem(problem) {
+      if (problem.field === "help_wanted") helpError.textContent = problem.message;
+      status.className = "status error";
+      status.textContent = problem.message;
+      var target = problem.field === "preferred_contact_method"
+        ? form.querySelector('[name="preferred_contact_method"]')
+        : problem.field === "help_wanted"
+          ? form.querySelector('[name="help_wanted"]')
+          : form.elements[problem.field];
+      if (target && target.focus) target.focus(); else status.focus();
+    }
+
+    function showStep(next, shouldFocus) {
+      if (next < 0 || next >= steps.length || next === currentStep) return;
+      var previous = steps[currentStep];
+      var incoming = steps[next];
+      var reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      var fromHeight = viewport.getBoundingClientRect().height;
+      if (!reduceMotion) viewport.style.height = fromHeight + "px";
+      previous.hidden = true;
+      incoming.hidden = false;
+      incoming.classList.add("is-entering");
+      currentStep = next;
+      document.getElementById("step-number").textContent = String(currentStep + 1);
+      document.getElementById("step-name").textContent = incoming.getAttribute("data-title") || "";
+      document.getElementById("progress-fill").style.width = String(((currentStep + 1) / steps.length) * 100) + "%";
+      progress.setAttribute("aria-valuenow", String(currentStep + 1));
+      backButton.hidden = currentStep === 0;
+      nextButton.hidden = currentStep === steps.length - 1;
+      button.hidden = currentStep !== steps.length - 1;
+      actions.classList.toggle("show-back", currentStep > 0);
+      clearStatus();
+      var finish = function () {
+        incoming.classList.remove("is-entering");
+        viewport.style.height = "auto";
+      };
+      if (reduceMotion) finish();
+      else {
+        var toHeight = incoming.offsetHeight;
+        window.requestAnimationFrame(function () {
+          viewport.style.height = toHeight + "px";
+          window.requestAnimationFrame(function () { incoming.classList.remove("is-entering"); });
+        });
+        window.setTimeout(finish, 380);
+      }
+      if (shouldFocus) {
+        var card = form.closest(".form-card");
+        if (card && card.scrollIntoView) card.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "start" });
+        var legend = incoming.querySelector("legend");
+        if (legend) { legend.setAttribute("tabindex", "-1"); window.setTimeout(function () { legend.focus(); }, reduceMotion ? 0 : 260); }
+      }
+    }
+
+    function advance() {
+      clearStatus();
+      var payload = buildPayload(valuesFromForm(form));
+      var problem = firstError(validateStep(payload, currentStep));
+      if (problem) { focusProblem(problem); return; }
+      showStep(currentStep + 1, true);
+    }
+
     notes.addEventListener("input", function () { document.getElementById("notes-count").textContent = String(notes.value.length); });
-    form.addEventListener("input", function () { status.className = "status"; status.textContent = ""; });
+    form.addEventListener("input", clearStatus);
+    nextButton.addEventListener("click", advance);
+    backButton.addEventListener("click", function () { showStep(currentStep - 1, true); });
 
     form.addEventListener("submit", function (event) {
       event.preventDefault();
-      status.className = "status"; status.textContent = ""; helpError.textContent = "";
+      if (currentStep < steps.length - 1) { advance(); return; }
+      clearStatus();
       var payload = buildPayload(valuesFromForm(form));
       var errors = validate(payload);
       var problem = firstError(errors);
       if (problem) {
-        if (problem.field === "help_wanted") helpError.textContent = problem.message;
-        status.className = "status error";
-        status.textContent = problem.message;
-        var target = problem.field === "preferred_contact_method" ? form.querySelector('[name="preferred_contact_method"]') : problem.field === "help_wanted" ? form.querySelector('[name="help_wanted"]') : form.elements[problem.field];
-        if (target && target.focus) target.focus(); else status.focus();
+        var stepWithProblem = STEP_FIELDS.findIndex(function (fields) { return fields.indexOf(problem.field) >= 0; });
+        if (stepWithProblem >= 0 && stepWithProblem !== currentStep) showStep(stepWithProblem, false);
+        focusProblem(problem);
         return;
       }
       if (!form.checkValidity()) { form.reportValidity(); return; }
@@ -180,5 +267,5 @@
     });
   }
 
-  return { ENDPOINT: ENDPOINT, HELP: HELP.slice(), METHODS: METHODS.slice(), text: text, normalizePhone: normalizePhone, validEmail: validEmail, validLink: validLink, makeIdempotencyKey: makeIdempotencyKey, buildPayload: buildPayload, validate: validate, firstError: firstError, bind: bind };
+  return { ENDPOINT: ENDPOINT, HELP: HELP.slice(), METHODS: METHODS.slice(), STEP_FIELDS: STEP_FIELDS.map(function (fields) { return fields.slice(); }), text: text, normalizePhone: normalizePhone, validEmail: validEmail, validLink: validLink, makeIdempotencyKey: makeIdempotencyKey, buildPayload: buildPayload, validate: validate, validateStep: validateStep, firstError: firstError, bind: bind };
 });

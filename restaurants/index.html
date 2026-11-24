@@ -129,6 +129,7 @@
     .days{display:grid;grid-template-columns:repeat(7,1fr);gap:7px}
     .day{min-height:72px;padding:8px 4px;border:1px solid var(--line);border-radius:13px;background:white;text-align:center;font-size:12px;color:var(--muted)}
     .day b{display:block;margin-top:7px;color:var(--ink);font-size:16px}
+    .day b.time{font:700 10px/1.15 var(--sans);letter-spacing:-.01em}
     .day b.closed{font:700 10px/1.1 var(--sans);letter-spacing:.03em}
     .day.on{background:var(--peach);border-color:var(--peach);color:var(--ink)}
     .days.paused .day.on{background:#e8dfd2;border-color:#cfc2b1}
@@ -350,11 +351,11 @@
         </div>
         <div class="control-layout">
           <div class="schedule" aria-label="Example weekly schedule">
-            <div class="schedule-head"><h3>Week of Nov 24</h3><button class="pause" type="button" aria-pressed="false" id="pauseButton">Pause future slots</button></div>
+            <div class="schedule-head"><h3>Offer times</h3><button class="pause" type="button" aria-pressed="false" id="pauseButton">Pause future slots</button></div>
             <div class="days">
-              <div class="day">Mon<b class="closed">Closed</b></div><div class="day on">Tue<b>3</b></div><div class="day">Wed<b class="closed">Closed</b></div><div class="day on">Thu<b>3</b></div><div class="day">Fri<b class="closed">Closed</b></div><div class="day on">Sat<b>2</b></div><div class="day">Sun<b class="closed">Closed</b></div>
+              <div class="day on">Mon<b class="time">5:00–6:30</b></div><div class="day on">Tue<b class="time">5:00–6:30</b></div><div class="day on">Wed<b class="time">5:00–6:30</b></div><div class="day on">Thu<b class="time">5:00–6:30</b></div><div class="day">Fri<b class="closed">Closed</b></div><div class="day on">Sat<b class="time">4:30–6:00</b></div><div class="day on">Sun<b class="time">4:30–6:00</b></div>
             </div>
-            <p class="schedule-note" id="scheduleStatus" aria-live="polite">Example: eight tables across three future windows on open days.</p>
+            <p class="schedule-note" id="scheduleStatus" aria-live="polite">Example: six days open, with three tables in each time window.</p>
           </div>
           <div class="control-list">
             <article class="control-item"><h3>Pick the window</h3><p>Before dinner, late evening or another time you’re already staffed and want more covers.</p></article>
@@ -492,7 +493,7 @@
         pause.setAttribute('aria-pressed',String(!pressed));
         pause.textContent=pressed?'Pause future slots':'Resume future slots';
         days.classList.toggle('paused',!pressed);
-        status.textContent=pressed?'Example: eight tables across three future windows on open days.':'Future example slots paused. Confirmed bookings would still stand.';
+        status.textContent=pressed?'Example: six days open, with three tables in each time window.':'Future example slots paused. Confirmed bookings would still stand.';
       });
     })();
   </script>

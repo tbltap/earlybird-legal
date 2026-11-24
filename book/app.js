@@ -1388,6 +1388,17 @@ async function viewSignIn(q) {
 /* ───────────────────────────── checkout: "Make a booking" ───────────────────────────── */
 // Diets and allergies: no separate consent prompt (owner, 23 Nov 2026: "Privacy Policy only"). The Privacy Policy and the
 // Consumer Health Data Privacy Policy cover a diet or allergy written in the request.
+// The diet pills on the booking step: the same keys and labels as the iPhone and Android apps (VisitDetails.diets).
+const DIETS = [["vegetarian", "Vegetarian"], ["vegan", "Vegan"], ["pescatarian", "Pescatarian"], ["gluten_free", "Gluten-free"],
+  ["dairy_free", "Dairy-free"], ["nut_free", "Nut-free"], ["halal", "Halal"], ["kosher", "Kosher"], ["no_pork", "No pork"]];
+// What the restaurant gets for this booking (0299 set_booking_details): exactly what's on the sheet, cleared fields as empty.
+// Sent just before the booking is confirmed (and before a card payment); one retry, and a failure never stops the booking.
+async function saveVisit(id, d) {
+  if (!id || !d) return;
+  const t = (x) => String(x || "").trim().slice(0, 120) || null;
+  const send = () => rpc("set_booking_details", { p_device: deviceId, p_booking: id, p_details: { dietary: d.dietary || [], allergies: t(d.allergies), note: t(d.request) } });
+  try { await send(); } catch { try { await sleep(800); await send(); } catch { /* the booking goes ahead */ } }
+}
 const HEALTH_WORDS = /\b(allerg\w*|intoleran\w*|anaphyla\w*|epi-?pen|coeliac|celiac|gluten\w*|dairy|lactose|(tree )?nuts?|peanuts?|shellfish|sesame|soy|eggs?|vegan|vegetarian|pescatarian|halal|kosher|diets?|dietary|diabet\w*|pregnan\w*)\b/i;
 function normalisePhone(raw) {
   const t = String(raw || "").trim(), digits = t.replace(/\D/g, "");
@@ -1422,7 +1433,12 @@ async function viewCheckout(q) {
   const prepPayment = async () => { C.intent = payNeeded() && !guest ? await pay("intent", { claim_id: hd().booking_id }) : null; };
   if (isPreview(v)) return out(ERR.not_yet_bookable, { code: "not_yet_bookable" });   // don't even try to hold
   try { await makeHold(); await prepPayment(); } catch (e) { if (e.code === "not_signed_in") throw e; return out(friendly(e), e); }
-  C.details = { name: [profile.first_name, profile.last_name].filter(Boolean).join(" ").replace(/^Early Bird diner$/, ""), phone: profile.phone || "", request: "", share: true, marketing: false, accepted: false, venueRef: "", bookedWithVenue: false, firstVisit: null };
+  C.details = { name: [profile.first_name, profile.last_name].filter(Boolean).join(" ").replace(/^Early Bird diner$/, ""), phone: profile.phone || "", request: "", dietary: [], allergies: "", share: true, marketing: false, accepted: false, venueRef: "", bookedWithVenue: false, firstVisit: null };
+  // Saved considerations, diet and allergies follow the diner (0299; owner + legal, 24 Nov 2026): the hold's details_prefill
+  // fills the fields; the diner can edit or clear anything, and the restaurant gets only what's left on the sheet.
+  { const pf = hd()?.details_prefill || {};
+    C.details.dietary = (pf.dietary || []).filter((k) => DIETS.some(([x]) => x === k));
+    C.details.allergies = String(pf.allergies || "").slice(0, 120); C.details.request = String(pf.considerations || pf.note || "").slice(0, 120); }
   // Back from signing in: put back what the visitor had typed (same table only), then they pay.
   const DRAFT = "eb.web.draft", draftKey = [slug, wanted.deal, wanted.date, wanted.time].join("|");
   let resumed = false;
@@ -1499,7 +1515,10 @@ async function viewCheckout(q) {
       <section class="grp"><h2 class="grp-h">Your details</h2>
         ${field("c-name", "Name", `<input id="c-name" type="text" autocomplete="name" maxlength="80" value="${esc(d.name)}" placeholder="First and last name">`)}
         ${field("c-phone", "Mobile", `<input id="c-phone" type="tel" autocomplete="tel" inputmode="tel" maxlength="32" placeholder="(310) 555-0101" value="${esc(d.phone)}">`, "Only for this booking, if the restaurant needs to reach you.")}
-        ${field("c-req", "Request <span class=\"optl\">optional</span>", `<input id="c-req" type="text" maxlength="500" value="${esc(d.request)}" placeholder="Allergies, a high chair, a window seat…">`, `Goes to ${esc(v.name)} for this booking and is deleted 30 days after it. Diets and allergies: <a href="../consumer-health-data.html" target="_blank" rel="noopener">Consumer Health Data Privacy Policy</a>.`)}
+        <fieldset class="fv visit"><legend>Would you like the restaurant to make any special considerations for your booking, so you're treated like a regular? <em>Optional</em></legend>
+          ${DIETS.map(([k, l]) => `<label><input type="checkbox" name="c-diet" value="${k}" ${d.dietary.includes(k) ? "checked" : ""}><span>${l}</span></label>`).join("")}</fieldset>
+        ${field("c-all", "Allergies", `<input id="c-all" type="text" maxlength="120" value="${esc(d.allergies)}" placeholder="e.g. peanuts, shellfish">`, "We'll save this to your account so every restaurant you book knows. Edit or clear it any time in Profile.")}
+        ${field("c-req", "A note for the restaurant", `<input id="c-req" type="text" maxlength="120" value="${esc(d.request)}" placeholder="A high chair, a window seat, a birthday…">`)}
       </section>
       ${payNeeded() && guest ? `<section class="grp"><h2 class="grp-h">Payment</h2><p class="small muted" style="margin:0">Next, sign in or create a free account, then pay ${money(due())} with Apple Pay, Google Pay or a card. Your table stays held.</p></section>`
         : payNeeded() ? `<section class="grp"><h2 class="grp-h">Payment</h2><div id="express-element"></div><div id="pay-element"></div><div class="ferr" id="e-card" role="alert" hidden></div></section>` : ""}
@@ -1530,7 +1549,8 @@ async function viewCheckout(q) {
   }
   const capture = () => {
     const d = C.details;
-    d.name = val("c-name"); d.phone = val("c-phone"); d.request = val("c-req");
+    d.name = val("c-name"); d.phone = val("c-phone"); d.request = val("c-req"); d.allergies = val("c-all");
+    d.dietary = [...document.querySelectorAll('input[name="c-diet"]:checked')].map((x) => x.value);
     d.share = !!document.getElementById("c-sh")?.checked; d.marketing = !!document.getElementById("c-mk")?.checked; d.accepted = !!document.getElementById("c-ok")?.checked;
     const fv = document.querySelector('input[name="c-fv"]:checked'); d.firstVisit = fv ? fv.value === "true" : null; // optional; tells the restaurant (0200)
     if (document.getElementById("c-ref")) { d.venueRef = val("c-ref"); d.bookedWithVenue = document.getElementById("c-bv").checked; }
@@ -1586,11 +1606,12 @@ async function viewCheckout(q) {
     const btn = document.getElementById("c-go");
     if (!payNeeded()) {
       btn.disabled = true; btn.textContent = "Booking…";
-      try { const b = await rpc("confirm", confirmParams(hd().booking_id)); C.done = true; after(b); }
+      try { await saveVisit(hd().booking_id, C.details); const b = await rpc("confirm", confirmParams(hd().booking_id)); C.done = true; after(b); }
       catch (e) { if (e.code === "hold_expired" || e.code === "overlapping_booking") { clearInterval(C.timer); C.done = true; return out(friendly(e), e); } btn.disabled = false; btn.textContent = goLabel(); draw(friendly(e)); }
       return;
     }
     btn.disabled = true; btn.textContent = "Paying…"; C.paying = true; clearErr("card");
+    await saveVisit(hd().booking_id, C.details);
     sstore.set("eb.web.pending", JSON.stringify({ id: hd().booking_id, details: C.details }));
     const { error } = await C.stripe.confirmPayment({ elements: C.elements, confirmParams: { return_url: returnUrl(), payment_method_data: { billing_details: { name: C.details.name, email: C.profile.email || undefined, phone: C.details.phone } } }, redirect: "if_required" });
     if (error) { C.paying = false; btn.disabled = false; btn.textContent = goLabel(); return showErr("card", error.message || "The payment didn't go through. Try another card."); }
@@ -1615,6 +1636,7 @@ async function viewCheckout(q) {
       express.on("click", (event) => { const p = firstProblem({ skipCard: true }); if (p) { showErr(p[0], p[1]); return; } C.details.phone = normalisePhone(C.details.phone); event.resolve(); });
       express.on("confirm", async () => {
         C.paying = true; clearErr("card");
+        await saveVisit(hd().booking_id, C.details);
         sstore.set("eb.web.pending", JSON.stringify({ id: hd().booking_id, details: C.details }));
         const { error } = await C.stripe.confirmPayment({ elements, clientSecret: info.client_secret, confirmParams: { return_url: returnUrl() }, redirect: "if_required" });
         if (error) { C.paying = false; showErr("card", error.message); return; }
@@ -1625,7 +1647,7 @@ async function viewCheckout(q) {
     pe.mount("#pay-element");
     pe.on("change", (e) => { C.cardComplete = !!e.complete; if (e.complete) clearErr("card"); });
   }
-  const confirmParams = (id) => ({ p_device: deviceId, p_claim: id, p_name: C.details.name.trim(), p_phone: C.details.phone, p_request: C.details.request || null, p_external_ref: C.details.venueRef || null, p_share_contact: C.details.share ? true : null, p_marketing: C.details.marketing ? true : null, p_first_visit: C.details.firstVisit ?? null });
+  const confirmParams = (id) => ({ p_device: deviceId, p_claim: id, p_name: C.details.name.trim(), p_phone: C.details.phone, p_request: null, p_external_ref: C.details.venueRef || null, p_share_contact: C.details.share ? true : null, p_marketing: C.details.marketing ? true : null, p_first_visit: C.details.firstVisit ?? null });
   function after(b) {
     const n = C.details.name.trim().split(/\s+/);
     rpc("save_profile", { p_first: n[0], p_last: n.slice(1).join(" ") || null, p_phone: C.details.phone }).catch(() => {});
@@ -1660,7 +1682,7 @@ async function settleBooking(id, d) {
     return null;
   }
   try {
-    return await rpc("confirm", { p_device: deviceId, p_claim: id, p_name: d.name.trim(), p_phone: d.phone, p_request: d.request || null, p_external_ref: d.venueRef || null, p_share_contact: d.share ? true : null, p_marketing: d.marketing ? true : null, p_first_visit: d.firstVisit ?? null });
+    return await rpc("confirm", { p_device: deviceId, p_claim: id, p_name: d.name.trim(), p_phone: d.phone, p_request: null, p_external_ref: d.venueRef || null, p_share_contact: d.share ? true : null, p_marketing: d.marketing ? true : null, p_first_visit: d.firstVisit ?? null });
   } catch (e) {
     // Paid already: the payment path confirms the booking itself (verify/webhook → finalize), so a confirm error here
     // (e.g. overlapping_booking or payment_required while the webhook is a moment behind) means "check the booking".
@@ -1783,6 +1805,33 @@ function downloadIcs(b) {
 }
 
 /* ───────────────────────────── profile ───────────────────────────── */
+// What every restaurant you book sees on the booking step (0299): saved diet, allergies and considerations. Edit or clear
+// here (set_booking_defaults: each key sent replaces what's saved; empty clears it; `note` works before and after 0310).
+function drawPrefsCard() {
+  const card = document.getElementById("prefs-card"); if (!card) return;
+  rpc("booking_defaults", {}).then((bd) => {
+    if (!bd) return;
+    const diet = bd.dietary || [], note = bd.considerations ?? bd.note ?? "";
+    card.innerHTML = `<div class="title">For restaurants you book</div>
+      <p class="small muted" style="margin:4px 0 0">Filled in on every booking, where you can change it for that booking.</p>
+      <form id="prefs-f" novalidate>
+        <fieldset class="fv visit"><legend>Dietary needs</legend>${DIETS.map(([k, l]) => `<label><input type="checkbox" name="pf-diet" value="${k}" ${diet.includes(k) ? "checked" : ""}><span>${l}</span></label>`).join("")}</fieldset>
+        <label class="field">Allergies<input id="pf-all" type="text" maxlength="120" value="${esc(bd.allergies || "")}" placeholder="e.g. peanuts, shellfish"></label>
+        <label class="field">Special considerations<input id="pf-note" type="text" maxlength="120" value="${esc(note)}" placeholder="A quiet table, a high chair…"></label>
+        <div class="actions" style="margin-top:10px"><button class="btn pale" type="submit">Save</button><button class="btn grey" type="button" id="pf-clear">Clear all</button></div></form>`;
+    card.hidden = false;
+    const save = async (vals) => {
+      try { await rpc("set_booking_defaults", { p_defaults: vals }); toast("Saved."); drawPrefsCard(); }
+      catch (e) { toast(friendly(e)); }
+    };
+    document.getElementById("prefs-f").onsubmit = (e) => {
+      e.preventDefault();
+      const t = (id) => document.getElementById(id).value.trim().slice(0, 120);
+      save({ dietary: [...document.querySelectorAll('input[name="pf-diet"]:checked')].map((x) => x.value), allergies: t("pf-all"), note: t("pf-note") });
+    };
+    document.getElementById("pf-clear").onclick = () => save({ dietary: [], allergies: "", note: "" });
+  }).catch(() => {});
+}
 async function viewAccount() {
   setTitle("Profile");
   const [p, cr, au, ps] = await Promise.all([rpc("profile"), rpc("my_credit", { p_device: deviceId }), Auth.user(), rpc("my_passes", { p_device: deviceId }).catch(() => null)]);
@@ -1804,10 +1853,12 @@ async function viewAccount() {
       <p class="small muted" style="margin-top:8px">Credit from a cancellation is used first on your next booking fee. Credit you earn is used only when it covers a whole booking fee. It's for booking fees only and has no cash value. <a href="../credit-terms.html">${esc(CREDIT)} terms</a></p>
       ${(cr.credits || []).length ? `<div class="title" style="font-size:16px;margin:14px 0 4px">Expiring soonest</div>${cr.credits.slice(0, 6).map((c) => `<div class="item"><div><span>${esc(c.title)}</span><div class="d">${c.pending ? "Pending" : c.expires_at ? "Use by " + esc(fmtStamp(c.expires_at)) : ""}</div></div><div class="p">${money(c.cents)}</div></div>`).join("")}` : ""}</div>
     ${passCard}${codeCard}
+    <div class="card" id="prefs-card" hidden></div>
     <a class="card airow" href="#/account/ai"><span class="ai-ic">${ic("bird")}</span><span><b>AI bookings</b><small id="ai-state">Book from Claude or ChatGPT</small></span>${ic("arrow")}</a>
     <div class="actions"><a class="btn pale" href="#/bookings">Bookings</a><button class="btn grey" id="so" type="button">Sign out</button></div>
     <p class="center small muted" style="margin-top:20px"><a href="../account-deletion.html" style="color:inherit">Delete my account</a></p>`);
   document.getElementById("so").onclick = async () => { await Auth.signOut(); navigate("#/"); };
+  drawPrefsCard();
   rpc("ai_booking_status").then((a) => { const el = document.getElementById("ai-state"); if (el && a) el.textContent = a.enabled ? `On · ${a.card ? `${cap(a.card.brand || "card")} •• ${a.card.last4}` : "no card"}` : "Off"; }).catch(() => {});
   document.getElementById("codef").onsubmit = async (e) => {
     e.preventDefault();

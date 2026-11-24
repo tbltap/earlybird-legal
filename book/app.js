@@ -1274,6 +1274,8 @@ function e164(dial, raw) {
   return d.length >= 7 && full.length <= 15 ? "+" + full : null;
 }
 const prettyPhone = (p) => (p ? `+${String(p).replace(/^\+/, "")}`.replace(/^\+1(\d{3})(\d{3})(\d{4})$/, "+1 ($1) $2-$3") : "");
+// The SMS consent line under a phone number that gets a sign-in code: the same words as the sign-in page (legalSms).
+const SMS_LINE = 'Early Bird texts 1 sign-in code per request. Msg &amp; data rates may apply. Reply STOP to opt out, HELP for help. By continuing you agree to the <a href="../terms.html" target="_blank" rel="noopener">Terms</a> and <a href="../privacy.html" target="_blank" rel="noopener">Privacy Policy</a>.';
 // Six boxes over one invisible input: typing, paste and the phone's "From Messages" code suggestion (autocomplete=one-time-code) all fill it.
 const codeBoxesHtml = () => `<div class="codebox" id="codebox"><div class="boxes" aria-hidden="true">${"<span></span>".repeat(6)}</div><input id="code-in" class="codein" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="40" aria-label="6-digit code"></div>`;
 function bindCodeBoxes(onFull) {
@@ -1441,8 +1443,13 @@ async function viewCheckout(q) {
     C.details.allergies = String(pf.allergies || "").slice(0, 120); C.details.request = String(pf.considerations || pf.note || "").slice(0, 120); }
   // Back from signing in: put back what the visitor had typed (same table only), then they pay.
   const DRAFT = "eb.web.draft", draftKey = [slug, wanted.deal, wanted.date, wanted.time].join("|");
-  let resumed = false;
-  try { const dr = JSON.parse(sstore.get(DRAFT) || "null"); if (dr && dr.key === draftKey && !guest) { Object.assign(C.details, dr.details, { name: dr.details.name || C.details.name, phone: dr.details.phone || C.details.phone }); resumed = true; } } catch { /* ignore */ }
+  let resumed = false, autoGo = false;
+  try { const dr = JSON.parse(sstore.get(DRAFT) || "null"); if (dr && dr.key === draftKey && !guest) {
+    const dd = dr.details || {};
+    Object.assign(C.details, dd, { name: dd.name || C.details.name, phone: dd.phone || C.details.phone,
+      // a known account's saved diet, allergies and considerations fill in whatever the visitor left empty (0299)
+      dietary: dd.dietary?.length ? dd.dietary : C.details.dietary, allergies: dd.allergies || C.details.allergies, request: dd.request || C.details.request });
+    resumed = true; autoGo = !!dr.auto; } } catch { /* ignore */ }
   if (!guest) sstore.set(DRAFT, null);
   // "Email me Early Bird news and offers" (0298; owner, 24 Nov 2026: ticked, and you can untick it). Asked only of someone
   // who has never answered: a signed-in diner with any earlier answer (here, in Settings or at sign-up) isn't asked again.
@@ -1470,7 +1477,11 @@ async function viewCheckout(q) {
   // a tester's booking at a preview restaurant (0263): Stripe test mode, nothing is charged
   const testBadge = (mode) => (hd()?.is_test ? '<span class="testbadge">Test booking: no real charge · card 4242 4242 4242 4242</span>' : mode === "test" ? '<span class="testbadge">TEST MODE · card 4242 4242 4242 4242</span>' : "");
   const due = () => (C.intent ? C.intent.amount_cents : hd().amount_due_cents);
-  const goLabel = () => (guest ? "Continue" : payNeeded() ? `Pay ${money(due())} and book` : "Book now");
+  // Signing in happens here, in the booking step (owner, 24 Nov 2026: no separate sign-in page): the phone number on the
+  // sheet gets a code, the code is typed (or auto-filled) right here, and after the day's 2 codes (0294) or on "Use email
+  // instead" it's email and password, also here. Then the step reloads as the account and carries on to book or pay.
+  C.si = C.si || { phase: "phone", e164: "", email: "", resendAt: 0, busy: false, msg: "", kind: "err" };
+  const goLabel = () => (guest ? (C.si.phase === "code" ? "Verify and continue" : C.si.phase === "email" ? "Sign in and continue" : "Continue") : payNeeded() ? `Pay ${money(due())} and book` : "Book now");
 
   const summaryMobile = () => {
     const h = hd();
@@ -1519,13 +1530,14 @@ async function viewCheckout(q) {
         <div class="grow-f" id="w-c-bv"><label class="check" style="margin:0"><input type="checkbox" id="c-bv" ${d.bookedWithVenue ? "checked" : ""}><span>I've booked ${time12(h.time)} with ${esc(v.name)}</span></label><div class="ferr" id="e-c-bv" role="alert" hidden></div></div></section>` : ""}
       <section class="grp"><h2 class="grp-h">Your details</h2>
         ${field("c-name", "Name", `<input id="c-name" type="text" autocomplete="name" maxlength="80" value="${esc(d.name)}" placeholder="First and last name">`)}
-        ${field("c-phone", "Mobile", `<input id="c-phone" type="tel" autocomplete="tel" inputmode="tel" maxlength="32" placeholder="(310) 555-0101" value="${esc(d.phone)}">`, "Only for this booking, if the restaurant needs to reach you.")}
+        ${guest ? field("c-phone", "Your phone number", `<input id="c-phone" type="tel" autocomplete="tel" inputmode="tel" maxlength="32" placeholder="(310) 555-0101" value="${esc(d.phone)}" ${C.si.phase === "code" ? "readonly" : ""}>`, SMS_LINE)
+          : field("c-phone", "Mobile", `<input id="c-phone" type="tel" autocomplete="tel" inputmode="tel" maxlength="32" placeholder="(310) 555-0101" value="${esc(d.phone)}">`, "Only for this booking, if the restaurant needs to reach you.")}
         <fieldset class="fv visit"><legend>Would you like the restaurant to make any special considerations for your booking, so you're treated like a regular? <em>Optional</em></legend>
           ${DIETS.map(([k, l]) => `<label><input type="checkbox" name="c-diet" value="${k}" ${d.dietary.includes(k) ? "checked" : ""}><span>${l}</span></label>`).join("")}</fieldset>
         ${field("c-all", "Allergies", `<input id="c-all" type="text" maxlength="120" value="${esc(d.allergies)}" placeholder="e.g. peanuts, shellfish">`, "We'll save this to your account so every restaurant you book knows. Edit or clear it any time in Profile.")}
         ${field("c-req", "A note for the restaurant", `<input id="c-req" type="text" maxlength="120" value="${esc(d.request)}" placeholder="A high chair, a window seat, a birthday…">`)}
       </section>
-      ${payNeeded() && guest ? `<section class="grp"><h2 class="grp-h">Payment</h2><p class="small muted" style="margin:0">Next, sign in or create a free account, then pay ${money(due())} with Apple Pay, Google Pay or a card. Your table stays held.</p></section>`
+      ${payNeeded() && guest ? `<section class="grp"><h2 class="grp-h">Payment</h2><p class="small muted" style="margin:0">After the code, pay ${money(due())} with Apple Pay, Google Pay or a card. Your table stays held.</p></section>`
         : payNeeded() ? `<section class="grp"><h2 class="grp-h">Payment</h2><div id="express-element"></div><div id="pay-element"></div><div class="ferr" id="e-card" role="alert" hidden></div></section>` : ""}
       <details class="disc"><summary><b>Early Bird conditions</b><span>${esc(rules().slice(0, 2).join(" · "))}</span></summary><ul class="rules">${rules().map((c) => `<li>${ic("check")}<span>${esc(c)}</span></li>`).join("")}</ul></details>
       <details class="disc"><summary><b>Cancellation policy</b><span>All of the fee back as ${esc(CREDIT)} within ${cfg.cancel_full_credit_minutes} minutes</span></summary>
@@ -1540,6 +1552,7 @@ async function viewCheckout(q) {
       <label class="check small"><input type="checkbox" id="c-sh" ${d.share ? "checked" : ""}><span>Share my name, mobile number and email with ${esc(v.name)}, so they can contact me about my bookings</span></label>
       <label class="check small"><input type="checkbox" id="c-mk" ${d.marketing ? "checked" : ""}><span>Let ${esc(v.name)} send me offers through Early Bird</span></label>
       ${d.news !== undefined ? `<label class="check small"><input type="checkbox" id="c-nw" ${d.news ? "checked" : ""}><span>Email me Early Bird news and offers</span></label>` : ""}
+      ${guest ? siHtml() : ""}
       <div class="paybar"><div class="paysum"><b>${money(due())}</b><span>${guest && payNeeded() ? "to pay after sign-in" : payNeeded() ? "to pay now" : due() === 0 && h.credit_cents > 0 ? (h.promo_cents >= h.credit_cents ? "free booking fee" : "covered by credit") : "nothing to pay"}</span></div><button class="btn" id="c-go" type="button">${goLabel()}</button></div>
       ${testBadge(C.intent?.mode || h.stripe_mode)}`;
   }
@@ -1596,6 +1609,73 @@ async function viewCheckout(q) {
     document.getElementById("c-ok").addEventListener("change", () => clearErr("c-ok"));
     document.getElementById("c-bv")?.addEventListener("change", () => clearErr("c-bv"));
     document.getElementById("c-go").onclick = submit;
+    if (guest) bindSignIn();
+  }
+  function siHtml() {
+    const si = C.si, m = si.msg ? `<div class="msg ${si.kind}" role="alert">${esc(si.msg)}</div>` : "";
+    if (si.phase === "code") return `<section class="grp" id="si"><h2 class="grp-h">Enter the code</h2>${m}<p class="small muted" style="margin:0 0 10px">We texted a 6-digit code to ${esc(prettyPhone(si.e164))}.</p>${codeBoxesHtml()}
+      <p class="small" style="margin:12px 0 0"><button class="linklike" type="button" id="si-resend" disabled>Resend</button> · <button class="linklike" type="button" id="si-change">Change number</button> · <button class="linklike" type="button" id="si-email">Use email instead</button></p></section>`;
+    if (si.phase === "email") return `<section class="grp" id="si"><h2 class="grp-h">Sign in with email</h2>${m}
+      <label class="field">Email<input id="si-em" type="email" autocomplete="email" inputmode="email" value="${esc(si.email)}"></label>
+      <label class="field">Password<input id="si-pw" type="password" autocomplete="current-password"></label>
+      <p class="small" style="margin:8px 0 0"><button class="linklike" type="button" id="si-forgot">Forgot password?</button> · <button class="linklike" type="button" id="si-phone">Use a text code instead</button></p></section>`;
+    return `<div id="si" class="small muted" style="margin:6px 0 0">${m}Continue texts a code to your phone number to sign you in. New here? An account is made for you. <button class="linklike" type="button" id="si-email">Use email instead</button></div>`;
+  }
+  let siTick = null;
+  function bindSignIn() {
+    const si = C.si;
+    const em = document.getElementById("si-email"); if (em) em.onclick = () => { capture(); si.phase = "email"; si.msg = ""; draw(); document.getElementById("si-em")?.focus(); };
+    const ph = document.getElementById("si-phone"); if (ph) ph.onclick = () => { capture(); si.phase = "phone"; si.msg = ""; draw(); };
+    const ch = document.getElementById("si-change"); if (ch) ch.onclick = () => { capture(); si.phase = "phone"; si.msg = ""; si.resendAt = 0; draw(); document.getElementById("c-phone")?.focus(); };
+    const fg = document.getElementById("si-forgot"); if (fg) fg.onclick = async () => {
+      capture(); si.email = val("si-em");
+      if (!/^\S+@\S+\.\S+$/.test(si.email)) { si.msg = "Type your email above first, then tap Forgot password."; si.kind = "err"; return draw(); }
+      try { await Auth.reset(si.email); si.msg = "Check your email for a link to set a new password."; si.kind = "ok"; } catch (e) { si.msg = e.message; si.kind = "err"; }
+      draw();
+    };
+    if (si.phase === "code") {
+      const ctl = bindCodeBoxes((c) => verifyCode(c, ctl));
+      const rs = document.getElementById("si-resend");
+      clearInterval(siTick);
+      siTick = setInterval(() => { if (!rs.isConnected) return clearInterval(siTick); const left = Math.ceil((si.resendAt - Date.now()) / 1000); rs.disabled = left > 0; rs.textContent = left > 0 ? `Resend in ${left}s` : "Resend"; }, 500);
+      rs.onclick = () => { capture(); sendCode(true); };
+    }
+  }
+  const LIMIT_RE = /today's \d+ text codes|daily limit|text codes for this number/i;
+  async function sendCode(again = false) {
+    const si = C.si, num = normalisePhone(C.details.phone);
+    if (!num) return showErr("c-phone", "That doesn't look like a mobile number. Use 10 digits, or + and your country code.");
+    const btn = document.getElementById("c-go"); btn.disabled = true; btn.textContent = "Sending…";
+    try { await Auth.sendPhoneCode(num); si.e164 = num; si.phase = "code"; si.resendAt = Date.now() + 30000; si.msg = again ? "We sent a new code." : ""; si.kind = "ok"; }
+    catch (e) {
+      // after the day's 2 codes for this number (0294): email and password, right here
+      if (LIMIT_RE.test(e.message || "")) { si.phase = "email"; si.msg = "You've had today's 2 text codes for this number. Sign in with your email and password instead."; si.kind = "info"; }
+      else { si.msg = e.message || friendly(e); si.kind = "err"; }
+    }
+    draw();
+  }
+  async function verifyCode(code, ctl) {
+    const si = C.si; if (si.busy) return; si.busy = true;
+    const btn = document.getElementById("c-go"); btn.disabled = true; btn.textContent = "Checking…";
+    try { await Auth.verifyPhoneCode(si.e164, code); await signedIn(); }
+    catch (e) { si.busy = false; ctl?.error(); ctl?.clear(); btn.disabled = false; btn.textContent = goLabel(); const box = document.getElementById("codebox"); document.querySelector("#si .msg")?.remove(); box?.insertAdjacentHTML("beforebegin", `<div class="msg err" role="alert">${esc(e.message || friendly(e))}</div>`); }
+  }
+  async function emailSignIn() {
+    const si = C.si; si.email = val("si-em"); const pw = document.getElementById("si-pw")?.value || "";
+    if (!/^\S+@\S+\.\S+$/.test(si.email)) { si.msg = "Check your email address and try again."; si.kind = "err"; return draw(); }
+    if (!pw) { si.msg = "Type your password."; si.kind = "err"; return draw(); }
+    const btn = document.getElementById("c-go"); btn.disabled = true; btn.textContent = "Signing in…";
+    try { await Auth.signIn(si.email, pw); await signedIn(); }
+    catch (e) { si.msg = e.message || friendly(e); si.kind = "err"; draw(); }
+  }
+  // Signed in: move this browser's things to the account, keep what was typed, and reload the step as the account. The
+  // next hold (as the account) replaces the visitor's; the step then books, or shows the card form, by itself.
+  async function signedIn() {
+    rpc("link_device", { p_device: deviceId }).catch(() => {});
+    clearInterval(siTick);
+    sstore.set(DRAFT, JSON.stringify({ key: draftKey, details: C.details, auto: true }));
+    C.done = true; C.si = null;
+    route();
   }
   async function submit() {
     if (C.busy || C.paying) return;
@@ -1603,9 +1683,9 @@ async function viewCheckout(q) {
       const g = firstProblem({ skipCard: true });
       if (g) return showErr(g[0], g[1]);
       C.details.phone = normalisePhone(C.details.phone);
-      sstore.set(DRAFT, JSON.stringify({ key: draftKey, details: C.details }));
-      C.done = true;   // keep the hold while signing in; the next hold (as the account) replaces it
-      return go("/signin", { next: location.hash, mode: "book" });
+      if (C.si.phase === "email") return emailSignIn();
+      if (C.si.phase === "code") { const v = document.getElementById("code-in")?.value || ""; return v.length === 6 ? verifyCode(v) : document.getElementById("code-in")?.focus(); }
+      return sendCode();
     }
     const p = firstProblem();
     if (p) return showErr(p[0], p[1]);
@@ -1673,6 +1753,8 @@ async function viewCheckout(q) {
     }
   }
   draw();
+  // Just signed in from this step: carry on by itself (book now, or bring up the card form).
+  if (autoGo) { if (!payNeeded()) submit(); else { document.getElementById("pay-element")?.scrollIntoView({ block: "center" }); toast("You're signed in. Pay to book."); } }
 }
 
 // The booking's answer to "Email me Early Bird news and offers" (0298): sent once when the booking is made, ticked or

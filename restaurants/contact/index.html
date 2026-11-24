@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en" class="no-js">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Let us set up your restaurant | Early Bird</title>
+<meta name="description" content="Tell Early Bird about your restaurant and our team will follow up to help set up your listing, menu, and early-table offer.">
+<meta name="theme-color" content="#F3EEE5">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; font-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src https://xopcdblqmmrvyocqomqz.supabase.co; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'">
+<link rel="canonical" href="https://eatearlybird.com/restaurants/contact/">
+<link rel="icon" type="image/png" sizes="64x64" href="../../img/favicon.png?v=20261122e">
+<link rel="icon" type="image/png" sizes="32x32" href="../../img/favicon-32.png?v=20261122e">
+<link rel="apple-touch-icon" href="../../img/apple-touch-icon.png?v=20261122d">
+<link rel="preload" href="../../fonts/InstrumentSerif-Regular.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="../../fonts/InterTight-var.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="style.css?v=20261124">
+</head>
+<body>
+<header class="bar">
+  <div class="wrap bar-inner">
+    <a class="brand" href="../"><img src="../../img/bird-mark-gradient.png?v=20261122" alt="" width="29" height="24">Early Bird</a>
+    <nav aria-label="Main">
+      <a class="back" href="../">For restaurants</a>
+      <a class="cta" href="../../book/#/biz">Set it up yourself</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <section class="intro" aria-labelledby="page-title">
+    <div class="wrap intro-grid">
+      <div class="pitch">
+        <p class="caps">Restaurant concierge</p>
+        <h1 id="page-title">Tell us about your place.<br><em>We'll take it from here.</em></h1>
+        <p class="lede">Share the details you know. A real person from Early Bird will review them and contact you about setting up your restaurant.</p>
+        <ol class="steps" aria-label="What happens next">
+          <li><span>1</span><div><b>We review your restaurant</b><small>We'll look at your website, menu, and the kind of help you want.</small></div></li>
+          <li><span>2</span><div><b>We contact you directly</b><small>Choose phone, text, or email and tell us the best time.</small></div></li>
+          <li><span>3</span><div><b>We help build the listing</b><small>You approve the details and stay in control of your offer.</small></div></li>
+        </ol>
+      </div>
+
+      <div class="form-card">
+        <form id="inquiry-form" novalidate>
+          <div class="trap" aria-hidden="true">
+            <label for="company-website">Leave this field empty</label>
+            <input id="company-website" name="website" type="text" tabindex="-1" autocomplete="off">
+          </div>
+
+          <fieldset>
+            <legend><span>01</span>Your restaurant</legend>
+            <div class="field full">
+              <label for="restaurant-name">Restaurant or business name <i>Required</i></label>
+              <input id="restaurant-name" name="restaurant_name" type="text" maxlength="120" autocomplete="organization" required>
+            </div>
+            <div class="field">
+              <label for="city">City <i>Required</i></label>
+              <input id="city" name="city" type="text" maxlength="100" autocomplete="address-level2" required>
+            </div>
+            <div class="field">
+              <label for="address">Street address</label>
+              <input id="address" name="address" type="text" maxlength="200" autocomplete="street-address" placeholder="If you have it">
+            </div>
+            <div class="field full">
+              <label for="restaurant-link">Website or social link</label>
+              <input id="restaurant-link" name="website_social" type="text" inputmode="url" maxlength="300" autocomplete="url" placeholder="https://… or @restaurant">
+              <p class="hint">A website, Instagram, Google Maps, or another public page is helpful.</p>
+            </div>
+            <div class="field full">
+              <label for="owner-operator">Owner or operator, if known</label>
+              <input id="owner-operator" name="owner_operator_name" type="text" maxlength="120" autocomplete="off" placeholder="Name or role">
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend><span>02</span>How to reach you</legend>
+            <div class="field">
+              <label for="submitter-name">Your name <i>Required</i></label>
+              <input id="submitter-name" name="submitter_name" type="text" maxlength="120" autocomplete="name" required>
+            </div>
+            <div class="field">
+              <label for="submitter-role">Your role <i>Required</i></label>
+              <select id="submitter-role" name="submitter_role" required>
+                <option value="">Choose one</option>
+                <option>Owner</option>
+                <option>Operator</option>
+                <option>General manager</option>
+                <option>Marketing or events</option>
+                <option>Chef</option>
+                <option>Staff member</option>
+                <option>Agency or representative</option>
+                <option>Other</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="phone">Phone <i>Required</i></label>
+              <input id="phone" name="phone" type="tel" inputmode="tel" maxlength="30" autocomplete="tel" placeholder="(310) 555-0123" required>
+            </div>
+            <div class="field">
+              <label for="email">Email <i>Required</i></label>
+              <input id="email" name="email" type="email" inputmode="email" maxlength="254" autocomplete="email" required>
+            </div>
+            <div class="field full">
+              <span class="label">Preferred contact method <i>Required</i></span>
+              <div class="choices inline" role="radiogroup" aria-label="Preferred contact method">
+                <label><input type="radio" name="preferred_contact_method" value="phone" required><span>Phone call</span></label>
+                <label><input type="radio" name="preferred_contact_method" value="sms" required><span>Text</span></label>
+                <label><input type="radio" name="preferred_contact_method" value="email" required><span>Email</span></label>
+                <label><input type="radio" name="preferred_contact_method" value="either" required><span>Whatever is easiest</span></label>
+              </div>
+            </div>
+            <div class="field full">
+              <label for="preferred-time">Best time to reach you <i>Required</i></label>
+              <input id="preferred-time" name="preferred_contact_time" type="text" maxlength="100" placeholder="For example, weekdays 2–4pm Pacific" required>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend><span>03</span>What can we help with?</legend>
+            <div class="field full">
+              <span class="label">Choose all that apply <i>Required</i></span>
+              <div class="choices help-grid" id="help-options">
+                <label><input type="checkbox" name="help_wanted" value="listing"><span>Create or claim my listing</span></label>
+                <label><input type="checkbox" name="help_wanted" value="menu"><span>Add my menu</span></label>
+                <label><input type="checkbox" name="help_wanted" value="photos"><span>Add restaurant photos</span></label>
+                <label><input type="checkbox" name="help_wanted" value="offers"><span>Plan an early-table offer</span></label>
+                <label><input type="checkbox" name="help_wanted" value="bookings"><span>Set up bookings</span></label>
+                <label><input type="checkbox" name="help_wanted" value="owner_setup"><span>Set up owner access</span></label>
+                <label><input type="checkbox" name="help_wanted" value="other"><span>Something else</span></label>
+              </div>
+              <p class="field-error" id="help-error" aria-live="polite"></p>
+            </div>
+            <div class="field full">
+              <label for="notes">Anything else we should know?</label>
+              <textarea id="notes" name="notes" rows="5" maxlength="1200" placeholder="Slow hours, goals, current booking tools, or any questions"></textarea>
+              <p class="hint"><span id="notes-count">0</span>/1,200 characters</p>
+            </div>
+          </fieldset>
+
+          <div class="consent">
+            <label>
+              <input type="checkbox" id="consent" name="consent" value="true" required>
+              <span>I agree that Early Bird may use the information above to respond to this inquiry by my selected method. If I choose text, message and data rates may apply. This is not consent to recurring marketing messages. <i>Required</i></span>
+            </label>
+          </div>
+
+          <div id="form-status" class="status" role="status" aria-live="polite" tabindex="-1"></div>
+          <button class="submit" id="submit-button" type="submit"><span>Send my request</span><i aria-hidden="true">→</i></button>
+          <p class="fine">We only use these details to evaluate and respond to your request. Read our <a href="../../privacy.html">Privacy Policy</a> and <a href="../../restaurant-terms.html">Restaurant Terms</a>.</p>
+        </form>
+
+        <section id="success" class="success" hidden aria-labelledby="success-title" tabindex="-1">
+          <span class="success-mark" aria-hidden="true">✓</span>
+          <p class="caps">Request received</p>
+          <h2 id="success-title">We'll be in touch.</h2>
+          <p>Thanks for telling us about <strong id="success-restaurant">your restaurant</strong>. Keep this reference in case you need to contact us:</p>
+          <code id="reference-id"></code>
+          <a class="return" href="../">Back to Early Bird for restaurants</a>
+        </section>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap footer-inner">
+    <nav aria-label="Footer">
+      <a href="../">For restaurants</a>
+      <a href="../../support.html">Support</a>
+      <a href="../../privacy.html">Privacy</a>
+      <a href="../../restaurant-terms.html">Restaurant terms</a>
+    </nav>
+    <span>&copy; 2026 Early Bird</span>
+  </div>
+</footer>
+
+<script src="app.js?v=20261124" defer></script>
+</body>
+</html>

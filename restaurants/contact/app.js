@@ -15,7 +15,7 @@
   var STEP_FIELDS = [
     ["restaurant_name", "city", "website_social"],
     ["submitter_name", "submitter_role", "phone", "email", "preferred_contact_method"],
-    ["help_wanted", "consent", "website", "elapsed_ms", "idempotency_key"]
+    ["tables_per_day", "help_wanted", "consent", "confirmation_email_consent", "website", "elapsed_ms", "idempotency_key"]
   ];
   var startedAt = Date.now();
   var idempotencyKey = "";
@@ -48,6 +48,61 @@
     } catch (_) { return false; }
   }
 
+  function wholeNumber(value) {
+    var raw = String(value == null ? "" : value).trim();
+    if (!/^-?\d+$/.test(raw)) return NaN;
+    var parsed = Number(raw);
+    return Number.isSafeInteger(parsed) ? parsed : NaN;
+  }
+
+  function tablesLabel(value) {
+    var count = wholeNumber(value);
+    if (!Number.isInteger(count) || count < 1) count = 1;
+    return count + (count === 1 ? " table each day" : " tables each day");
+  }
+
+  function completionCopy(result) {
+    var body = result && typeof result === "object" ? result : {};
+    var duplicate = body.duplicate === true;
+    var emailSent = body.customer_email === "sent";
+    var smsSent = body.customer_sms === "sent";
+    var neutral = "Your request is safely received. Someone from our team will review it and follow up by your selected method.";
+    if (duplicate) {
+      return {
+        lede: "Your request was already safely received. Someone from our team will review it and follow up by your selected method.",
+        next: "We won't send another confirmation, but our team will follow up by your selected method."
+      };
+    }
+    if (body.customer_email === "pending" || body.customer_sms === "pending") {
+      return {
+        lede: neutral,
+        next: "A person will review your listing and early-table offer, then follow up by your selected method."
+      };
+    }
+    if (emailSent && smsSent) {
+      return {
+        lede: "Someone from our team will review your request immediately. Check your email and texts—we've sent your confirmation and next steps.",
+        next: "We sent a confirmation by email and text. A person will review your listing and early-table offer with you."
+      };
+    }
+    if (emailSent) {
+      return {
+        lede: "Someone from our team will review your request immediately. Check your email—we've sent your confirmation and next steps.",
+        next: "We sent a confirmation by email. A person will review your listing and early-table offer with you."
+      };
+    }
+    if (smsSent) {
+      return {
+        lede: "Someone from our team will review your request immediately. Check your texts—we've sent your confirmation and next steps.",
+        next: "We sent a confirmation by text. A person will review your listing and early-table offer with you."
+      };
+    }
+    return {
+      lede: neutral,
+      next: "A person will review your listing and early-table offer, then follow up by your selected method."
+    };
+  }
+
   function makeIdempotencyKey(cryptoObject) {
     if (cryptoObject && typeof cryptoObject.randomUUID === "function") return cryptoObject.randomUUID();
     var bytes = new Uint8Array(16);
@@ -76,9 +131,11 @@
       email: text(values.email, 254).toLowerCase(),
       preferred_contact_method: method,
       preferred_contact_time: "",
+      tables_per_day: wholeNumber(values.tables_per_day),
       help_wanted: help,
       notes: text(values.notes, 1200),
       consent: values.consent === true || values.consent === "true" || values.consent === "on",
+      confirmation_email_consent: values.consent === true || values.consent === "true" || values.consent === "on",
       website: text(values.website, 200),
       elapsed_ms: Math.max(0, Math.round(submittedAt - beganAt)),
       idempotency_key: text(requestKey || idempotencyKey, 80)
@@ -95,8 +152,10 @@
     if (!payload.phone) errors.phone = "Enter a valid phone number, including country code outside the U.S. or Canada.";
     if (!validEmail(payload.email)) errors.email = "Enter a valid email address.";
     if (METHODS.indexOf(payload.preferred_contact_method) < 0) errors.preferred_contact_method = "Choose how you would like us to contact you.";
+    if (!Number.isInteger(payload.tables_per_day) || payload.tables_per_day < 1 || payload.tables_per_day > 500) errors.tables_per_day = "Enter a whole number from 1 to 500.";
     if (!payload.help_wanted.length) errors.help_wanted = "Choose at least one way we can help.";
     if (!payload.consent) errors.consent = "Please agree so we can respond to your request.";
+    if (!payload.confirmation_email_consent) errors.confirmation_email_consent = "Please agree so we can send your confirmation email.";
     if (payload.website) errors.website = "Invalid submission.";
     if (!Number.isFinite(payload.elapsed_ms) || payload.elapsed_ms < 3000 || payload.elapsed_ms > 24 * 60 * 60 * 1000) errors.elapsed_ms = "Please reload the page and try again.";
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(payload.idempotency_key)) errors.idempotency_key = "Please reload the page and try again.";
@@ -121,7 +180,7 @@
   }
 
   function firstError(errors) {
-    var order = ["restaurant_name", "city", "website_social", "submitter_name", "submitter_role", "phone", "email", "preferred_contact_method", "help_wanted", "consent", "elapsed_ms", "idempotency_key"];
+    var order = ["restaurant_name", "city", "website_social", "submitter_name", "submitter_role", "phone", "email", "preferred_contact_method", "tables_per_day", "help_wanted", "consent", "confirmation_email_consent", "elapsed_ms", "idempotency_key"];
     for (var i = 0; i < order.length; i++) if (errors[order[i]]) return { field: order[i], message: errors[order[i]] };
     return null;
   }
@@ -140,6 +199,10 @@
     var progress = form.querySelector("[role=progressbar]");
     var notes = document.getElementById("notes");
     var helpError = document.getElementById("help-error");
+    var tablesError = document.getElementById("tables-error");
+    var tablesInput = form.elements.tables_per_day;
+    var tablesDecrement = document.getElementById("tables-decrement");
+    var tablesIncrement = document.getElementById("tables-increment");
     var currentStep = 0;
     startedAt = Date.now();
     idempotencyKey = makeIdempotencyKey(window.crypto);
@@ -148,10 +211,12 @@
       status.className = "status";
       status.textContent = "";
       helpError.textContent = "";
+      if (tablesError) tablesError.textContent = "";
     }
 
     function focusProblem(problem) {
       if (problem.field === "help_wanted") helpError.textContent = problem.message;
+      if (problem.field === "tables_per_day" && tablesError) tablesError.textContent = problem.message;
       status.className = "status error";
       status.textContent = problem.message;
       var target = problem.field === "preferred_contact_method"
@@ -160,6 +225,23 @@
           ? form.querySelector('[name="help_wanted"]')
           : form.elements[problem.field];
       if (target && target.focus) target.focus(); else status.focus();
+    }
+
+    function syncTablesButtons() {
+      if (!tablesInput) return;
+      var value = wholeNumber(tablesInput.value);
+      if (tablesDecrement) tablesDecrement.disabled = Number.isInteger(value) && value <= 1;
+      if (tablesIncrement) tablesIncrement.disabled = Number.isInteger(value) && value >= 500;
+    }
+
+    function changeTablesBy(delta) {
+      if (!tablesInput) return;
+      var value = wholeNumber(tablesInput.value);
+      if (!Number.isInteger(value)) value = 1;
+      tablesInput.value = String(Math.min(500, Math.max(1, value + delta)));
+      clearStatus();
+      syncTablesButtons();
+      tablesInput.focus();
     }
 
     function showStep(next, shouldFocus) {
@@ -212,6 +294,12 @@
     }
 
     notes.addEventListener("input", function () { document.getElementById("notes-count").textContent = String(notes.value.length); });
+    if (tablesInput) {
+      tablesInput.addEventListener("input", syncTablesButtons);
+      syncTablesButtons();
+    }
+    if (tablesDecrement) tablesDecrement.addEventListener("click", function () { changeTablesBy(-1); });
+    if (tablesIncrement) tablesIncrement.addEventListener("click", function () { changeTablesBy(1); });
     form.addEventListener("input", clearStatus);
     nextButton.addEventListener("click", advance);
     backButton.addEventListener("click", function () { showStep(currentStep - 1, true); });
@@ -251,7 +339,14 @@
           error.status = result.response.status; throw error;
         }
         if (timer) window.clearTimeout(timer);
+        var copy = completionCopy(result.body);
+        document.getElementById("pitch-caps").textContent = "Request received";
+        document.getElementById("pitch-title").textContent = "Thanks.";
+        document.getElementById("pitch-emphasis").textContent = "We'll take it from here.";
+        document.getElementById("pitch-lede").textContent = copy.lede;
         document.getElementById("success-restaurant").textContent = payload.restaurant_name;
+        document.getElementById("success-tables").textContent = tablesLabel(payload.tables_per_day);
+        document.getElementById("success-next").textContent = copy.next;
         document.getElementById("reference-id").textContent = text(result.body.reference_id, 80);
         form.hidden = true;
         var success = document.getElementById("success");
@@ -267,5 +362,5 @@
     });
   }
 
-  return { ENDPOINT: ENDPOINT, HELP: HELP.slice(), METHODS: METHODS.slice(), STEP_FIELDS: STEP_FIELDS.map(function (fields) { return fields.slice(); }), text: text, normalizePhone: normalizePhone, validEmail: validEmail, validLink: validLink, makeIdempotencyKey: makeIdempotencyKey, buildPayload: buildPayload, validate: validate, validateStep: validateStep, firstError: firstError, bind: bind };
+  return { ENDPOINT: ENDPOINT, HELP: HELP.slice(), METHODS: METHODS.slice(), STEP_FIELDS: STEP_FIELDS.map(function (fields) { return fields.slice(); }), text: text, normalizePhone: normalizePhone, validEmail: validEmail, validLink: validLink, wholeNumber: wholeNumber, tablesLabel: tablesLabel, completionCopy: completionCopy, makeIdempotencyKey: makeIdempotencyKey, buildPayload: buildPayload, validate: validate, validateStep: validateStep, firstError: firstError, bind: bind };
 });

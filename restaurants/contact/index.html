@@ -14,7 +14,7 @@
 <link rel="apple-touch-icon" href="../../img/apple-touch-icon.png?v=20261122d">
 <link rel="preload" href="../../fonts/InstrumentSerif-Regular.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="../../fonts/InterTight-var.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="style.css?v=20261124steps3">
+<link rel="stylesheet" href="style.css?v=20261124confirm1">
 </head>
 <body>
 <header class="bar">
@@ -22,7 +22,7 @@
     <a class="brand" href="../"><img src="../../img/bird-mark-gradient.png?v=20261122" alt="" width="29" height="24">Early Bird</a>
     <nav aria-label="Main">
       <a class="back" href="../">For restaurants</a>
-      <a class="cta" href="../../book/#/signin?next=%23%2Fbiz">Owner sign in</a>
+      <a class="cta" href="../../book/#/biz">Set it up yourself</a>
     </nav>
   </div>
 </header>
@@ -31,14 +31,9 @@
   <section class="intro" aria-labelledby="page-title">
     <div class="wrap intro-grid">
       <div class="pitch">
-        <p class="caps">Restaurant concierge</p>
-        <h1 id="page-title">Tell us about your place.<br><em>We'll take it from here.</em></h1>
-        <p class="lede">Share the details you know. A real person from Early Bird will review them and contact you about setting up your restaurant.</p>
-        <ol class="steps" aria-label="What happens next">
-          <li><span>1</span><div><b>We review your restaurant</b><small>We'll look at your website, menu, and the kind of help you want.</small></div></li>
-          <li><span>2</span><div><b>We contact you right away</b><small>Choose phone, text, or email. We'll reach out as soon as your request arrives.</small></div></li>
-          <li><span>3</span><div><b>We help build the listing</b><small>You approve the details and stay in control of your offer.</small></div></li>
-        </ol>
+        <p class="caps" id="pitch-caps">Restaurant concierge</p>
+        <h1 id="page-title"><span id="pitch-title">Tell us about your place.</span><br><em id="pitch-emphasis">We'll take it from here.</em></h1>
+        <p class="lede" id="pitch-lede">Tell us the basics below. We'll build your listing, then contact you to review the details and your early-table offer.</p>
       </div>
 
       <div class="form-card">
@@ -126,6 +121,16 @@
           <fieldset class="form-step" data-step="2" data-title="What can we help with?" hidden>
             <legend><span>03</span>What can we help with?</legend>
             <div class="field full">
+              <label for="tables-per-day">How many tables would you like us to help fill each day? <i>Required</i></label>
+              <div class="number-stepper" data-number-stepper>
+                <button type="button" class="stepper-button" id="tables-decrement" data-stepper-action="decrement" aria-label="Decrease tables per day">&minus;</button>
+                <input id="tables-per-day" name="tables_per_day" type="number" inputmode="numeric" min="1" max="500" step="1" value="1" required aria-describedby="tables-per-day-hint tables-error">
+                <button type="button" class="stepper-button" id="tables-increment" data-stepper-action="increment" aria-label="Increase tables per day">&plus;</button>
+              </div>
+              <p class="hint" id="tables-per-day-hint">Start with 1. You can change this later.</p>
+              <p class="field-error" id="tables-error" aria-live="polite"></p>
+            </div>
+            <div class="field full">
               <span class="label">Choose all that apply <i>Required</i></span>
               <div class="choices help-grid" id="help-options">
                 <label><input type="checkbox" name="help_wanted" value="listing"><span>Create or claim my listing</span></label>
@@ -146,7 +151,7 @@
             <div class="consent field full">
               <label>
                 <input type="checkbox" id="consent" name="consent" value="true" required>
-                <span>I agree that Early Bird may use the information above to respond to this inquiry by my selected method. If I choose text, message and data rates may apply. This is not consent to recurring marketing messages. <i>Required</i></span>
+                <span>I agree that Early Bird may send an immediate confirmation email and respond to this inquiry by my selected method. Texts are sent only if I choose Text; message and data rates may apply. This is not consent to recurring marketing messages. <i>Required</i></span>
               </label>
             </div>
           </fieldset>
@@ -165,13 +170,25 @@
 
         <section id="success" class="success" hidden aria-labelledby="success-title" tabindex="-1">
           <span class="success-mark" aria-hidden="true">✓</span>
-          <p class="caps">Request received</p>
-          <h2 id="success-title">We'll be in touch.</h2>
-          <p>Thanks for telling us about <strong id="success-restaurant">your restaurant</strong>. Keep this reference in case you need to contact us:</p>
+          <p class="caps">Submission complete</p>
+          <h2 id="success-title">We've got it.</h2>
+          <p id="success-intro">We'll build the listing for <strong id="success-restaurant">your restaurant</strong> and contact you to review everything before it goes live.</p>
+          <div class="success-detail">
+            <p class="caps">Your starting request</p>
+            <strong id="success-tables">1 table each day</strong>
+            <p class="success-next" id="success-next">A person from our team will review your request and follow up by your selected method.</p>
+          </div>
+          <p class="reference-label">Your reference</p>
           <code id="reference-id"></code>
           <a class="return" href="../">Back to Early Bird for restaurants</a>
         </section>
       </div>
+
+      <ol class="steps" aria-label="What happens next">
+        <li><span>1</span><div><b>We review your restaurant</b><small>We'll look at your website, menu, and the kind of help you want.</small></div></li>
+        <li><span>2</span><div><b>We contact you right away</b><small>Choose phone, text, or email. We'll reach out as soon as your request arrives.</small></div></li>
+        <li><span>3</span><div><b>We'll build your listing</b><small>You approve the details and stay in control of your offer.</small></div></li>
+      </ol>
     </div>
   </section>
 </main>
@@ -188,6 +205,6 @@
   </div>
 </footer>
 
-<script src="app.js?v=20261124steps3" defer></script>
+<script src="app.js?v=20261124confirm1" defer></script>
 </body>
 </html>

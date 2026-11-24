@@ -441,7 +441,8 @@ async function route() {
     // Restaurants listing themselves (eatearlybird.com/restaurants): its own module, loaded only when opened.
     if (path === "/biz" || path.startsWith("/biz/")) return await (await import("./biz.js" + new URL(import.meta.url).search)).default(path, q);
     if (Auth.session() && store.get(IKEY)) claimInvite();
-    const needsAccount = path === "/account/ai" || path === "/bookings" || path.startsWith("/booking/") || path === "/account" || new URLSearchParams(location.search).get("pay");
+    const guestReturn = (() => { try { const pd = JSON.parse(sstore.get("eb.web.pending") || "null"); return !!(pd && pd.guestToken && pd.id === new URLSearchParams(location.search).get("pay")); } catch { return false; } })();
+    const needsAccount = path === "/account/ai" || path === "/bookings" || path.startsWith("/booking/") || path === "/account" || (new URLSearchParams(location.search).get("pay") && !guestReturn);
     if (!Auth.session() && (needsAccount || path === "/signin")) {
       const sq = new URLSearchParams(location.search);
       const next = sq.get("pay") ? "" : path === "/signin" ? q.next || "#/" : location.hash || "#/";
@@ -456,6 +457,7 @@ async function route() {
     if (path.startsWith("/a/")) return await viewArea(decodeURIComponent(path.slice(3)), q);
     if (path === "/book") return await viewCheckout(q);
     if (path === "/signin") return await viewSignIn(q);
+    if (path === "/manage") return await viewGuestBooking(q);
     if (path === "/bookings") return await viewBookings();
     if (path.startsWith("/booking/")) return await viewBooking(path.slice(9), q);
     if (path === "/account") return await viewAccount();
@@ -1441,7 +1443,22 @@ async function viewCheckout(q) {
   };
   const hd = () => C.hold;
   const payNeeded = () => hd().payment_mode === "stripe" && hd().amount_due_cents > 0;
-  const prepPayment = async () => { C.intent = payNeeded() && !guest ? await pay("intent", { claim_id: hd().booking_id }) : null; };
+  const prepPayment = async () => {
+    if (guest) { C.intent = null; C.guestPay = false; C.guestToken = null; if (payNeeded()) await startGuestPay(); return; }
+    C.intent = payNeeded() ? await pay("intent", { claim_id: hd().booking_id }) : null;
+  };
+  // Pay first, sign in later (owner, 24 Nov 2026: "let them buy the booking, super frictionless"; backend 0317): a visitor
+  // pays at once (the card is only authorised), the server checks the phone and the hold, then charges and confirms. The
+  // booking stays a guest booking, managed by its private link, until they verify their number. If guest checkout is off
+  // or can't start, the visitor signs in on the sheet as before.
+  async function startGuestPay() {
+    try {
+      const gs = await rpc("guest_checkout_start", { p_device: deviceId, p_booking: hd().booking_id });
+      C.guestToken = gs.token;
+      C.intent = await pay("guest_intent", { booking_id: hd().booking_id, guest_token: C.guestToken });
+      C.guestPay = true;
+    } catch { C.intent = null; C.guestPay = false; C.guestToken = null; }
+  }
   if (isPreview(v)) return out(ERR.not_yet_bookable, { code: "not_yet_bookable" });   // don't even try to hold
   funnel("time_picked", v.id);
   try { await makeHold(); await prepPayment(); } catch (e) { if (e.code === "not_signed_in") throw e; return out(friendly(e), e); }
@@ -1491,7 +1508,7 @@ async function viewCheckout(q) {
   // sheet gets a code, the code is typed (or auto-filled) right here, and after the day's 2 codes (0294) or on "Use email
   // instead" it's email and password, also here. Then the step reloads as the account and carries on to book or pay.
   C.si = C.si || { phase: "phone", e164: "", email: "", resendAt: 0, busy: false, msg: "", kind: "err" };
-  const goLabel = () => (guest ? (C.si.phase === "code" ? "Verify and continue" : C.si.phase === "email" ? "Sign in and continue" : "Continue") : payNeeded() ? `Pay ${money(due())} and book` : "Book now");
+  const goLabel = () => (guest && C.guestPay ? `Pay ${money(due())} and book` : guest ? (C.si.phase === "code" ? "Verify and continue" : C.si.phase === "email" ? "Sign in and continue" : "Continue") : payNeeded() ? `Pay ${money(due())} and book` : "Book now");
 
   const summaryMobile = () => {
     const h = hd();
@@ -1540,15 +1557,17 @@ async function viewCheckout(q) {
         <div class="grow-f" id="w-c-bv"><label class="check" style="margin:0"><input type="checkbox" id="c-bv" ${d.bookedWithVenue ? "checked" : ""}><span>I've booked ${time12(h.time)} with ${esc(v.name)}</span></label><div class="ferr" id="e-c-bv" role="alert" hidden></div></div></section>` : ""}
       <section class="grp"><h2 class="grp-h">Your details</h2>
         ${field("c-name", "Name", `<input id="c-name" type="text" autocomplete="name" maxlength="80" value="${esc(d.name)}" placeholder="First and last name">`)}
-        ${guest ? field("c-phone", "Your phone number", `<input id="c-phone" type="tel" autocomplete="tel" inputmode="tel" maxlength="32" placeholder="(310) 555-0101" value="${esc(d.phone)}" ${C.si.phase === "code" ? "readonly" : ""}>`, SMS_LINE)
+        ${guest && C.guestPay ? field("c-phone", "Mobile", `<input id="c-phone" type="tel" autocomplete="tel" inputmode="tel" maxlength="32" placeholder="(310) 555-0101" value="${esc(d.phone)}">`, "For this booking. Apple Pay or Google Pay can fill this in.")
+          + field("c-email", "Email", `<input id="c-email" type="email" autocomplete="email" inputmode="email" maxlength="120" placeholder="you@example.com" value="${esc(d.email || "")}">`, "For this booking.")
+          : guest ? field("c-phone", "Your phone number", `<input id="c-phone" type="tel" autocomplete="tel" inputmode="tel" maxlength="32" placeholder="(310) 555-0101" value="${esc(d.phone)}" ${C.si.phase === "code" ? "readonly" : ""}>`, SMS_LINE)
           : field("c-phone", "Mobile", `<input id="c-phone" type="tel" autocomplete="tel" inputmode="tel" maxlength="32" placeholder="(310) 555-0101" value="${esc(d.phone)}">`, "Only for this booking, if the restaurant needs to reach you.")}
         <fieldset class="fv visit"><legend>Would you like the restaurant to make any special considerations for your booking, so you're treated like a regular? <em>Optional</em></legend>
           ${DIETS.map(([k, l]) => `<label><input type="checkbox" name="c-diet" value="${k}" ${d.dietary.includes(k) ? "checked" : ""}><span>${l}</span></label>`).join("")}</fieldset>
         ${field("c-all", "Allergies", `<input id="c-all" type="text" maxlength="120" value="${esc(d.allergies)}" placeholder="e.g. peanuts, shellfish">`, "We'll save this to your account so every restaurant you book knows. Edit or clear it any time in Profile.")}
         ${field("c-req", "A note for the restaurant", `<input id="c-req" type="text" maxlength="120" value="${esc(d.request)}" placeholder="A high chair, a window seat, a birthday…">`)}
       </section>
-      ${payNeeded() && guest ? `<section class="grp"><h2 class="grp-h">Payment</h2><p class="small muted" style="margin:0">After the code, pay ${money(due())} with Apple Pay, Google Pay or a card. Your table stays held.</p></section>`
-        : payNeeded() ? `<section class="grp"><h2 class="grp-h">Payment</h2><div id="express-element"></div><div id="pay-element"></div><div class="ferr" id="e-card" role="alert" hidden></div></section>` : ""}
+      ${payNeeded() && guest && !C.guestPay ? `<section class="grp"><h2 class="grp-h">Payment</h2><p class="small muted" style="margin:0">After the code, pay ${money(due())} with Apple Pay, Google Pay or a card. Your table stays held.</p></section>`
+        : payNeeded() ? `${guest && C.guestPay ? '<p class="small" style="margin:18px 0 -4px">Your card is only held now. We charge it once your booking is confirmed; if it can\'t be, the hold is released and you\'re not charged.</p>' : ""}<section class="grp"><h2 class="grp-h">Payment</h2><div id="express-element"></div><div id="pay-element"></div><div class="ferr" id="e-card" role="alert" hidden></div></section>` : ""}
       <details class="disc"><summary><b>Early Bird conditions</b><span>${esc(rules().slice(0, 2).join(" · "))}</span></summary><ul class="rules">${rules().map((c) => `<li>${ic("check")}<span>${esc(c)}</span></li>`).join("")}</ul></details>
       <details class="disc"><summary><b>Cancellation policy</b><span>All of the fee back as ${esc(CREDIT)} within ${cfg.cancel_full_credit_minutes} minutes</span></summary>
         <div class="policy">Cancellations come back as ${esc(CREDIT)} for booking fees on other Early Bird bookings, used first on your next one, for ${cfg.credit_valid_days} days.
@@ -1559,11 +1578,11 @@ async function viewCheckout(q) {
       <fieldset class="fv"><legend>Been to ${esc(v.name)} before? <em>Optional</em></legend>
         <label><input type="radio" name="c-fv" value="true" ${d.firstVisit === true ? "checked" : ""}><span>First time here</span></label>
         <label><input type="radio" name="c-fv" value="false" ${d.firstVisit === false ? "checked" : ""}><span>Been before</span></label></fieldset>
-      <label class="check small"><input type="checkbox" id="c-sh" ${d.share ? "checked" : ""}><span>Share my name, mobile number and email with ${esc(v.name)}, so they can contact me about my bookings</span></label>
-      <label class="check small"><input type="checkbox" id="c-mk" ${d.marketing ? "checked" : ""}><span>Let ${esc(v.name)} send me offers through Early Bird</span></label>
+      ${guest && C.guestPay ? "" : `<label class="check small"><input type="checkbox" id="c-sh" ${d.share ? "checked" : ""}><span>Share my name, mobile number and email with ${esc(v.name)}, so they can contact me about my bookings</span></label>
+      <label class="check small"><input type="checkbox" id="c-mk" ${d.marketing ? "checked" : ""}><span>Let ${esc(v.name)} send me offers through Early Bird</span></label>`}
       ${d.news !== undefined ? `<label class="check small"><input type="checkbox" id="c-nw" ${d.news ? "checked" : ""}><span>Email me Early Bird news and offers</span></label>` : ""}
-      ${guest ? siHtml() : ""}
-      <div class="paybar"><div class="paysum"><b>${money(due())}</b><span>${guest && payNeeded() ? "to pay after sign-in" : payNeeded() ? "to pay now" : due() === 0 && h.credit_cents > 0 ? (h.promo_cents >= h.credit_cents ? "free booking fee" : "covered by credit") : "nothing to pay"}</span></div><button class="btn" id="c-go" type="button">${goLabel()}</button></div>
+      ${guest && !C.guestPay ? siHtml() : ""}
+      <div class="paybar"><div class="paysum"${guest && C.guestPay ? ' style="min-width:0;max-width:112px"' : ""}><b>${money(due())}</b>${guest && C.guestPay ? '<span style="font-size:11.5px;line-height:1.25">Held now, charged once confirmed</span>' : ""}<span>${guest && C.guestPay ? "" : guest && payNeeded() && !C.guestPay ? "to pay after sign-in" : payNeeded() ? "to pay now" : due() === 0 && h.credit_cents > 0 ? (h.promo_cents >= h.credit_cents ? "free booking fee" : "covered by credit") : "nothing to pay"}</span></div><button class="btn" id="c-go" type="button"${guest && C.guestPay ? ' style="white-space:nowrap;min-width:0;padding-left:14px;padding-right:14px;font-size:clamp(13.5px,4.3vw,18px)"' : ""}>${goLabel()}</button></div>
       ${testBadge(C.intent?.mode || h.stripe_mode)}`;
   }
 
@@ -1580,7 +1599,7 @@ async function viewCheckout(q) {
   }
   const capture = () => {
     const d = C.details;
-    d.name = val("c-name"); d.phone = val("c-phone"); d.request = val("c-req"); d.allergies = val("c-all");
+    d.name = val("c-name"); d.phone = val("c-phone"); if (document.getElementById("c-email")) d.email = val("c-email"); d.request = val("c-req"); d.allergies = val("c-all");
     d.dietary = [...document.querySelectorAll('input[name="c-diet"]:checked')].map((x) => x.value);
     d.share = !!document.getElementById("c-sh")?.checked; d.marketing = !!document.getElementById("c-mk")?.checked; d.accepted = !!document.getElementById("c-ok")?.checked;
     if (document.getElementById("c-nw")) d.news = document.getElementById("c-nw").checked;
@@ -1602,9 +1621,17 @@ async function viewCheckout(q) {
     const input = document.getElementById(id); if (input && input.focus) setTimeout(() => input.focus({ preventScroll: true }), 300);
   };
   // The first thing missing, in the order it appears on the page.
-  function firstProblem({ skipCard = false } = {}) {
+  function firstProblem({ skipCard = false, wallet = false } = {}) {
     capture();
     const d = C.details, h = hd();
+    if (guest && C.guestPay) {   // pay-first: a wallet fills in name, phone and email; a typed card needs them here
+      if (!wallet && d.name.trim().length < 2) return ["c-name", "Add your name for the booking."];
+      if (!wallet && !normalisePhone(d.phone)) return ["c-phone", d.phone ? "That doesn't look like a mobile number. Use 10 digits, or + and your country code." : "Add your mobile number."];
+      if (!wallet && !/^\S+@\S+\.\S+$/.test(d.email || "")) return ["c-email", "Add your email address."];
+      if (!skipCard && !C.cardComplete) return ["card", "Add your card details, or use Apple Pay / Google Pay above."];
+      if (!d.accepted) return ["c-ok", "Tick to agree to the conditions."];
+      return null;
+    }
     if (d.name.trim().length < 2) return ["c-name", "Add your name for the booking."];
     if (!normalisePhone(d.phone)) return ["c-phone", d.phone ? "That doesn't look like a mobile number. Use 10 digits, or + and your country code." : "Add your mobile number."];
     if (h.reservation_url && !d.bookedWithVenue) return ["c-bv", `Book with ${v.name} first, then tick this.`];
@@ -1694,7 +1721,7 @@ async function viewCheckout(q) {
   }
   async function submit() {
     if (C.busy || C.paying) return;
-    if (guest) {
+    if (guest && !C.guestPay) {
       const g = firstProblem({ skipCard: true });
       if (g) return showErr(g[0], g[1]);
       C.details.phone = normalisePhone(C.details.phone);
@@ -1713,13 +1740,25 @@ async function viewCheckout(q) {
       return;
     }
     btn.disabled = true; btn.textContent = "Paying…"; C.paying = true; clearErr("card");
-    await saveVisit(hd().booking_id, C.details);
-    sstore.set("eb.web.pending", JSON.stringify({ id: hd().booking_id, details: C.details }));
-    const { error } = await C.stripe.confirmPayment({ elements: C.elements, confirmParams: { return_url: returnUrl(), payment_method_data: { billing_details: { name: C.details.name, email: C.profile.email || undefined, phone: C.details.phone } } }, redirect: "if_required" });
+    if (!C.guestPay) await saveVisit(hd().booking_id, C.details);
+    sstore.set("eb.web.pending", JSON.stringify({ id: hd().booking_id, details: C.details, ...(C.guestPay ? { guestToken: C.guestToken } : {}) }));
+    const { error } = await C.stripe.confirmPayment({ elements: C.elements, confirmParams: { return_url: returnUrl(), payment_method_data: { billing_details: { name: C.details.name, email: (C.guestPay ? C.details.email : C.profile.email) || undefined, phone: C.details.phone } } }, redirect: "if_required" });
     if (error) { C.paying = false; btn.disabled = false; btn.textContent = goLabel(); return showErr("card", error.message || "The payment didn't go through. Try another card."); }
     await finishPayment();
   }
   const returnUrl = () => `${location.origin}${location.pathname}?pay=${hd().booking_id}`;
+  async function finishGuest() {
+    unmount();
+    showPage(`<div class="gate"><h1 class="display">Finishing your booking…</h1><p class="muted">Checking your table. Please don't close this page.</p></div>`, { wash: false });
+    clearInterval(C.timer);
+    const r = await guestFinish(hd().booking_id, C.guestToken, C.details, C.wallet);
+    if (r.paid) { C.done = true; return guestBooked(r); }
+    // refused before charging (the authorisation is released): say why; for a fixable one, a fresh payment on the same table
+    C.paying = false; C.wallet = null;
+    if (r.error === "hold_expired" || r.error === "overlapping_booking" || r.error === "too_many_bookings") { C.done = true; return out(r.message, { code: r.error }); }
+    try { C.intent = await pay("guest_intent", { booking_id: hd().booking_id, guest_token: C.guestToken }); } catch { C.done = true; return out(r.message, { code: r.error }); }
+    startTimer(); draw(r.message);
+  }
   function mountPayment() {
     const info = C.intent;
     funnel("pay", v.id, { booking_id: hd().booking_id });
@@ -1728,7 +1767,7 @@ async function viewCheckout(q) {
     const elements = (C.elements = C.stripe.elements({ clientSecret: info.client_secret, appearance: { theme: "stripe", variables: { colorPrimary: "#34548A", colorText: "#14171F", colorDanger: "#C8402F", fontFamily: "-apple-system, BlinkMacSystemFont, system-ui, sans-serif", borderRadius: "12px", fontSizeBase: "16px", spacingUnit: "4px" } } }));
     let express = null;
     try {
-      express = C.expressEl = elements.create("expressCheckout", { buttonHeight: 50, buttonType: { applePay: "book", googlePay: "book" }, paymentMethods: { applePay: "auto", googlePay: "auto", link: "never", amazonPay: "never", paypal: "never", klarna: "never" } });
+      express = C.expressEl = elements.create("expressCheckout", { buttonHeight: 50, buttonType: { applePay: "book", googlePay: "book" }, paymentMethods: { applePay: "auto", googlePay: "auto", link: "never", amazonPay: "never", paypal: "never", klarna: "never" }, ...(C.guestPay ? { emailRequired: true, phoneNumberRequired: true } : {}) });
       express.mount("#express-element");
       express.on("ready", (e) => {
         const any = e.availablePaymentMethods && Object.values(e.availablePaymentMethods).some(Boolean);
@@ -1736,11 +1775,12 @@ async function viewCheckout(q) {
         if (!any) box?.remove(); else box?.insertAdjacentHTML("afterend", '<div class="ordiv"><span>or pay by card</span></div>');
       });
       // Apple Pay / Google Pay: check the form first; the wallet sheet only opens when nothing is missing.
-      express.on("click", (event) => { const p = firstProblem({ skipCard: true }); if (p) { showErr(p[0], p[1]); return; } C.details.phone = normalisePhone(C.details.phone); event.resolve(); });
-      express.on("confirm", async () => {
+      express.on("click", (event) => { const p = firstProblem({ skipCard: true, wallet: !!C.guestPay }); if (p) { showErr(p[0], p[1]); return; } C.details.phone = normalisePhone(C.details.phone); event.resolve(); });
+      express.on("confirm", async (ev) => {
         C.paying = true; clearErr("card");
-        await saveVisit(hd().booking_id, C.details);
-        sstore.set("eb.web.pending", JSON.stringify({ id: hd().booking_id, details: C.details }));
+        if (C.guestPay) { const bd = ev?.billingDetails || {}; C.wallet = { name: bd.name || "", email: bd.email || "", phone: bd.phone || "" }; }
+        else await saveVisit(hd().booking_id, C.details);
+        sstore.set("eb.web.pending", JSON.stringify({ id: hd().booking_id, details: C.details, ...(C.guestPay ? { guestToken: C.guestToken } : {}) }));
         const { error } = await C.stripe.confirmPayment({ elements, clientSecret: info.client_secret, confirmParams: { return_url: returnUrl() }, redirect: "if_required" });
         if (error) { C.paying = false; showErr("card", error.message); return; }
         await finishPayment();
@@ -1752,6 +1792,7 @@ async function viewCheckout(q) {
   }
   const confirmParams = (id) => ({ p_device: deviceId, p_claim: id, p_name: C.details.name.trim(), p_phone: C.details.phone, p_request: null, p_external_ref: C.details.venueRef || null, p_share_contact: C.details.share ? true : null, p_marketing: C.details.marketing ? true : null, p_first_visit: C.details.firstVisit ?? null });
   function after(b) {
+    if (C.guestPay) return;
     newsConsent(b?.id || hd().booking_id, C.details);
     const n = C.details.name.trim().split(/\s+/);
     rpc("save_profile", { p_first: n[0], p_last: n.slice(1).join(" ") || null, p_phone: C.details.phone }).catch(() => {});
@@ -1759,6 +1800,7 @@ async function viewCheckout(q) {
     go("/booking/" + b.id, { new: 1 });
   }
   async function finishPayment() {
+    if (C.guestPay) return finishGuest();
     unmount();
     showPage(`<div class="gate"><h1 class="display">Finishing your booking…</h1><p class="muted">Confirming your payment. Please don't close this page.</p></div>`, { wash: false });
     clearInterval(C.timer);
@@ -1780,6 +1822,38 @@ function newsConsent(id, d) {
   const send = () => rpc("set_email_consent", { p_on: !!d.news, p_source: "booking", p_booking: id });
   send().catch(() => sleep(2000).then(send)).catch(() => {});
   d.news = undefined;   // once
+}
+/* Guest checkout (0317): finish a visitor's authorised payment. The server takes name, phone and email from the wallet
+   (else from what was typed), refuses before charging on an overlap, an expired hold, a bad number or email, or a limit,
+   and otherwise charges and confirms. The details and the email-news answer travel with it. */
+const GUEST_REFUSALS = {
+  overlapping_booking: "There's already a table booked then with this phone number. Nothing was charged.",
+  hold_expired: "Your table's hold ran out before the payment finished. Nothing was charged. Pick a time again.",
+  bad_phone: "That phone number doesn't work for a booking (US or Canada numbers only). Nothing was charged. Check it and pay again.",
+  bad_email: "That email address doesn't look right. Nothing was charged. Check it and pay again.",
+  too_many_bookings: "That's more bookings than we can take from one person today. Nothing was charged.",
+};
+async function guestFinish(id, token, d, wallet) {
+  const t = (x) => String(x || "").trim().slice(0, 120) || null;
+  const body = { action: "guest_finish", booking_id: id, guest_token: token, rules_ack: true,
+    contact: { name: (wallet?.name || d.name || "").trim() || undefined, phone: normalisePhone(wallet?.phone || d.phone) || undefined, email: (wallet?.email || d.email || "").trim() || undefined },
+    details: { dietary: d.dietary || [], allergies: t(d.allergies), note: t(d.request) },
+    ...(d.news === undefined ? {} : { email_news: !!d.news }) };
+  let j = {};
+  try {
+    const res = await fetch(CFG.payUrl, { method: "POST", headers: { "Content-Type": "application/json", apikey: CFG.key, Authorization: `Bearer ${CFG.key}` }, body: JSON.stringify(body) });
+    j = await res.json().catch(() => ({}));
+    if (res.ok && j.paid) return j;
+  } catch { j = { error: "offline" }; }
+  return { paid: false, error: j.error || "failed", message: GUEST_REFUSALS[j.error] || j.detail || "The booking didn't go through. If you were charged, contact support; otherwise nothing was charged." };
+}
+// The private link that manages a guest booking: kept in this browser (and shown on the confirmation) until the number is verified.
+const GUEST_KEY = "eb.web.guest";
+const guestTokens = () => { try { return JSON.parse(store.get(GUEST_KEY) || "[]"); } catch { return []; } };
+function guestBooked(r) {
+  try { store.set(GUEST_KEY, JSON.stringify([r.manage_token, ...guestTokens().filter((x) => x !== r.manage_token)].slice(0, 20))); } catch { /* private mode */ }
+  sstore.set("eb.web.pending", null); sstore.set("eb.web.draft", null);
+  navigate(`#/manage?t=${encodeURIComponent(r.manage_token)}&new=1`);
 }
 // Ask the server to check the payment with Stripe (it confirms the booking), then save the diner's details.
 async function settleBooking(id, d) {
@@ -1817,6 +1891,13 @@ async function viewReturn(q) {
   try { pending = JSON.parse(sstore.get("eb.web.pending") || "null"); } catch { /* ignore */ }
   const d = pending?.id === id ? pending.details : { name: "", phone: "", request: "", share: false, marketing: false, venueRef: "" };
   history.replaceState(null, "", location.pathname + "#/");
+  if (pending?.id === id && pending.guestToken) {
+    if (q.redirect_status === "failed") return showPage(`<div class="gate"><h1 class="display">Booking not completed</h1></div><div class="msg err">The payment didn't go through. Nothing was charged.</div><a class="btn" href="#/">Back to restaurants</a>`, { wash: false });
+    const r = await guestFinish(id, pending.guestToken, d, null);
+    if (r.paid) return guestBooked(r);
+    sstore.set("eb.web.pending", null);
+    return showPage(`<div class="gate"><h1 class="display">Booking not completed</h1></div><div class="msg err">${esc(r.message)}</div><a class="btn" href="#/">Back to restaurants</a>`, { wash: false });
+  }
   try {
     if (q.redirect_status === "failed") throw new ApiError("payment_failed", "The payment didn't go through. Please try booking again.");
     const b = await settleBooking(id, d);
@@ -1826,6 +1907,79 @@ async function viewReturn(q) {
   } catch (e) {
     showPage(`<div class="gate"><h1 class="display">Booking not completed</h1></div><div class="msg err">${esc(e.message || friendly(e))}</div><a class="btn" href="#/bookings">Bookings</a>`, { wash: false });
   }
+}
+
+/* ───────────────────────────── a guest booking (0317) ───────────────────────────── */
+// The confirmation and manage page for a booking made without an account (#/manage?t=<manage token>). The token is the
+// whole credential, so it lives after # (never in a server log or referrer). "Verify your number" is the usual phone code;
+// then claim_guest_bookings moves the booking into the account (only when the verified phone is the booking's phone).
+async function viewGuestBooking(q) {
+  setTitle("Your booking");
+  const t = q.t || "";
+  let b = null;
+  try { b = await rpc("guest_booking", { p_manage_token: t }); } catch (e) {
+    if (e.code === "sign_in_to_manage") return showPage(`<div class="gate"><h1 class="display">This booking is in your account</h1><p class="muted">Sign in to see or change it.</p></div><a class="btn" href="#/bookings">My bookings</a>`, { wash: false });
+    return showPage(`<div class="gate"><h1 class="display">This link doesn't work</h1><p class="muted">It may be old or incomplete.</p></div><a class="btn" href="#/">Back to restaurants</a>`, { wash: false });
+  }
+  const link = `${CFG.siteUrl || location.origin}/book/#/manage?t=${encodeURIComponent(t)}`;
+  const v = b.venue || {}, when = `${esc(fmtDate(b.date, { weekday: "long", month: "long", day: "numeric" }))} at ${time12(b.time)}`;
+  const st = { step: "offer", e164: normalisePhone(b.phone || b.guest_phone || "") || "", msg: "", kind: "err", resendAt: 0, busy: false };
+  let tick = null; view.cleanup = () => clearInterval(tick);
+  const verifyHtml = () => {
+    const m = st.msg ? `<div class="msg ${st.kind}" role="alert">${esc(st.msg)}</div>` : "";
+    if (b.status !== "confirmed") return "";
+    if (st.step === "code") return `<div class="card"><div class="title">Enter the code</div>${m}<p class="small muted">We texted a 6-digit code to ${esc(prettyPhone(st.e164))}.</p>${codeBoxesHtml()}<p class="small" style="margin:12px 0 0"><button class="linklike" type="button" id="g-resend" disabled>Resend</button> · <button class="linklike" type="button" id="g-email">Use email instead</button></p></div>`;
+    if (st.step === "email") return `<div class="card"><div class="title">Sign in with email</div>${m}<label class="field">Email<input id="g-em" type="email" autocomplete="email"></label><label class="field">Password<input id="g-pw" type="password" autocomplete="current-password"></label><button class="btn" id="g-login" type="button">Sign in</button></div>`;
+    return `<div class="card"><div class="title">Verify your number to manage this booking</div>${m}<p class="small muted" style="margin:4px 0 10px">We'll text a code to ${esc(prettyPhone(st.e164) || "your number")}. Then the booking is in your Early Bird account, in the app and here. You can do this later.</p>
+      <button class="btn pale" id="g-send" type="button">Text me a code</button><p class="tiny muted" style="margin:10px 0 0">${SMS_LINE}</p></div>`;
+  };
+  const draw = () => {
+    showPage(`${q.new ? '<div class="gate"><h1 class="display">You\'re booked</h1></div>' : '<h1 class="display" style="margin:14px 0 16px">Your booking</h1>'}
+      <div class="card"><b style="font-size:19px">${esc(v.name || "")}</b><div class="muted">${when} · ${b.diners} ${b.diners === 1 ? "diner" : "diners"}</div>
+        ${b.code ? `<div class="balance" style="margin-top:10px">${esc(b.code)}</div><div class="small muted">Show this code when you order.</div>` : ""}
+        <div class="small" style="margin-top:8px">${statusPill(b)}</div></div>
+      <div class="card"><div class="title">Manage this booking</div>
+        <p class="small" style="margin:4px 0 6px;word-break:break-all"><a href="${esc(link)}">${esc(link)}</a></p>
+        <p class="small muted" style="margin:0 0 10px">This is your private link to manage this booking. Anyone who has it can see and cancel the booking, so don't share it.</p>
+        ${b.status === "confirmed" ? '<button class="btn grey" id="g-cancel" type="button">Cancel booking</button>' : ""}</div>
+      ${verifyHtml()}`, { wash: false });
+    bindAll();
+  };
+  const signedIn = async () => {
+    try { const r = await rpc("claim_guest_bookings", { p_device: deviceId, p_manage_tokens: [t] }); rpc("link_device", { p_device: deviceId }).catch(() => {});
+      const id = (r?.booking_ids || [])[0];
+      if (r?.claimed) { try { store.set(GUEST_KEY, JSON.stringify(guestTokens().filter((x) => x !== t))); } catch { /* ignore */ } toast("Verified. This booking is in your account."); return navigate(id ? `#/booking/${id}` : "#/bookings"); }
+      st.step = "offer"; st.msg = "You're signed in, but this number isn't the one on the booking, so it stays here."; st.kind = "info"; draw();
+    } catch (e) { st.step = "offer"; st.msg = friendly(e); st.kind = "err"; draw(); }
+  };
+  const bindAll = () => {
+    const c = document.getElementById("g-cancel");
+    if (c) c.onclick = async () => {
+      if (!confirm("Cancel this booking?")) return;
+      c.disabled = true;
+      try { await rpc("guest_cancel", { p_manage_token: t }); toast("Booking cancelled."); b = await rpc("guest_booking", { p_manage_token: t }); draw(); }
+      catch (e) { c.disabled = false; toast(friendly(e)); }
+    };
+    const s = document.getElementById("g-send");
+    if (s) s.onclick = async () => {
+      funnel("signin_shown", v.id || null, { booking_id: b.id });
+      if (!st.e164) { st.step = "email"; draw(); return; }
+      s.disabled = true;
+      try { await Auth.sendPhoneCode(st.e164); st.step = "code"; st.msg = ""; st.resendAt = Date.now() + 30000; }
+      catch (e) { if (/today's \d+ text codes|text codes for this number/i.test(e.message || "")) { st.step = "email"; st.msg = "You've had today's 2 text codes for this number. Sign in with your email and password instead."; st.kind = "info"; } else { st.msg = e.message; st.kind = "err"; } }
+      draw();
+    };
+    const em = document.getElementById("g-email"); if (em) em.onclick = () => { st.step = "email"; st.msg = ""; draw(); };
+    const lg = document.getElementById("g-login");
+    if (lg) lg.onclick = async () => { lg.disabled = true; try { await Auth.signIn(val("g-em"), document.getElementById("g-pw").value); await signedIn(); } catch (e) { st.msg = e.message; st.kind = "err"; draw(); } };
+    if (st.step === "code") {
+      const ctl = bindCodeBoxes(async (code) => { if (st.busy) return; st.busy = true; try { await Auth.verifyPhoneCode(st.e164, code); await signedIn(); } catch (e) { st.busy = false; ctl.error(); ctl.clear(); } });
+      const rs = document.getElementById("g-resend"); clearInterval(tick);
+      tick = setInterval(() => { if (!rs.isConnected) return clearInterval(tick); const left = Math.ceil((st.resendAt - Date.now()) / 1000); rs.disabled = left > 0; rs.textContent = left > 0 ? `Resend in ${left}s` : "Resend"; }, 500);
+      rs.onclick = async () => { rs.disabled = true; try { await Auth.sendPhoneCode(st.e164); st.resendAt = Date.now() + 30000; ctl.clear(); } catch (e) { st.msg = e.message; draw(); } };
+    }
+  };
+  draw();
 }
 
 /* ───────────────────────────── bookings ───────────────────────────── */

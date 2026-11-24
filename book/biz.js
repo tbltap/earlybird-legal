@@ -117,15 +117,9 @@ const claimFor = (claims, venueId) => claims.find((c) => c.venue_id === venueId 
 /* ───────────────────────────── home: pitch, or your restaurants ───────────────────────────── */
 async function viewBizHome() {
   setTitle("List your restaurant");
-  const steps = `<ol class="bizsteps">
-      <li><b>Find or add your restaurant</b><span>Search for it, or add it if it's not on Early Bird yet.</span></li>
-      <li><b>Show that you run it</b><span>A photo of a business licence, permit, or a utility bill or lease in the business name.</span></li>
-      <li><b>Set your early tables</b><span>The days, the times and how many tables. You can change them any time.</span></li>
-      <li><b>Add your photos, menu and links</b><span>Pictures of the place and the food, your menu as a file or a link, your ordering and reservations sites.</span></li>
-      <li><b>Send it</b><span>It goes live once your document checks out. We'll then give you a call.</span></li></ol>`;
   if (!Auth.session()) {
-    page(`${pitchHtml()}<section class="p-sec"><h2 class="p-h2">Up and running in about 15 minutes</h2>${steps}</section>${finalCta()}`);
-    return wireEcon();
+    page(conciergeHomeHtml());
+    return;
   }
   page(`<p class="loading">Loading your restaurants…</p>`);
   const claims = (await myClaims()).filter((c) => c.status !== "withdrawn");
@@ -135,10 +129,34 @@ async function viewBizHome() {
     return `<a class="bizrow" href="${href}"><div><b>${esc(c.venue_name || "Your restaurant")}</b><span>${esc(c.venue_address || "")}</span></div><span class="bizpill ${st === "Live" ? "ok" : st === "Not approved" ? "bad" : ""}">${esc(st)}</span></a>`;
   };
   page(`<h1 class="display bizt">Your restaurants</h1>
-    ${claims.length ? `<div class="bizlist">${claims.map(row).join("")}</div>` : `<p class="muted">You haven't added a restaurant yet.</p>`}
-    <a class="btn" href="#/biz/find">${claims.length ? "Add another restaurant" : "Find your restaurant"}</a>
-    <p><a class="btn pale" href="#/biz/why">What empty tables cost you</a></p>
-    <h2 class="bizh">The steps</h2>${steps}`);
+    ${claims.length ? `<div class="bizlist">${claims.map(row).join("")}</div>` : `<div class="bc-empty"><h2>We can build it for you.</h2><p>Send us your restaurant and contact details. We'll add the menu, photos and listing, then call you to approve it.</p><a class="btn" href="../restaurants/contact/">Start my free setup</a></div>`}
+    ${claims.length ? `<a class="btn" href="../restaurants/contact/">Add another restaurant</a>` : ""}
+    <p class="center small"><a href="#/biz/find">I'd rather set it up myself</a> · <a href="#/biz/why">How Early Bird works</a></p>`);
+}
+function conciergeHomeHtml() {
+  return `<div class="bizconcierge">
+    <section class="bc-hero">
+      <span class="p-eyebrow">Early Bird for restaurants</span>
+      <h1>Tell us your restaurant.<br>We'll do the rest.</h1>
+      <p>We'll build your page, add your menu and photos, and set up your offer with you. Nothing goes live until you approve it.</p>
+      <a class="btn bc-primary" href="../restaurants/contact/">Start my free setup</a>
+      <span class="bc-time">Takes about 2 minutes · Free to list</span>
+    </section>
+    <section class="bc-proof" aria-label="What you control">
+      <div><b>$0</b><span>to list</span></div>
+      <div><b>You choose</b><span>your quiet times</span></div>
+      <div><b>You approve</b><span>before launch</span></div>
+    </section>
+    <section class="bc-work">
+      <span class="p-eyebrow">What we handle</span>
+      <div class="bc-worklist">
+        <div>${ic("store")}<p><b>Your page</b><span>We add the restaurant details, links and location.</span></p></div>
+        <div>${ic("book")}<p><b>Your menu and photos</b><span>Send a link or file. We organize and upload everything.</span></p></div>
+        <div>${ic("tag")}<p><b>Your Early Bird offer</b><span>We call to confirm the quiet times and rules you want.</span></p></div>
+      </div>
+    </section>
+    <div class="bc-links"><a href="#/biz/why">See how Early Bird works</a><a href="#/signin?next=${encodeURIComponent("#/biz")}">Already started? Sign in</a></div>
+  </div>`;
 }
 function viewWhy() {
   setTitle("How Early Bird makes you money");
@@ -165,7 +183,7 @@ function guestMaths(x, it = PITCH) {
   const guests = Math.round(x.tables * x.perTable * x.nights * x.full / 100 * (n > 1 ? SECOND_ITEM_FACTOR : 1));
   return { pays, ingredients, fees, keep, guests, sales: guests * pays, cost: guests * (ingredients + fees), net: guests * keep };
 }
-const startHref = () => (Auth.session() ? "#/biz/find" : `#/signin?next=${encodeURIComponent("#/biz")}`);
+const startHref = () => (Auth.session() ? "#/biz/find" : "../restaurants/contact/");
 // Owner, 21 Nov: "listing is free no fees guests pay a small booking fee to cover our charges and you get incremental
 // revenue and guest contacts and own the guest relationship ... frame it as how much its costing you to not take
 // advantage of early bird", laid out cleanly, the way Apple would.
@@ -271,8 +289,8 @@ function rng([k, l, mn, mx, st, u]) {
   return `<label class="erange"><span>${l}</span><output id="o-${k}">${u === "$" ? "$" + EX[k] : EX[k] + u}</output><input type="range" id="e-${k}" min="${mn}" max="${mx}" step="${st}" value="${EX[k]}" data-u="${u}"></label>`;
 }
 function finalCta() {
-  return `<section class="p-final"><h2>Every empty table is money you don't get back.</h2><p>Free to list. Live once we've checked it's your restaurant.</p>
-    <a class="btn" href="${startHref()}">Get started for free</a>
+  return `<section class="p-final"><h2>Tell us your restaurant. We'll build it for you.</h2><p>Free to list. Nothing goes live until you approve it.</p>
+    <a class="btn" href="${startHref()}">Start my free setup</a>
     <p class="small"><a href="../restaurant-terms.html">Restaurant Terms</a> · <a href="../support.html">Questions? Ask us</a></p></section>`;
 }
 function wireEcon() {

@@ -97,6 +97,15 @@ used</td>
 <td>you, the restaurant (when it checks you in)</td>
 </tr>
 <tr>
+<td><strong>Guest bookings</strong> (website, without an account)</td>
+<td>your name, mobile number and email (typed, or from Apple Pay or
+Google Pay), the booking, a private manage link (we keep only a
+scrambled version of it), and, for abuse limits, a fingerprint of your
+card from Stripe (not the card number) and a scrambled (hashed) version
+of your IP address</td>
+<td>you, your wallet (Apple Pay or Google Pay), Stripe</td>
+</tr>
+<tr>
 <td><strong>Payments</strong></td>
 <td>amount, currency, whether it succeeded, refunds, and Stripe's
 payment reference; Stripe may tell us the card brand and last four
@@ -192,6 +201,14 @@ show you own or manage a restaurant</td>
 </tr>
 </tbody>
 </table></div>
+<p><strong>Guest bookings.</strong> If you book on the website without
+an account, we use your name, number and email to confirm and serve the
+booking and to send you its confirmation, and the restaurant sees your
+first name as for any booking (§7). We check each guest booking before
+your card is charged; to stop abuse we count bookings per phone number,
+card and device, using a fingerprint of your card that Stripe gives us
+and a hashed version of your IP address. Your booking is added to an
+account only after you verify your phone number with a sign-in code.</p>
 <p><strong>On the website.</strong> The website stores a few things in
 your browser so it works:</p>
 <ul>
@@ -312,9 +329,10 @@ area to plan and measure them.</li>
 picked for the search and your interests in Early Bird, and count how
 many people saw and tapped them (§6).</li>
 <li><strong>To send messages:</strong> sign-in codes, booking
-confirmations and receipts; Early Bird offers as app notifications if
-you allow notifications; and Early Bird news and offers by email if you
-agree (§8).</li>
+confirmations and receipts (on the confirmation page, in the app, and by
+email from noreply@eatearlybird.com); Early Bird offers as app
+notifications if you allow notifications; and Early Bird news and offers
+by email if you agree (§8).</li>
 <li><strong>For legal reasons:</strong> tax, accounting, responding to
 lawful requests, and defending legal claims.</li>
 </ul>
@@ -325,7 +343,10 @@ the payment as our payment provider. Stripe also uses payment
 information to prevent fraud, under its own privacy policy
 (stripe.com/privacy). With Apple Pay or Google Pay, Apple or Google
 handles your card details under its own privacy policy. We receive only
-the payment result and the information in §2.</p>
+the payment result and the information in §2. On a guest booking your
+payment is first only authorised, and charged once the booking passes
+our checks; if it doesn't, the authorisation is cancelled and nothing is
+charged.</p>
 <h3 id="booking-from-an-ai-assistant-claude-chatgpt">Booking from an AI
 assistant (Claude, ChatGPT)</h3>
 <p>You can add Early Bird to an AI assistant such as Claude or ChatGPT.
@@ -444,6 +465,11 @@ billing</td>
 <tr>
 <td>Twilio Inc.</td>
 <td>sending sign-in text messages</td>
+</tr>
+<tr>
+<td>Our email delivery provider</td>
+<td>sending booking confirmations and other emails you asked for, and
+Early Bird news and offers if you agreed</td>
 </tr>
 <tr>
 <td>Apple Inc.</td>
@@ -567,6 +593,20 @@ or neighbourhood) is kept with your activity</td>
 <td>30 days</td>
 </tr>
 <tr>
+<td>Guest booking contact details (name, phone, email)</td>
+<td>with the booking, as for other bookings; moved to your account when
+you verify your number</td>
+</tr>
+<tr>
+<td>Card fingerprints and hashed IP addresses for guest checkout
+limits</td>
+<td>30 days</td>
+</tr>
+<tr>
+<td>Guest booking manage links</td>
+<td>until the booking is over; we keep only a scrambled version</td>
+</tr>
+<tr>
 <td>Support messages</td>
 <td>2 years after the conversation ends</td>
 </tr>
@@ -631,7 +671,8 @@ sources (§2), purposes (§3) and who receives them:</p>
 <tbody>
 <tr>
 <td>Identifiers</td>
-<td>name, phone, email, account ID, device ID, IP address</td>
+<td>name, phone, email, account ID, device ID, IP address (and, for
+guest checkout limits, a hashed IP address and a card fingerprint)</td>
 <td>service providers; restaurants you book (name) or consent to
 (contact)</td>
 </tr>
@@ -764,7 +805,7 @@ requires, ask for your consent.</p>
 Brisbane Dr, Sandy, Utah 84094, United States. Email
 privacy@eatearlybird.com.</p>
 
-<p class="version">Version 2026-11-24.earlybird-privacy-v2.5</p>
+<p class="version">Version 2026-11-24.earlybird-privacy-v2.6</p>
 </main>
 <footer>
   <p><a href="legal.html">Legal</a> · <a href="privacy.html">Privacy</a> · <a href="support.html">Support</a></p>

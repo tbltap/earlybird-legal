@@ -305,11 +305,12 @@ function termsNotice() {
 }
 
 async function drawChrome(path) {
-  const desk = isDesk(), signedIn = !!Auth.session(), minimal = path === "/book";
+  const desk = isDesk(), signedIn = !!Auth.session(), minimal = path === "/book", owner = isOwnerFlow();
   document.body.classList.toggle("desk", desk);
   const head = document.getElementById("dhead"), foot = document.getElementById("dfoot");
   head.hidden = foot.hidden = !desk;
   if (!desk) return;
+  if (owner) { head.innerHTML = foot.innerHTML = ""; head.hidden = foot.hidden = true; return; }
   const legal = `<div class="df-legal"><a href="../legal.html">Legal</a><a href="../privacy.html">Privacy</a><a href="../support.html">Support</a><span>© 2026 Ngassa Holdings LLC, doing business as Early Bird</span></div>`;
   if (minimal) {
     head.innerHTML = ""; head.hidden = true; // the booking page is a sheet, like the app: no header
@@ -366,8 +367,11 @@ const SUPPORT = "support@eatearlybird.com";
 const isPartner = (v) => v?.is_partner === true;
 const npNote = (v) => (isPartner(v) ? "" : `<div class="npnote">${ic("info")}<span><b>Not an Early Bird partner yet</b> · If they don't honour 50% off, your fee comes back. <a href="../terms.html#6-the-discount-and-the-rules-for-it" target="_blank" rel="noopener">How it works</a></span></div>`);
 const legalLinks = `<div class="legal"><a href="../legal.html">Legal</a><a href="../privacy.html">Privacy</a><a href="../support.html">Support</a></div>`;
+const ownerBrand = `<a class="owner-brand" href="#/biz" aria-label="Early Bird for restaurants"><img src="../img/bird-mark-gradient.png?v=20261122" alt="" width="38" height="32"><span>Early Bird</span></a>`;
+const isOwnerFlow = () => { const { path, q } = parseHash(); return path.startsWith("/biz") || (path === "/signin" && String(q.next || "").startsWith("#/biz")); };
 const topbar = (right = "") => `<div class="wash"><div class="col"><div class="topbar${right ? "" : " empty"}">${right}</div></div></div>`;
 const showPage = (inner, { wash = true, right = "", size = "" } = {}) => {
+  if (isOwnerFlow()) { APP.innerHTML = `<div class="col ${size || ""} owner-shell">${ownerBrand}<div class="owner-content">${inner}</div>${legalLinks}</div>`; return; }
   if (isDesk()) { APP.innerHTML = `<div class="col ${size || (Auth.session() ? "" : "narrow")}">${inner}</div>`; return; }
   APP.innerHTML = (wash ? topbar(right) : "") + `<div class="col">${inner}${legalLinks}</div>`;
 };
@@ -428,10 +432,11 @@ async function viewInvite(raw) {
 async function route() {
   if (view.cleanup) { try { await view.cleanup(); } catch { /* ignore */ } view = { cleanup: null }; }
   const { path, q } = parseHash();
+  document.body.classList.toggle("owner-flow", isOwnerFlow());
   window.scrollTo(0, 0);
   drawTabs(path);
   drawChrome(path);
-  termsNotice();
+  if (isOwnerFlow()) document.getElementById("tnote")?.remove(); else termsNotice();
   APP.innerHTML = '<div class="col"><p class="loading">Loading…</p></div>';
   try {
     // Visitors can browse, open restaurant pages and fill in the booking form without an account (owner, 22 Nov 2026:

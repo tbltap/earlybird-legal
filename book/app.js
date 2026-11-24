@@ -1444,6 +1444,11 @@ async function viewCheckout(q) {
   let resumed = false;
   try { const dr = JSON.parse(sstore.get(DRAFT) || "null"); if (dr && dr.key === draftKey && !guest) { Object.assign(C.details, dr.details, { name: dr.details.name || C.details.name, phone: dr.details.phone || C.details.phone }); resumed = true; } } catch { /* ignore */ }
   if (!guest) sstore.set(DRAFT, null);
+  // "Email me Early Bird news and offers" (0298; owner, 24 Nov 2026: ticked, and you can untick it). Asked only of someone
+  // who has never answered: a signed-in diner with any earlier answer (here, in Settings or at sign-up) isn't asked again.
+  // news: true/false = the box's state, undefined = no box (nothing is sent).
+  if (C.details.news === undefined) C.details.news = true;
+  if (!guest) { try { const ec = await rpc("email_consent", {}); if (!ec || ec.source) C.details.news = undefined; } catch { C.details.news = undefined; } }
   const unmount = () => { try { C.paymentEl?.destroy(); C.expressEl?.destroy(); } catch { /* ignore */ } C.paymentEl = C.expressEl = null; };
   view.cleanup = () => { clearInterval(C.timer); unmount(); if (C.hold && !C.intent && !C.done) rpc("release_hold", { p_device: deviceId, p_claim: C.hold.booking_id }).catch(() => {}); };
 
@@ -1534,6 +1539,7 @@ async function viewCheckout(q) {
         <label><input type="radio" name="c-fv" value="false" ${d.firstVisit === false ? "checked" : ""}><span>Been before</span></label></fieldset>
       <label class="check small"><input type="checkbox" id="c-sh" ${d.share ? "checked" : ""}><span>Share my name, mobile number and email with ${esc(v.name)}, so they can contact me about my bookings</span></label>
       <label class="check small"><input type="checkbox" id="c-mk" ${d.marketing ? "checked" : ""}><span>Let ${esc(v.name)} send me offers through Early Bird</span></label>
+      ${d.news !== undefined ? `<label class="check small"><input type="checkbox" id="c-nw" ${d.news ? "checked" : ""}><span>Email me Early Bird news and offers</span></label>` : ""}
       <div class="paybar"><div class="paysum"><b>${money(due())}</b><span>${guest && payNeeded() ? "to pay after sign-in" : payNeeded() ? "to pay now" : due() === 0 && h.credit_cents > 0 ? (h.promo_cents >= h.credit_cents ? "free booking fee" : "covered by credit") : "nothing to pay"}</span></div><button class="btn" id="c-go" type="button">${goLabel()}</button></div>
       ${testBadge(C.intent?.mode || h.stripe_mode)}`;
   }
@@ -1552,6 +1558,7 @@ async function viewCheckout(q) {
     d.name = val("c-name"); d.phone = val("c-phone"); d.request = val("c-req"); d.allergies = val("c-all");
     d.dietary = [...document.querySelectorAll('input[name="c-diet"]:checked')].map((x) => x.value);
     d.share = !!document.getElementById("c-sh")?.checked; d.marketing = !!document.getElementById("c-mk")?.checked; d.accepted = !!document.getElementById("c-ok")?.checked;
+    if (document.getElementById("c-nw")) d.news = document.getElementById("c-nw").checked;
     const fv = document.querySelector('input[name="c-fv"]:checked'); d.firstVisit = fv ? fv.value === "true" : null; // optional; tells the restaurant (0200)
     if (document.getElementById("c-ref")) { d.venueRef = val("c-ref"); d.bookedWithVenue = document.getElementById("c-bv").checked; }
   };
@@ -1649,6 +1656,7 @@ async function viewCheckout(q) {
   }
   const confirmParams = (id) => ({ p_device: deviceId, p_claim: id, p_name: C.details.name.trim(), p_phone: C.details.phone, p_request: null, p_external_ref: C.details.venueRef || null, p_share_contact: C.details.share ? true : null, p_marketing: C.details.marketing ? true : null, p_first_visit: C.details.firstVisit ?? null });
   function after(b) {
+    newsConsent(b?.id || hd().booking_id, C.details);
     const n = C.details.name.trim().split(/\s+/);
     rpc("save_profile", { p_first: n[0], p_last: n.slice(1).join(" ") || null, p_phone: C.details.phone }).catch(() => {});
     sstore.set("eb.web.pending", null);
@@ -1667,6 +1675,14 @@ async function viewCheckout(q) {
   draw();
 }
 
+// The booking's answer to "Email me Early Bird news and offers" (0298): sent once when the booking is made, ticked or
+// not (unticked records a no). It never holds up the booking: one quiet retry, then it's left.
+function newsConsent(id, d) {
+  if (!d || d.news === undefined || !id) return;
+  const send = () => rpc("set_email_consent", { p_on: !!d.news, p_source: "booking", p_booking: id });
+  send().catch(() => sleep(2000).then(send)).catch(() => {});
+  d.news = undefined;   // once
+}
 // Ask the server to check the payment with Stripe (it confirms the booking), then save the diner's details.
 async function settleBooking(id, d) {
   let r = null;
@@ -1706,6 +1722,7 @@ async function viewReturn(q) {
   try {
     if (q.redirect_status === "failed") throw new ApiError("payment_failed", "The payment didn't go through. Please try booking again.");
     const b = await settleBooking(id, d);
+    if (b) newsConsent(b.id || id, d);
     sstore.set("eb.web.pending", null);
     if (b) go("/booking/" + b.id, { new: 1 });
   } catch (e) {
@@ -1805,6 +1822,24 @@ function downloadIcs(b) {
 }
 
 /* ───────────────────────────── profile ───────────────────────────── */
+// "Email me Early Bird news and offers" (0298), the Settings switch: on/off is the diner's latest answer, sent with source
+// "settings". Hidden if the server doesn't answer.
+function drawNewsCard() {
+  const card = document.getElementById("news-card"); if (!card) return;
+  rpc("email_consent", {}).then((ec) => {
+    if (!ec) return;
+    card.innerHTML = `<div class="title">Emails</div><label class="check"><input type="checkbox" id="news-sw" ${ec.on ? "checked" : ""}><span>Email me Early Bird news and offers</span></label>
+      ${ec.has_email ? "" : '<p class="small muted" style="margin:6px 0 0">Add your email to get them.</p>'}`;
+    card.hidden = false;
+    const sw = document.getElementById("news-sw");
+    sw.onchange = async () => {
+      sw.disabled = true;
+      try { const r = await rpc("set_email_consent", { p_on: sw.checked, p_source: "settings" }); sw.checked = !!r?.on; toast(sw.checked ? "You'll get Early Bird news and offers by email." : "No more Early Bird news and offers by email."); }
+      catch (e) { sw.checked = !sw.checked; toast(friendly(e)); }
+      sw.disabled = false;
+    };
+  }).catch(() => {});
+}
 // What every restaurant you book sees on the booking step (0299): saved diet, allergies and considerations. Edit or clear
 // here (set_booking_defaults: each key sent replaces what's saved; empty clears it; `note` works before and after 0310).
 function drawPrefsCard() {
@@ -1854,10 +1889,12 @@ async function viewAccount() {
       ${(cr.credits || []).length ? `<div class="title" style="font-size:16px;margin:14px 0 4px">Expiring soonest</div>${cr.credits.slice(0, 6).map((c) => `<div class="item"><div><span>${esc(c.title)}</span><div class="d">${c.pending ? "Pending" : c.expires_at ? "Use by " + esc(fmtStamp(c.expires_at)) : ""}</div></div><div class="p">${money(c.cents)}</div></div>`).join("")}` : ""}</div>
     ${passCard}${codeCard}
     <div class="card" id="prefs-card" hidden></div>
+    <div class="card" id="news-card" hidden></div>
     <a class="card airow" href="#/account/ai"><span class="ai-ic">${ic("bird")}</span><span><b>AI bookings</b><small id="ai-state">Book from Claude or ChatGPT</small></span>${ic("arrow")}</a>
     <div class="actions"><a class="btn pale" href="#/bookings">Bookings</a><button class="btn grey" id="so" type="button">Sign out</button></div>
     <p class="center small muted" style="margin-top:20px"><a href="../account-deletion.html" style="color:inherit">Delete my account</a></p>`);
   document.getElementById("so").onclick = async () => { await Auth.signOut(); navigate("#/"); };
+  drawNewsCard();
   drawPrefsCard();
   rpc("ai_booking_status").then((a) => { const el = document.getElementById("ai-state"); if (el && a) el.textContent = a.enabled ? `On · ${a.card ? `${cap(a.card.brand || "card")} •• ${a.card.last4}` : "no card"}` : "Off"; }).catch(() => {});
   document.getElementById("codef").onsubmit = async (e) => {

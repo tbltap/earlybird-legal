@@ -644,8 +644,15 @@ const foodShots = (v) => {
 };
 // "Spicy Rigatoni · $24" (owner, 23 Nov 2026: "where is the name of the item and price?"); nothing when the dish is unknown.
 const dishCap = (f, cls) => (f && f.name ? `<span class="${cls}"><span>${esc(f.name)}</span>${f.price ? `<b>${m0(f.price)}</b>` : ""}</span>` : "");
-const foodPhoto = (v) => foodShots(v)[0]?.url || cardPhoto(v);
-const pvPhoto = (v) => { const f = foodShots(v)[0]; const u = f?.url || cardPhoto(v); return u ? `<img src="${esc(u)}" alt="" loading="lazy" onerror="this.remove()">${dishCap(f, "dcap")}` : ""; };
+// List card for a restaurant with no deal (owner, 23 Nov 2026: "the place photos then items also as secondaries"): the
+// place's own photo first (the mosaic's best venue shot, as the app), then its dishes as a row of small photos with name
+// and price. With no place photo, the first dish takes the big slot (captioned on the photo).
+const placePhoto = (v) => (v.mosaic || []).find((m) => m && m.url && m.kind !== "food")?.url || v.photo || "";
+const pvHero = (v) => { const p = placePhoto(v); if (p) return { url: p }; return foodShots(v)[0] || (cardPhoto(v) ? { url: cardPhoto(v) } : null); };
+const foodPhoto = (v) => pvHero(v)?.url || "";
+const pvPhoto = (v) => { const h = pvHero(v); return h ? `<img src="${esc(h.url)}" alt="" loading="lazy" onerror="this.remove()">${dishCap(h.name ? h : null, "dcap")}` : ""; };
+const pvFoods = (v, n) => { const h = pvHero(v)?.url, f = foodShots(v).filter((x) => x.url !== h).slice(0, n);
+  return f.length ? `<div class="pvfoods">${f.map((x) => `<figure class="fdish"><img src="${esc(x.url)}" alt="${esc(x.name || "")}" loading="lazy" onerror="this.parentNode.remove()">${dishCap(x, "fcap")}</figure>`).join("")}</div>` : ""; };
 document.addEventListener("click", async (e) => {
   const b = e.target.closest && e.target.closest("[data-notify]"); if (!b) return;
   e.preventDefault(); e.stopPropagation();
@@ -677,7 +684,7 @@ function resultHtml(v) {
     }).join("");
   }
   if (isPreview(v)) return `<article class="res pv">${foodPhoto(v) ? `<a class="pvph" href="${href}" tabindex="-1">${pvPhoto(v)}</a>` : ""}<a class="head" href="${href}">${foodPhoto(v) ? "" : thumbHtml(v)}<div><div class="nm">${esc(v.name)}</div><div class="meta">${esc(sub)}</div></div></a>
-    ${previewHtml(v)}</article>`;
+    ${pvFoods(v, 6)}${previewHtml(v)}</article>`;
   return `<article class="res"><a class="head" href="${href}">${thumbHtml(v)}<div><div class="nm">${esc(v.name)}</div><div class="meta">${esc(sub)}</div>${v._note ? `<div class="pnote">${esc(v._note)}</div>` : ""}</div></a>
     ${d ? `<div class="chips chiprow"><span class="pill">${ic("card")}${m0(d.fee_per_diner_cents)} booking fee</span>${S.config.reward_per_booking_cents > 0 ? `<span class="pill">${ic("bird")}+${m0(S.config.reward_per_booking_cents)} credit</span>` : ""}</div>` : ""}
     ${cols ? `<div class="days">${cols}</div>` : d ? `<p class="muted small" style="padding:12px 18px 0">No ${H.meal} tables listed.</p>` : ""}</article>`;
@@ -994,7 +1001,7 @@ function resultHtmlDesk(v) {
   const where = [distTxt(v) && `<b class="dist">${distTxt(v)}</b>`, v.area && `${ic("pin")}${esc(v.area)}`, cuisineText(v) && `${ic("fork")}${esc(cuisineText(v))}`, priceTxt(v)].filter(Boolean).join("");
   return `<article class="drow"><a class="dthumb" href="${href}">${esc((v.name || "?").charAt(0))}${isPreview(v) ? pvPhoto(v) : cardPhoto(v) ? `<img src="${esc(cardPhoto(v))}" alt="" loading="lazy" onerror="this.remove()">` : ""}${v.rating >= 4.7 && v.review_count >= 20 ? '<span class="ribbon">Top rated</span>' : ""}</a>
     <div class="dbody"><div class="dtop"><a class="dname" href="${href}">${esc(v.name)} <span aria-hidden="true">›</span></a>${v.rating != null ? `<span class="drate">${Number(v.rating).toFixed(1)} ${stars5(v.rating)} <span class="muted">(${v.review_count})</span></span>` : isPreview(v) ? "" : '<span class="drate muted">New on Early Bird</span>'}</div>
-      <div class="dwhere">${where}</div>${isPreview(v) ? previewHtml(v) + "</div></article>" : `${v._note ? `<div class="pnote">${esc(v._note)}</div>` : ""}
+      <div class="dwhere">${where}</div>${isPreview(v) ? pvFoods(v, 4) + previewHtml(v) + "</div></article>" : `${v._note ? `<div class="pnote">${esc(v._note)}</div>` : ""}
       ${d ? `<div class="dfacts"><span>${ic("card")}${m0(d.fee_per_diner_cents)} booking fee per diner</span>${S.config.reward_per_booking_cents > 0 ? `<span>${ic("bird")}+${m0(S.config.reward_per_booking_cents)} ${esc(CREDIT)}</span>` : ""}</div>` : ""}
       ${cols ? `<div class="ddays">${cols}</div>` : d ? `<p class="muted small">No ${H.meal} tables in these days.</p>` : ""}</div></article>`}`;
 }

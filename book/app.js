@@ -142,15 +142,15 @@ const Auth = {
     return j;
   },
   // Phone sign-in: same two calls as the app (Auth.swift): text a code, then check it. The account is made the first time.
-  async sendPhoneCode(phone) { await this.call("otp", { phone, create_user: true, channel: "sms" }); },
-  async verifyPhoneCode(phone, code) { const j = await this.call("verify", { type: "sms", phone, token: code }); if (!j.access_token) throw new ApiError("otp_expired", "That code is wrong or has expired."); this.save(j); return j; },
+  async sendPhoneCode(phone) { await this.call("otp", { phone, create_user: true, channel: "sms" }); funnel("code_sent"); },
+  async verifyPhoneCode(phone, code) { const j = await this.call("verify", { type: "sms", phone, token: code }); if (!j.access_token) throw new ApiError("otp_expired", "That code is wrong or has expired."); this.save(j); funnel("code_ok", null, { method: "phone" }); return j; },
   // The signed-in user's own sign-in details (email, phone, a pending new email).
   async user() { const t = await this.token(); if (!t) return null; const res = await fetch(`${CFG.url}/auth/v1/user`, { headers: { apikey: CFG.key, Authorization: `Bearer ${t}` } }); return res.ok ? res.json() : null; },
   // Add the other sign-in method to this account (Supabase Auth "update user"): the account stays the same person.
   async addEmail(email, password) { return this.call("user" + redirectQuery(), { email: email.toLowerCase(), password }, { method: "PUT", token: await this.token() }); },
   async addPhone(phone) { return this.call("user", { phone }, { method: "PUT", token: await this.token() }); },
   async confirmPhoneChange(phone, code) { const j = await this.call("verify", { type: "phone_change", phone, token: code }); if (j.access_token) this.save(j); return j; },
-  async signIn(email, password) { const j = await this.call("token?grant_type=password", { email: email.toLowerCase(), password }); this.save(j); return j; },
+  async signIn(email, password) { const j = await this.call("token?grant_type=password", { email: email.toLowerCase(), password }); this.save(j); funnel("email_login", null, { method: "email" }); return j; },
   async signUp(email, password, first, last) {
     const j = await this.call("signup" + redirectQuery(), { email: email.toLowerCase(), password, data: { first_name: first, last_name: last } });
     if (!j.access_token) throw new ApiError("confirm_email", "Check your email to confirm your account, then sign in.");
@@ -195,6 +195,13 @@ function authMessage(j, status) {
 }
 
 /* ───────────────────────────── API (always with the diner's token) ───────────────────────────── */
+// The booking funnel (0316): one step per screen a person reaches (restaurant page, time picked, sign-in shown, code
+// sent / accepted, email sign-in, details, pay), with one random id for this visit so signed-out and signed-in steps join
+// up. The server adds hold and booked itself, and the visit's ?src= tag. Fire and forget: it never holds anything up.
+const FUNNEL_SESSION = (() => { try { let s = sessionStorage.getItem("eb.web.fsess"); if (!s) { s = Math.random().toString(36).slice(2, 12) + Date.now().toString(36); sessionStorage.setItem("eb.web.fsess", s); } return s; } catch { return null; } })();
+function funnel(step, venue = null, props = {}) {
+  try { rpc("funnel", { p_device: deviceId, p_step: step, p_venue: venue || null, p_props: { ...(FUNNEL_SESSION ? { session: FUNNEL_SESSION } : {}), ...props } }).catch(() => {}); } catch { /* never mind */ }
+}
 async function rpc(fn, params = {}) {
   const token = await Auth.token(); // visitors (not signed in) browse with the publishable key
   const res = await fetch(`${CFG.url}/rest/v1/rpc/${fn}`, {
@@ -1038,6 +1045,7 @@ async function viewVenue(slug, q) {
     return;
   }
   const v = page.venue, deal = v.deal;
+  funnel("venue_view", v.id);
   setTitle(isPreview(v) ? `${v.name}${v.area ? " in " + v.area : ""}` : `${v.name}: ${deal?.discount || 50}% off food${v.area ? " in " + v.area : ""}`);   // the title search shows (owner, 22 Nov 2026); no discount on a restaurant with no active deal
   if (isDesk()) return viewVenueDesk(v, q);
   const meals = deal?.meals?.length ? deal.meals : ["dinner"];
@@ -1289,6 +1297,7 @@ function bindCodeBoxes(onFull) {
 
 async function viewSignIn(q) {
   setTitle("Sign in");
+  funnel("signin_shown");
   const next = q.next || "#/";
   const toLinked = /^#\/(r|book|booking)\b/.test(next);
   const done = async () => {
@@ -1434,6 +1443,7 @@ async function viewCheckout(q) {
   const payNeeded = () => hd().payment_mode === "stripe" && hd().amount_due_cents > 0;
   const prepPayment = async () => { C.intent = payNeeded() && !guest ? await pay("intent", { claim_id: hd().booking_id }) : null; };
   if (isPreview(v)) return out(ERR.not_yet_bookable, { code: "not_yet_bookable" });   // don't even try to hold
+  funnel("time_picked", v.id);
   try { await makeHold(); await prepPayment(); } catch (e) { if (e.code === "not_signed_in") throw e; return out(friendly(e), e); }
   C.details = { name: [profile.first_name, profile.last_name].filter(Boolean).join(" ").replace(/^Early Bird diner$/, ""), phone: profile.phone || "", request: "", dietary: [], allergies: "", share: true, marketing: false, accepted: false, venueRef: "", bookedWithVenue: false, firstVisit: null };
   // Saved considerations, diet and allergies follow the diner (0299; owner + legal, 24 Nov 2026): the hold's details_prefill
@@ -1557,8 +1567,10 @@ async function viewCheckout(q) {
       ${testBadge(C.intent?.mode || h.stripe_mode)}`;
   }
 
+  let funnelDetails = false;
   function draw(msg) {
     unmount();
+    if (!funnelDetails) { funnelDetails = true; funnel("details", v.id, { booking_id: hd().booking_id }); }
     const body = formHtml(msg);
     if (isDesk()) showPage(`<div id="co"><div class="cotop"><a href="#/r/${esc(v.slug)}">‹ Back to ${esc(v.name)}</a></div><h1 class="cohead">Finalise your booking</h1><div class="cogrid"><div class="coleft">${body}</div>${summaryDesk()}</div></div>`, { size: "wide" });
     else showPage(`<div id="co">${summaryMobile()}${body}</div>`, { wash: false });
@@ -1621,10 +1633,12 @@ async function viewCheckout(q) {
       <p class="small" style="margin:8px 0 0"><button class="linklike" type="button" id="si-forgot">Forgot password?</button> · <button class="linklike" type="button" id="si-phone">Use a text code instead</button></p></section>`;
     return `<div id="si" class="small muted" style="margin:6px 0 0">${m}Continue texts a code to your phone number to sign you in. New here? An account is made for you. <button class="linklike" type="button" id="si-email">Use email instead</button></div>`;
   }
-  let siTick = null;
+  let siTick = null, funnelSignin = false;
+  // the sign-in step in the sheet (0316 funnel): counted once, when a visitor first moves on to it
+  const signinShown = () => { if (!funnelSignin) { funnelSignin = true; funnel("signin_shown", v.id, { booking_id: hd().booking_id }); } };
   function bindSignIn() {
     const si = C.si;
-    const em = document.getElementById("si-email"); if (em) em.onclick = () => { capture(); si.phase = "email"; si.msg = ""; draw(); document.getElementById("si-em")?.focus(); };
+    const em = document.getElementById("si-email"); if (em) em.onclick = () => { signinShown(); capture(); si.phase = "email"; si.msg = ""; draw(); document.getElementById("si-em")?.focus(); };
     const ph = document.getElementById("si-phone"); if (ph) ph.onclick = () => { capture(); si.phase = "phone"; si.msg = ""; draw(); };
     const ch = document.getElementById("si-change"); if (ch) ch.onclick = () => { capture(); si.phase = "phone"; si.msg = ""; si.resendAt = 0; draw(); document.getElementById("c-phone")?.focus(); };
     const fg = document.getElementById("si-forgot"); if (fg) fg.onclick = async () => {
@@ -1644,6 +1658,7 @@ async function viewCheckout(q) {
   const LIMIT_RE = /today's \d+ text codes|daily limit|text codes for this number/i;
   async function sendCode(again = false) {
     const si = C.si, num = normalisePhone(C.details.phone);
+    signinShown();
     if (!num) return showErr("c-phone", "That doesn't look like a mobile number. Use 10 digits, or + and your country code.");
     const btn = document.getElementById("c-go"); btn.disabled = true; btn.textContent = "Sending…";
     try { await Auth.sendPhoneCode(num); si.e164 = num; si.phase = "code"; si.resendAt = Date.now() + 30000; si.msg = again ? "We sent a new code." : ""; si.kind = "ok"; }
@@ -1707,6 +1722,7 @@ async function viewCheckout(q) {
   const returnUrl = () => `${location.origin}${location.pathname}?pay=${hd().booking_id}`;
   function mountPayment() {
     const info = C.intent;
+    funnel("pay", v.id, { booking_id: hd().booking_id });
     C.cardComplete = false;
     C.stripe = C.stripe && C.stripeKey === info.publishable_key ? C.stripe : Stripe(info.publishable_key); C.stripeKey = info.publishable_key;
     const elements = (C.elements = C.stripe.elements({ clientSecret: info.client_secret, appearance: { theme: "stripe", variables: { colorPrimary: "#34548A", colorText: "#14171F", colorDanger: "#C8402F", fontFamily: "-apple-system, BlinkMacSystemFont, system-ui, sans-serif", borderRadius: "12px", fontSizeBase: "16px", spacingUnit: "4px" } } }));

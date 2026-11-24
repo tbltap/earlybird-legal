@@ -1938,6 +1938,7 @@ async function viewGuestBooking(q) {
       <div class="card"><b style="font-size:19px">${esc(v.name || "")}</b><div class="muted">${when} · ${b.diners} ${b.diners === 1 ? "diner" : "diners"}</div>
         ${b.code ? `<div class="balance" style="margin-top:10px">${esc(b.code)}</div><div class="small muted">Show this code when you order.</div>` : ""}
         <div class="small" style="margin-top:8px">${statusPill(b)}</div></div>
+      ${b.status === "confirmed" ? `<div class="card"><div class="title" role="heading" aria-level="2">Share with your guests</div><p class="small muted" style="margin:4px 0 10px">Sends the restaurant, time, party, address, a map and the restaurant page. It doesn't include your manage link.</p><button class="btn pale" id="g-share" type="button">${ic("share")}&nbsp; Share</button></div>` : ""}
       <div class="card"><div class="title">Manage this booking</div>
         <p class="small" style="margin:4px 0 6px;word-break:break-all"><a href="${esc(link)}">${esc(link)}</a></p>
         <p class="small muted" style="margin:0 0 10px">This is your private link to manage this booking. Anyone who has it can see and cancel the booking, so don't share it.</p>
@@ -1952,7 +1953,20 @@ async function viewGuestBooking(q) {
       st.step = "offer"; st.msg = "You're signed in, but this number isn't the one on the booking, so it stays here."; st.kind = "info"; draw();
     } catch (e) { st.step = "offer"; st.msg = friendly(e); st.kind = "err"; draw(); }
   };
+  const shareText = () => {
+    const site = CFG.siteUrl || location.origin, addr = v.address || "";
+    return [`Early Bird booking: ${v.name || ""}`, `${time12(b.time)}, ${fmtDate(b.date, { weekday: "long", month: "long", day: "numeric" })}`,
+      `${b.diners} ${b.diners === 1 ? "diner" : "diners"}`, addr,
+      addr ? `Map: https://www.google.com/maps/search/?api=1&query=${encodeURIComponent((v.name || "") + " " + addr)}` : "",
+      v.slug ? `${site}/v/${v.slug}` : ""].filter(Boolean).join("\n");
+  };
   const bindAll = () => {
+    const sh = document.getElementById("g-share");
+    if (sh) sh.onclick = async () => {
+      const text = shareText();
+      if (navigator.share) { try { await navigator.share({ title: `Booking at ${v.name || "the restaurant"}`, text }); return; } catch (e) { if (e && e.name === "AbortError") return; } }
+      try { await navigator.clipboard.writeText(text); toast("Copied. Paste it to your guests."); } catch { prompt("Copy this for your guests:", text); }
+    };
     const c = document.getElementById("g-cancel");
     if (c) c.onclick = async () => {
       if (!confirm("Cancel this booking?")) return;
